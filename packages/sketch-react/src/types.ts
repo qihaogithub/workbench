@@ -28,6 +28,15 @@ export type SketchEditorMode = "edit" | "preview";
 
 export type SketchBrushToolbarMode = "individual" | "grouped";
 
+/** Viewport in the fixed page coordinate system used by the shared canvas. */
+export interface SketchEditorViewport {
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+export type SketchViewportChangeReason = "fit" | "interaction";
+
 export type SketchEditorProfileName = "whiteboard";
 
 export interface SketchEditorProfileConfig {
@@ -107,10 +116,18 @@ export interface SketchEditorSurfaceProps {
   allowedTools?: readonly SketchTool[];
   /** Controls whether pencil and eraser are presented as one grouped toolbar entry. */
   brushToolbarMode?: SketchBrushToolbarMode;
+  /** Optional initial viewport; omitted when the canvas should use its default view. */
+  initialViewport?: SketchEditorViewport;
+  /** Fits the page or visible scene content after the first measurable layout. */
+  autoFitToContent?: boolean;
   fillContainer?: boolean;
   className?: string;
   onSceneChange?: (scene: SketchSceneDocument) => void;
   onSelectionChange?: (selection: SketchEditorSelection) => void;
+  onViewportChange?: (
+    viewport: SketchEditorViewport,
+    reason: SketchViewportChangeReason,
+  ) => void;
 }
 
 export interface InlineTextSelectionState {
@@ -149,8 +166,14 @@ export interface SketchEditorPartProps {
 export interface SketchEditorCanvasProps extends SketchEditorPartProps {
   configData?: Record<string, unknown>;
   previewSize?: PreviewSize;
+  initialViewport?: SketchEditorViewport;
+  autoFitToContent?: boolean;
   fillContainer?: boolean;
   mode?: SketchEditorMode;
+  onViewportChange?: (
+    viewport: SketchEditorViewport,
+    reason: SketchViewportChangeReason,
+  ) => void;
 }
 
 export interface SketchEditorCanvasHandle {

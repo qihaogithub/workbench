@@ -1,13 +1,11 @@
 import { Crepe, type CrepeConfig } from "@milkdown/crepe";
+import type { Ctx } from "@milkdown/kit/ctx";
 import type {
   ConfigReferenceCandidate,
   DocumentUploadHandler,
 } from "../DocumentEditor";
-import { HEADING_STYLE_OPTIONS } from "./heading-style-toolbar";
-
-const videoIcon = '<span aria-hidden="true">▶</span>';
-const attachmentIcon = '<span aria-hidden="true">⌕</span>';
-const referenceIcon = '<span aria-hidden="true">@</span>';
+import { PRIMARY_HEADING_STYLE_OPTIONS } from "./heading-style-toolbar";
+import { documentHeadingMenuApi } from "./document-heading-menu";
 
 export interface CrepeProjectActions {
   uploadImage: (file: File) => Promise<string>;
@@ -21,9 +19,6 @@ export interface CrepeProjectActions {
 interface BuildCrepeConfigOptions {
   placeholder: string;
   actions: CrepeProjectActions;
-  enableUploads?: boolean;
-  referenceCandidates?: ConfigReferenceCandidate[];
-  enableProjectReferences?: boolean;
   /** 是否显示固定顶部格式工具栏；选区浮动工具栏由 Toolbar 特性独立控制。 */
   showTopBar?: boolean;
 }
@@ -31,9 +26,6 @@ interface BuildCrepeConfigOptions {
 export function buildCrepeConfig({
   placeholder,
   actions,
-  enableUploads = false,
-  referenceCandidates = [],
-  enableProjectReferences = false,
   showTopBar = true,
 }: BuildCrepeConfigOptions): Pick<CrepeConfig, "features" | "featureConfigs"> {
   return {
@@ -42,9 +34,9 @@ export function buildCrepeConfig({
       [Crepe.Feature.ListItem]: true,
       [Crepe.Feature.LinkTooltip]: true,
       [Crepe.Feature.ImageBlock]: true,
-      [Crepe.Feature.BlockEdit]: true,
+      [Crepe.Feature.BlockEdit]: false,
       [Crepe.Feature.Placeholder]: true,
-      [Crepe.Feature.Toolbar]: true,
+      [Crepe.Feature.Toolbar]: false,
       [Crepe.Feature.CodeMirror]: true,
       [Crepe.Feature.Table]: true,
       [Crepe.Feature.Latex]: false,
@@ -65,70 +57,16 @@ export function buildCrepeConfig({
         inlineUploadPlaceholderText: "或粘贴图片地址",
       },
       [Crepe.Feature.TopBar]: {
-        headingOptions: HEADING_STYLE_OPTIONS,
-      },
-      [Crepe.Feature.BlockEdit]: {
-        textGroup: {
-          label: "文本",
-          text: { label: "正文" },
-          h1: { label: "H1" },
-          h2: { label: "H2" },
-          h3: { label: "H3" },
-          h4: { label: "H4" },
-          h5: { label: "H5" },
-          h6: { label: "H6" },
-          quote: { label: "引用" },
-          divider: { label: "分隔线" },
-        },
-        listGroup: {
-          label: "列表",
-          bulletList: { label: "无序列表" },
-          orderedList: { label: "有序列表" },
-          taskList: { label: "任务列表" },
-        },
-        advancedGroup: {
-          label: "插入",
-          image: { label: "图片" },
-          codeBlock: { label: "代码块" },
-          table: { label: "表格" },
-          math: null,
-        },
-        buildMenu(builder) {
-          if (referenceCandidates.length > 0) {
-            const group = builder.addGroup("project-references", "引用配置项");
-            referenceCandidates.forEach((candidate) => {
-              group.addItem(`reference-${candidate.key}`, {
-                label: candidate.label,
-                icon: referenceIcon,
-                onRun: () => actions.insertReference(candidate),
-              });
+        headingOptions: PRIMARY_HEADING_STYLE_OPTIONS,
+        buildTopBar(builder) {
+          builder
+            .getGroup("heading")
+            .clear()
+            .addItem("document-heading", {
+              icon: "<span data-document-heading-trigger>正文 ▾</span>",
+              active: () => false,
+              onRun: (ctx: Ctx) => ctx.get(documentHeadingMenuApi.key).toggle(),
             });
-          }
-
-          if (enableProjectReferences && actions.openProjectReference) {
-            builder
-              .addGroup("entity-references", "插入项目引用")
-              .addItem("insert-project-reference", {
-                label: "选择项目 / 页面 / 文档",
-                icon: referenceIcon,
-                onRun: actions.openProjectReference,
-              });
-          }
-
-          if (enableUploads) {
-            builder
-              .addGroup("project-uploads", "上传")
-              .addItem("upload-video", {
-                label: "上传视频",
-                icon: videoIcon,
-                onRun: actions.uploadVideo,
-              })
-              .addItem("upload-file", {
-                label: "上传附件",
-                icon: attachmentIcon,
-                onRun: actions.uploadFile,
-              });
-          }
         },
       },
     },

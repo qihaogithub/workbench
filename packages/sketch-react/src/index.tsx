@@ -20,7 +20,6 @@ import {
   ArrowUpToLine,
   ArrowRight,
   Bold,
-  Check,
   ChevronDown,
   ChevronRight,
   Circle,
@@ -103,6 +102,8 @@ import type {
   SketchEditorCanvasProps,
   SketchEditorCanvasHandle,
   SketchBrushSettings,
+  SketchEditorViewport,
+  SketchViewportChangeReason,
   SketchPropertyPanelProps,
   SketchEditorToolbarProps,
   SketchLayerPanelProps,
@@ -190,11 +191,11 @@ interface MarqueeState {
   current: { x: number; y: number };
 }
 
-interface SketchCanvasViewport {
-  scale: number;
-  offsetX: number;
-  offsetY: number;
-}
+type SketchCanvasViewport = SketchEditorViewport;
+
+type SketchViewportUpdate =
+  | SketchCanvasViewport
+  | ((current: SketchCanvasViewport) => SketchCanvasViewport);
 
 interface PanState {
   pointer: { x: number; y: number };
@@ -1066,6 +1067,10 @@ function normalizeViewport(viewport: SketchCanvasViewport): SketchCanvasViewport
     offsetX: roundViewportValue(viewport.offsetX),
     offsetY: roundViewportValue(viewport.offsetY),
   };
+}
+
+function viewportKey(viewport: SketchCanvasViewport): string {
+  return `${viewport.scale}:${viewport.offsetX}:${viewport.offsetY}`;
 }
 
 function zoomViewportAt(
@@ -4623,7 +4628,6 @@ function SketchBrushToolbarGroup({
           <div className="h-8 w-px bg-slate-200" aria-hidden="true" />
 
           <div className="flex items-center gap-1" role="radiogroup" aria-label="粗细">
-            <span className="text-[11px] font-semibold text-slate-500">粗细</span>
             {SKETCH_BRUSH_WIDTH_PRESETS.map((preset) => {
               const selected = controller.brushSettings.strokeWidth === preset.value;
               return (
@@ -4640,7 +4644,12 @@ function SketchBrushToolbarGroup({
                   )}
                   onClick={() => controller.setBrushSettings({ strokeWidth: preset.value })}
                 >
-                  {preset.label}
+                  <span
+                    aria-hidden="true"
+                    data-sketch-brush-width-dot={preset.value}
+                    className="rounded-full bg-current"
+                    style={{ width: `${preset.value * 2}px`, height: `${preset.value * 2}px` }}
+                  />
                 </button>
               );
             })}
@@ -6956,13 +6965,34 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
   controller,
   configData = {},
   previewSize,
+  initialViewport,
+  autoFitToContent = false,
   fillContainer = false,
   mode = "edit",
   className,
+  onViewportChange,
 }: SketchEditorCanvasProps, ref) {
   const [dragStart, setDragStart] = React.useState<DragState | null>(null);
   const [marquee, setMarquee] = React.useState<MarqueeState | null>(null);
-  const [viewport, setViewport] = React.useState<SketchCanvasViewport>({ scale: 1, offsetX: 24, offsetY: 24 });
+  const defaultViewport = React.useMemo<SketchCanvasViewport>(
+    () => normalizeViewport(initialViewport ?? { scale: 1, offsetX: 24, offsetY: 24 }),
+    [initialViewport],
+  );
+  const [viewport, setViewport] = React.useState<SketchCanvasViewport>(defaultViewport);
+  const viewportChangeReasonRef = React.useRef<SketchViewportChangeReason>("interaction");
+  const lastReportedViewportRef = React.useRef(
+    viewportKey(defaultViewport),
+  );
+  const autoFitAppliedRef = React.useRef(false);
+  const setViewportWithReason = React.useCallback(
+    (next: SketchViewportUpdate, reason: SketchViewportChangeReason = "interaction") => {
+      viewportChangeReasonRef.current = reason;
+      setViewport((current) => normalizeViewport(
+        typeof next === "function" ? next(current) : next,
+      ));
+    },
+    [],
+  );
   const [isSpacePanning, setIsSpacePanning] = React.useState(false);
   const [drawingDraft, setDrawingDraft] = React.useState<DrawingDraftState | null>(null);
   const [inlineTextEdit, setInlineTextEdit] = React.useState<InlineTextEditState | null>(null);
@@ -7165,6 +7195,34 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
+
+  React.useEffect(() => {
+    const key = viewportKey(viewport);
+    if (lastReportedViewportRef.current === key) return;
+    lastReportedViewportRef.current = key;
+    onViewportChange?.(viewport, viewportChangeReasonRef.current);
+  }, [onViewportChange, viewport]);
+
+  React.useLayoutEffect(() => {
+    if (!autoFitToContent || autoFitAppliedRef.current) return;
+    const container = containerRef.current;
+    if (!container || container.clientWidth <= 0 || container.clientHeight <= 0) return;
+
+    const contentBounds = scene.nodes.length
+      ? getSketchSelectionVisualBounds(scene, scene.nodes, configData)
+      : null;
+    const bounds = contentBounds ?? {
+      x: 0,
+      y: 0,
+      width: scene.pageSize.width,
+      height: scene.pageSize.height,
+    };
+    setViewportWithReason(
+      getCenteredViewportForBounds(bounds, container, contentBounds ? 2.5 : 1),
+      "fit",
+    );
+    autoFitAppliedRef.current = true;
+  }, [autoFitToContent, canvasContainerHeight, canvasContainerWidth, configData, scene, setViewportWithReason]);
 
   React.useLayoutEffect(() => {
     if (!detailsPanelOpen) {
@@ -7401,14 +7459,14 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
   }, [configData, controller, inlineTextEdit, scene.nodes]);
 
   const fitPageToViewport = React.useCallback(() => {
-    setViewport(getCenteredViewportForBounds({ x: 0, y: 0, width: scene.pageSize.width, height: scene.pageSize.height }, containerRef.current, 1));
-  }, [scene.pageSize.height, scene.pageSize.width]);
+    setViewportWithReason(getCenteredViewportForBounds({ x: 0, y: 0, width: scene.pageSize.width, height: scene.pageSize.height }, containerRef.current, 1));
+  }, [scene.pageSize.height, scene.pageSize.width, setViewportWithReason]);
 
   const zoomToSelection = React.useCallback(() => {
     const bounds = canvasSelectionBounds;
     if (!bounds) return fitPageToViewport();
-    setViewport(getCenteredViewportForBounds(bounds, containerRef.current, 3));
-  }, [canvasSelectionBounds, fitPageToViewport]);
+    setViewportWithReason(getCenteredViewportForBounds(bounds, containerRef.current, 3));
+  }, [canvasSelectionBounds, fitPageToViewport, setViewportWithReason]);
 
   const zoomViewportBy = React.useCallback((factor: number) => {
     const container = containerRef.current;
@@ -7416,8 +7474,8 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
       x: (container?.clientWidth ?? width) / 2,
       y: (container?.clientHeight ?? height) / 2,
     };
-    setViewport((current) => zoomViewportAt(current, current.scale * factor, anchor));
-  }, [height, width]);
+    setViewportWithReason((current) => zoomViewportAt(current, current.scale * factor, anchor));
+  }, [height, setViewportWithReason, width]);
 
   const actionEntries = React.useMemo(() => buildSketchActionEntries({
     scene,
@@ -8509,11 +8567,11 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
             ? { x: event.clientX - rect.left, y: event.clientY - rect.top }
             : { x: width / 2, y: height / 2 };
           const factor = event.deltaY > 0 ? 0.9 : 1.1;
-          setViewport((current) => zoomViewportAt(current, current.scale * factor, anchor));
+          setViewportWithReason((current) => zoomViewportAt(current, current.scale * factor, anchor));
           return;
         }
         event.preventDefault();
-        setViewport((current) =>
+        setViewportWithReason((current) =>
           normalizeViewport({
             ...current,
             offsetX: current.offsetX - event.deltaX,
@@ -8636,7 +8694,7 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
         const activePanStart = panStartRef.current;
         if (activePanStart) {
           event.preventDefault();
-          setViewport(
+          setViewportWithReason(
             normalizeViewport({
               ...activePanStart.viewport,
               offsetX: activePanStart.viewport.offsetX + event.clientX - activePanStart.pointer.x,
@@ -10522,10 +10580,13 @@ export function SketchEditorSurface({
   profile,
   allowedTools,
   brushToolbarMode = "individual",
+  initialViewport,
+  autoFitToContent = false,
   fillContainer = false,
   className,
   onSceneChange,
   onSelectionChange,
+  onViewportChange,
 }: SketchEditorSurfaceProps) {
   const profileConfig = resolveSketchEditorProfile(profile);
   const resolvedVisibleTools = profileConfig?.visibleTools ?? allowedTools;
@@ -10554,8 +10615,11 @@ export function SketchEditorSurface({
         scene={parsedScene}
         controller={controller}
         configData={configData}
+        initialViewport={initialViewport}
+        autoFitToContent={autoFitToContent}
         fillContainer={fillContainer}
         className="h-full"
+        onViewportChange={onViewportChange}
       />
       <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
         <SketchEditorToolbar
@@ -10586,6 +10650,8 @@ export type {
   SketchEditorCanvasHandle,
   SketchBrushSettings,
   SketchBrushToolbarMode,
+  SketchEditorViewport,
+  SketchViewportChangeReason,
   SketchEditorProfileName,
   SketchEditorProfileConfig,
   SketchPropertyPanelProps,

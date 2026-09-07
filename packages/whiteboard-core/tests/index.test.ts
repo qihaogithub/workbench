@@ -9,6 +9,7 @@ import {
   transitionWhiteboardAsset,
   validateWhiteboardBridgeDocument,
   validateWhiteboardDocument,
+  type WhiteboardDocument,
 } from "../src";
 
 const html = `<main data-sketch-canvas="v1" data-width="400" data-height="300"><div data-sketch-id="box" data-sketch-kind="rect" data-sketch-role="subject"></div><div data-sketch-id="title" data-sketch-kind="text">Hello&#10;world</div></main>`;
@@ -294,6 +295,54 @@ describe("whiteboard-core bridge", () => {
     const document = parseWhiteboardCode(html, css).value!;
     expect(validateWhiteboardBridgeDocument(document).valid).toBe(true);
     expect(validateWhiteboardDocument(document).valid).toBe(true);
+    const canonical = canonicalizeWhiteboardDocument(document);
+    expect(canonical.version).toBe(3);
+    expect(canonical.scene.metadata).toEqual({});
+    expect(canonical.scene.nodes[0]).toMatchObject({ id: "box", type: "rect" });
+  });
+  it("保留手动视口模式并拒绝未知模式", () => {
+    const document = canonicalizeWhiteboardDocument(parseWhiteboardCode(html, css).value!);
+    document.editorView = { mode: "manual", zoom: 0.75, offsetX: 20, offsetY: 30 };
+    expect(validateWhiteboardDocument(document).valid).toBe(true);
+    expect(canonicalizeWhiteboardDocument(document).editorView).toEqual(document.editorView);
+    expect(validateWhiteboardDocument({ ...document, editorView: { ...document.editorView, mode: "unknown" } }).valid).toBe(false);
+  });
+  it("accepts a persisted V3 scene with native path nodes", () => {
+    const document = {
+      id: "native-v3",
+      version: 3,
+      sceneFormat: "sketch-scene-v1",
+      documentRevision: 10,
+      scene: {
+        version: 1,
+        pageSize: { width: 320, height: 240 },
+        nodes: [
+          {
+            id: "path",
+            type: "path",
+            x: 10,
+            y: 20,
+            width: 100,
+            height: 80,
+            zIndex: 0,
+            path: "M 0 0 L 100 80",
+            points: [{ x: 0, y: 0 }, { x: 100, y: 80 }],
+          },
+        ],
+        assets: [],
+        bindings: {},
+        metadata: { source: "whiteboard" },
+      },
+      nodeSemantics: {},
+      editorView: { zoom: 1, offsetX: 0, offsetY: 0 },
+      updatedAt: 1,
+    } as WhiteboardDocument;
+
+    expect(validateWhiteboardDocument(document).valid).toBe(true);
+    const canonical = canonicalizeWhiteboardDocument(document);
+    expect(canonical.scene.metadata).toEqual({ source: "whiteboard" });
+    expect(canonical.scene.nodes[0]).toMatchObject({ type: "path", path: "M 0 0 L 100 80" });
+    expect(validateWhiteboardBridgeDocument(document).diagnostics.map((item) => item.code)).toContain("UNSUPPORTED_NODE");
   });
   it("returns structured diagnostics for unsafe CSS and resources", () => {
     const result = parseWhiteboardCode(

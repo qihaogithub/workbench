@@ -25,7 +25,14 @@ export const BRIDGE_STYLE_FIELDS = [
 ] as const;
 
 export interface WhiteboardNodeSemantics { role?: SemanticRole; assetRef?: string }
-export interface WhiteboardEditorView { zoom: number; offsetX: number; offsetY: number }
+export type WhiteboardEditorViewMode = "fit-content" | "manual";
+export interface WhiteboardEditorView {
+  /** Missing on legacy documents and normalized to fit-content by callers. */
+  mode?: WhiteboardEditorViewMode;
+  zoom: number;
+  offsetX: number;
+  offsetY: number;
+}
 export interface WhiteboardSafeArea { x: number; y: number; width: number; height: number }
 export interface WhiteboardDocumentV2 {
   id: string;
@@ -455,7 +462,10 @@ export function validateWhiteboardNativeDocument(document: unknown): { valid: bo
     diagnostics.push(diag("INVALID_EDITOR_VIEW", "editorView is required"));
   } else {
     for (const key of Object.keys(view)) {
-      if (!["zoom", "offsetX", "offsetY"].includes(key)) diagnostics.push(diag("UNSUPPORTED_EDITOR_VIEW_FIELD", `editorView field ${key} is not part of the native whiteboard document`));
+      if (!["mode", "zoom", "offsetX", "offsetY"].includes(key)) diagnostics.push(diag("UNSUPPORTED_EDITOR_VIEW_FIELD", `editorView field ${key} is not part of the native whiteboard document`));
+    }
+    if (view.mode !== undefined && view.mode !== "fit-content" && view.mode !== "manual") {
+      diagnostics.push(diag("INVALID_EDITOR_VIEW", "editorView mode must be fit-content or manual"));
     }
     if (![view.zoom, view.offsetX, view.offsetY].every((value) => typeof value === "number" && Number.isFinite(value)) || (view.zoom as number) <= 0) {
       diagnostics.push(diag("INVALID_EDITOR_VIEW", "editorView values must be finite and zoom must be positive"));
@@ -464,7 +474,8 @@ export function validateWhiteboardNativeDocument(document: unknown): { valid: bo
   if (typeof d.updatedAt !== "number" || !Number.isFinite(d.updatedAt) || d.updatedAt < 0) {
     diagnostics.push(diag("INVALID_TIMESTAMP", "updatedAt must be a finite non-negative number"));
   }
-  if (!scene || !validateSketchSceneDocument(scene).valid) {
+  const sceneValidation = scene ? validateSketchSceneDocument(scene) : null;
+  if (!sceneValidation?.valid) {
     diagnostics.push(diag("INVALID_SCENE", "scene does not satisfy the Sketch protocol"));
   }
 
@@ -472,7 +483,8 @@ export function validateWhiteboardNativeDocument(document: unknown): { valid: bo
   if (!semantics || typeof semantics !== "object" || Array.isArray(semantics)) {
     diagnostics.push(diag("INVALID_SEMANTICS", "nodeSemantics is required"));
   } else {
-    const nodes = scene?.nodes ?? [];
+    const sceneNodes = scene && Array.isArray(scene.nodes) ? scene.nodes : [];
+    const nodes = sceneNodes.filter((node): node is SketchSceneNode => Boolean(node && typeof node === "object"));
     const nodeIds = new Set(nodes.map((node) => node.id));
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
     for (const [nodeId, value] of Object.entries(semantics)) {
@@ -538,7 +550,8 @@ export function validateWhiteboardBridgeDocument(document: unknown): { valid: bo
   const editorView = d.editorView;
   if (!editorView || typeof editorView !== "object" || Array.isArray(editorView)) diagnostics.push(diag("INVALID_EDITOR_VIEW", "editorView is required"));
   else {
-    for (const key of Object.keys(editorView)) if (!["zoom", "offsetX", "offsetY"].includes(key)) diagnostics.push(diag("UNSUPPORTED_EDITOR_VIEW_FIELD", `editorView field ${key} is not supported`));
+    for (const key of Object.keys(editorView)) if (!["mode", "zoom", "offsetX", "offsetY"].includes(key)) diagnostics.push(diag("UNSUPPORTED_EDITOR_VIEW_FIELD", `editorView field ${key} is not supported`));
+    if (editorView.mode !== undefined && editorView.mode !== "fit-content" && editorView.mode !== "manual") diagnostics.push(diag("INVALID_EDITOR_VIEW", "editorView mode must be fit-content or manual"));
     if (![editorView.zoom, editorView.offsetX, editorView.offsetY].every(Number.isFinite) || editorView.zoom <= 0) diagnostics.push(diag("INVALID_EDITOR_VIEW", "editorView values must be finite and zoom must be positive"));
   }
   if (typeof d.updatedAt !== "number" || !Number.isFinite(d.updatedAt) || d.updatedAt < 0) diagnostics.push(diag("INVALID_TIMESTAMP", "updatedAt must be a finite non-negative number"));
@@ -548,6 +561,9 @@ export function validateWhiteboardBridgeDocument(document: unknown): { valid: bo
   if (scene?.metadata && Object.keys(scene.metadata).length) diagnostics.push(diag("UNSUPPORTED_SCENE_FIELD", "scene metadata is not part of the whiteboard bridge"));
   const ids = new Set<string>();
   const sceneNodes = scene && Array.isArray(scene.nodes) ? scene.nodes : [];
+  const pageSize = scene && scene.pageSize && typeof scene.pageSize === "object" && !Array.isArray(scene.pageSize)
+    ? scene.pageSize
+    : null;
   for (const candidate of sceneNodes) {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
       diagnostics.push(diag("INVALID_NODE", "node must be an object"));
@@ -557,8 +573,8 @@ export function validateWhiteboardBridgeDocument(document: unknown): { valid: bo
     for (const key of Object.keys(node)) if (!allowedNodeKeys.has(key)) diagnostics.push(diag("UNSUPPORTED_NODE_FIELD", `node field ${key} is not supported by the bridge profile`, { nodeId: typeof node.id === "string" ? node.id : undefined }));
     if (!isBridgeNodeType(node.type)) diagnostics.push(diag("UNSUPPORTED_NODE", `node type ${String(node.type)} is not in bridge profile`, { nodeId: node.id }));
     if (!idPattern.test(node.id) || ids.has(node.id)) diagnostics.push(diag(ids.has(node.id) ? "DUPLICATE_NODE_ID" : "MISSING_NODE_ID", "node id must be unique and valid", { nodeId: node.id })); else ids.add(node.id);
-    if (![node.x, node.y, node.width, node.height].every(Number.isFinite) || node.x < 0 || node.y < 0 || node.width <= 0 || node.height <= 0 || (scene && (node.x + node.width > scene.pageSize.width || node.y + node.height > scene.pageSize.height))) diagnostics.push(diag("INVALID_GEOMETRY", "node geometry must be finite and within the page", { nodeId: node.id }));
-    if (node.type === "group" && scene && node.children?.some((child) => !scene.nodes.some((candidate) => candidate.id === child))) diagnostics.push(diag("INVALID_GROUP", "group contains an unknown child", { nodeId: node.id }));
+    if (![node.x, node.y, node.width, node.height].every(Number.isFinite) || node.x < 0 || node.y < 0 || node.width <= 0 || node.height <= 0 || (pageSize && (node.x + node.width > pageSize.width || node.y + node.height > pageSize.height))) diagnostics.push(diag("INVALID_GEOMETRY", "node geometry must be finite and within the page", { nodeId: node.id }));
+    if (node.type === "group" && node.children?.some((child) => !sceneNodes.some((candidate) => Boolean(candidate && typeof candidate === "object" && !Array.isArray(candidate) && (candidate as SketchSceneNode).id === child)))) diagnostics.push(diag("INVALID_GROUP", "group contains an unknown child", { nodeId: node.id }));
     if (node.type === "image" && node.src && !isManagedAssetPath(node.src)) diagnostics.push(diag("UNLOCALIZED_RESOURCE", "image src must reference a localized workspace asset", { nodeId: node.id, suggestion: "Upload or place the image as a managed asset before committing." }));
     if (node.style) {
       for (const [key, value] of Object.entries(node.style)) {
@@ -589,15 +605,24 @@ export function validateWhiteboardBridgeDocument(document: unknown): { valid: bo
     if (!value || typeof value !== "object" || Array.isArray(value)) diagnostics.push(diag("INVALID_SEMANTICS", "node semantics must be an object", { nodeId: id }));
     else {
       const semanticsValue = value as WhiteboardNodeSemantics;
-      if (scene?.nodes.find((node) => node.id === id)?.type === "group" && (semanticsValue.role !== undefined || semanticsValue.assetRef !== undefined)) diagnostics.push(diag("INVALID_GROUP_SEMANTICS", "group nodes cannot carry role or assetRef", { nodeId: id }));
+      if (sceneNodes.find((node) => node?.id === id)?.type === "group" && (semanticsValue.role !== undefined || semanticsValue.assetRef !== undefined)) diagnostics.push(diag("INVALID_GROUP_SEMANTICS", "group nodes cannot carry role or assetRef", { nodeId: id }));
       if (semanticsValue.role !== undefined && !roleSet.has(semanticsValue.role)) diagnostics.push(diag("INVALID_ROLE", "unsupported semantic role", { nodeId: id }));
-      if (semanticsValue.assetRef !== undefined && (!assetIdPattern.test(semanticsValue.assetRef) || scene?.nodes.find((node) => node.id === id)?.type !== "image")) diagnostics.push(diag("INVALID_ASSET_REF", "assetRef must be a managed id attached to an image node", { nodeId: id }));
+      if (semanticsValue.assetRef !== undefined && (!assetIdPattern.test(semanticsValue.assetRef) || sceneNodes.find((node) => node?.id === id)?.type !== "image")) diagnostics.push(diag("INVALID_ASSET_REF", "assetRef must be a managed id attached to an image node", { nodeId: id }));
       if (Object.keys(semanticsValue).some((key) => key !== "role" && key !== "assetRef")) diagnostics.push(diag("UNSUPPORTED_SEMANTICS", "unknown node semantics field", { nodeId: id }));
     }
   }
-  if (d.safeArea && scene) {
-    for (const key of Object.keys(d.safeArea)) if (!["x", "y", "width", "height"].includes(key)) diagnostics.push(diag("UNSUPPORTED_SAFE_AREA_FIELD", `safeArea field ${key} is not supported`));
-    if (![d.safeArea.x, d.safeArea.y, d.safeArea.width, d.safeArea.height].every(Number.isFinite) || d.safeArea.x < 0 || d.safeArea.y < 0 || d.safeArea.width < 0 || d.safeArea.height < 0 || d.safeArea.x + d.safeArea.width > scene.pageSize.width || d.safeArea.y + d.safeArea.height > scene.pageSize.height) diagnostics.push(diag("INVALID_SAFE_AREA", "safeArea must be within page bounds"));
+  if (d.safeArea !== undefined) {
+    if (!d.safeArea || typeof d.safeArea !== "object" || Array.isArray(d.safeArea)) {
+      diagnostics.push(diag("INVALID_SAFE_AREA", "safeArea must be an object within page bounds"));
+    } else {
+      for (const key of Object.keys(d.safeArea)) if (!["x", "y", "width", "height"].includes(key)) diagnostics.push(diag("UNSUPPORTED_SAFE_AREA_FIELD", `safeArea field ${key} is not supported`));
+      const valid = Boolean(pageSize)
+        && [d.safeArea.x, d.safeArea.y, d.safeArea.width, d.safeArea.height].every(Number.isFinite)
+        && d.safeArea.x >= 0 && d.safeArea.y >= 0 && d.safeArea.width >= 0 && d.safeArea.height >= 0
+        && d.safeArea.x + d.safeArea.width <= pageSize!.width
+        && d.safeArea.y + d.safeArea.height <= pageSize!.height;
+      if (!valid) diagnostics.push(diag("INVALID_SAFE_AREA", "safeArea must be within page bounds"));
+    }
   }
   return { valid: diagnostics.length === 0, diagnostics };
 }

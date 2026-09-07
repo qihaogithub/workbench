@@ -1,34 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { mountHeadingStyleToolbar } from "./heading-style-toolbar";
+import {
+  getHeadingStyleLabel,
+  HEADING_STYLE_OPTIONS,
+} from "./heading-style-toolbar";
 
-describe("mountHeadingStyleToolbar", () => {
-  it("does not react to its own label update indefinitely", async () => {
-    const root = document.createElement("div");
-    root.innerHTML = '<div class="milkdown-toolbar"></div>';
-    document.body.append(root);
-
-    const toolbar = mountHeadingStyleToolbar({
-      root,
-      getActiveLevel: () => null,
-      onSelect: () => {},
-    });
-
-    // Let the MutationObserver process mutations produced by the initial label.
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(
-      root.querySelectorAll("[data-heading-style-selector]"),
-    ).toHaveLength(1);
-    expect(root.querySelector("[data-heading-style-trigger]")?.textContent).toBe(
-      "正文⌄",
-    );
-    expect(root.querySelector(".heading-style-chevron")?.getAttribute("aria-hidden")).toBe(
-      "true",
-    );
-
-    toolbar.destroy();
-    root.remove();
+describe("heading style options", () => {
+  it("keeps the shared heading labels stable for both toolbars", () => {
+    expect(HEADING_STYLE_OPTIONS.map((option) => option.label)).toEqual([
+      "正文",
+      "H1",
+      "H2",
+      "H3",
+      "H4",
+      "H5",
+      "H6",
+    ]);
+    expect(getHeadingStyleLabel(null)).toBe("正文");
+    expect(getHeadingStyleLabel(3)).toBe("H3");
+    expect(getHeadingStyleLabel(99)).toBe("正文");
   });
 });

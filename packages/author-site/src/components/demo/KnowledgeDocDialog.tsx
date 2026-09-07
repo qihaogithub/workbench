@@ -426,6 +426,7 @@ export function KnowledgeDocDialog({
           </div>
           <div className="flex-1 min-h-0">
             <DocumentEditor
+              documentKey={`${projectId ?? workingDir}:knowledge:${item?.id}`}
               value={editContent}
               onChange={(nextValue) => {
                 setEditContent(nextValue);
