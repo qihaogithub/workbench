@@ -17,9 +17,11 @@ import {
 } from "@workbench/sketch-core";
 import {
   SketchEditorSurface,
+  type SketchEditorViewport,
   type SketchImageGenerationAdapter,
   type SketchImageGenerationCapabilities,
   type SketchImageGenerationRequest,
+  type SketchViewportChangeReason,
 } from "@workbench/sketch-react";
 import {
   asWhiteboardDocumentV3,
@@ -182,13 +184,14 @@ function newDocument(target?: WhiteboardCommitTarget, sessionId?: string): White
             },
           }
         : {},
-    editorView: { zoom: 1, offsetX: 0, offsetY: 0 },
+    editorView: { mode: "fit-content", zoom: 1, offsetX: 0, offsetY: 0 },
     updatedAt: Date.now(),
   };
 }
 
 function draftFingerprint(value: WhiteboardDocument): string {
-  return JSON.stringify({ ...asWhiteboardDocumentV3(value), updatedAt: 0 });
+  const { editorView: _editorView, ...content } = asWhiteboardDocumentV3(value);
+  return JSON.stringify({ ...content, updatedAt: 0 });
 }
 
 function normalizeManagedAssetSemantics(
@@ -624,6 +627,22 @@ export function WhiteboardDialog({
     onOpenChange(false);
   }, [dirty, onOpenChange, saving]);
 
+  const handleViewportChange = useCallback(
+    (viewport: SketchEditorViewport, reason: SketchViewportChangeReason) => {
+      if (reason !== "interaction") return;
+      setDocument((current) => ({
+        ...current,
+        editorView: {
+          mode: "manual",
+          zoom: viewport.scale,
+          offsetX: viewport.offsetX,
+          offsetY: viewport.offsetY,
+        },
+      }));
+    },
+    [],
+  );
+
   const handleSceneChange = useCallback((scene: SketchSceneDocument) => {
     setDocument((current) => {
       const nodeIds = new Set(scene.nodes.map((node) => node.id));
@@ -934,9 +953,15 @@ export function WhiteboardDialog({
               <SketchEditorSurface
                 scene={document.scene}
                 profile="whiteboard"
+                initialViewport={document.editorView.mode === "manual" ? {
+                  scale: document.editorView.zoom,
+                  offsetX: document.editorView.offsetX,
+                  offsetY: document.editorView.offsetY,
+                } : undefined}
                 fillContainer
                 imageGeneration={imageGeneration}
                 onSceneChange={handleSceneChange}
+                onViewportChange={handleViewportChange}
               />
             )}
           </div>

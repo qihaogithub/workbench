@@ -3,7 +3,7 @@
 白板的独立开发宿主。它只依赖 `@workbench/sketch-core` 和
 `@workbench/sketch-react`，不会读取创作端项目数据、登录会话或白板回填 API。
 Studio 与配置图片白板对话框都通过 `SketchEditorSurface` 使用同一套可编辑
-工作区；两者只在工作区外的页面外壳、尺寸和提交动作上有所不同。
+工作区，并统一使用 `profile="whiteboard"`；两者只在工作区外的页面外壳、尺寸和提交动作上有所不同。Studio 首次布局自动适配内容，宿主可通过共享视口参数恢复手动缩放和平移。
 
 ## 启动
 

@@ -73,6 +73,7 @@ export function SketchPlaygroundApp() {
       <SketchEditorSurface
         scene={scene}
         profile="whiteboard"
+        autoFitToContent
         fillContainer
         className="h-full"
         onSceneChange={setScene}

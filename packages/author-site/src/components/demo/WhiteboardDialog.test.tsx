@@ -10,17 +10,23 @@ jest.mock("@workbench/sketch-react", () => ({
     onSceneChange,
     profile,
     imageGeneration,
+    initialViewport,
+    onViewportChange,
   }: {
     scene: { nodes?: Array<{ id: string }> };
     onSceneChange: (next: unknown) => void;
     profile?: string;
     imageGeneration?: unknown;
+    initialViewport?: { scale: number; offsetX: number; offsetY: number };
+    onViewportChange?: (viewport: { scale: number; offsetX: number; offsetY: number }, reason: "interaction") => void;
   }) => (
     <div>
       <output data-testid="editor-profile">{profile}</output>
       <output data-testid="image-generation-adapter">
         {imageGeneration ? "available" : "missing"}
       </output>
+      <output data-testid="editor-viewport">{JSON.stringify(initialViewport)}</output>
+      <button type="button" onClick={() => onViewportChange?.({ scale: 2, offsetX: 10, offsetY: 20 }, "interaction")}>移动视口</button>
       <output data-testid="scene-node-ids">
         {(scene.nodes ?? []).map((node) => node.id).join(",")}
       </output>
@@ -86,6 +92,20 @@ describe("WhiteboardDialog", () => {
         }),
       }),
     );
+  });
+
+  it("恢复手动视口，单独移动视口不会触发未保存内容确认", async () => {
+    const confirm = jest.spyOn(window, "confirm").mockReturnValue(false);
+    const { onOpenChange } = renderDialog({
+      initialDocument: { ...document, editorView: { mode: "manual", zoom: 1.5, offsetX: 3, offsetY: 4 } },
+    });
+    expect(screen.getByTestId("editor-viewport")).toHaveTextContent('"scale":1.5');
+    fireEvent.click(screen.getByRole("button", { name: "移动视口" }));
+    expect(screen.getByTestId("editor-viewport")).toHaveTextContent('"scale":2');
+    fireEvent.keyDown(globalThis.document.body, { key: "Escape" });
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
   });
 
   it("starts a new whiteboard with the title but without the factory note", async () => {

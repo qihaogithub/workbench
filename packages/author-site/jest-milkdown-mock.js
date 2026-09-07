@@ -16,6 +16,7 @@ module.exports = {
     };
     constructor() { this.editor = { action: () => undefined }; }
     setReadonly() { return this; }
+    addFeature() { return this; }
     on() { return this; }
     create() { return Promise.resolve(); }
     destroy() { return Promise.resolve(); }
@@ -86,6 +87,8 @@ module.exports = {
   replaceAll: () => () => true,
   getMarkdown: () => () => '',
   $command: () => command(),
+  $ctx: (_value, name) => ({ key: name }),
+  $prose: (factory) => ({ key: 'mock-prose', factory }),
 
   // plugins
   history: [],

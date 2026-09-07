@@ -2,13 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Crepe } from "@milkdown/crepe";
-import { commandsCtx, editorViewCtx, parserCtx } from "@milkdown/kit/core";
+import { editorViewCtx, parserCtx } from "@milkdown/kit/core";
 import type { CommentMention } from "@workbench/shared";
-import {
-  headingSchema,
-  paragraphSchema,
-  setBlockTypeCommand,
-} from "@milkdown/kit/preset/commonmark";
+import type { EditorView } from "@milkdown/kit/prose/view";
 import { getMarkdown, insert, replaceAll } from "@milkdown/kit/utils";
 import { cn } from "./utils";
 import {
@@ -16,8 +12,9 @@ import {
   uploadImage,
   type CrepeProjectActions,
 } from "./markdown/crepe-config";
-import { mountHeadingStyleToolbar } from "./markdown/heading-style-toolbar";
-import { mountTopBarOverflow } from "./markdown/top-bar-overflow";
+import { documentBlockEdit } from "./markdown/document-block-edit";
+import { documentHeadingMenu } from "./markdown/document-heading-menu";
+import { documentSelectionToolbar } from "./markdown/document-selection-toolbar";
 import {
   decodeMarkdownReferenceUri,
   serializeMarkdownReference,
@@ -75,6 +72,8 @@ export type MarkdownReferenceClickHandler = (input: {
 }) => void;
 
 export interface DocumentEditorProps {
+  /** Stable resource identity. Switching it resets selection, menus and history. */
+  documentKey?: string;
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
@@ -122,6 +121,11 @@ export interface DocumentEditorProps {
   className?: string;
 }
 
+interface DocumentMenuAnchor {
+  left: number;
+  top: number;
+}
+
 function escapeMarkdownLabel(label: string): string {
   return label.replace(/\[/g, "\\[").replace(/\]/g, "\\]");
 }
@@ -131,7 +135,16 @@ function insertMarkdown(crepe: Crepe, markdown: string) {
   crepe.editor.action((ctx) => ctx.get(editorViewCtx).focus());
 }
 
-export function DocumentEditor({
+export function DocumentEditor(props: DocumentEditorProps) {
+  return (
+    <DocumentEditorInstance
+      key={props.documentKey ?? JSON.stringify(props.referenceContext?.source)}
+      {...props}
+    />
+  );
+}
+
+function DocumentEditorInstance({
   value,
   onChange,
   readOnly = false,
@@ -157,6 +170,7 @@ export function DocumentEditor({
 }: DocumentEditorProps) {
   const { lightbox, openMarkdownImage } = useMarkdownImageLightbox();
   const rootRef = useRef<HTMLDivElement>(null);
+  const overlayRootRef = useRef<HTMLDivElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const crepeRef = useRef<Crepe | null>(null);
@@ -203,6 +217,7 @@ export function DocumentEditor({
     query: string;
     candidates: MarkdownReferenceCandidate[];
     selectedIndex: number;
+    anchor: DocumentMenuAnchor;
   } | null>(null);
   const referenceMenuRef = useRef(referenceMenu);
   referenceMenuRef.current = referenceMenu;
@@ -218,6 +233,7 @@ export function DocumentEditor({
     query: string;
     candidates: MarkdownMentionCandidate[];
     selectedIndex: number;
+    anchor: DocumentMenuAnchor;
   } | null>(null);
   const mentionMenuRef = useRef(mentionMenu);
   mentionMenuRef.current = mentionMenu;
@@ -238,13 +254,13 @@ export function DocumentEditor({
 
       try {
         const result = await handler(file);
-        if (!mountedRef.current || !crepeRef.current) return;
+        if (!mountedRef.current || crepeRef.current !== crepe) return;
         const name = escapeMarkdownLabel(file.name || "附件");
         const markdown =
           kind === "video"
             ? `\n<video controls src="${result.url}"></video>\n`
             : `\n[${name}](${result.url})\n`;
-        insertMarkdown(crepeRef.current, markdown);
+        insertMarkdown(crepe, markdown);
       } catch (error) {
         reportUploadError(error);
       }
@@ -255,7 +271,26 @@ export function DocumentEditor({
   useEffect(() => {
     mountedRef.current = true;
     const root = rootRef.current;
-    if (!root) return;
+    const overlayRoot = overlayRootRef.current;
+    if (!root || !overlayRoot) return;
+
+    const getMenuAnchor = (view: EditorView): DocumentMenuAnchor => {
+      try {
+        const coords = view.coordsAtPos(view.state.selection.from);
+        const overlayRect = overlayRoot.getBoundingClientRect();
+        return {
+          left: coords.left - overlayRect.left,
+          top: coords.bottom - overlayRect.top + 8,
+        };
+      } catch {
+        const rect = view.dom.getBoundingClientRect();
+        const overlayRect = overlayRoot.getBoundingClientRect();
+        return {
+          left: rect.left - overlayRect.left,
+          top: rect.top - overlayRect.top + 8,
+        };
+      }
+    };
 
     const actions: CrepeProjectActions = {
       uploadImage: (file) => uploadImage(uploadHandlerRef.current, file),
@@ -274,11 +309,6 @@ export function DocumentEditor({
     const config = buildCrepeConfig({
       placeholder,
       actions,
-      enableUploads: uploadsEnabled,
-      referenceCandidates: referenceCandidatesRef.current,
-      enableProjectReferences: Boolean(
-        referenceProviderRef.current && referenceContextRef.current,
-      ),
       showTopBar,
     });
     const crepe = new Crepe({
@@ -287,6 +317,43 @@ export function DocumentEditor({
       ...config,
     });
     crepeRef.current = crepe;
+    if (showTopBar)
+      crepe.addFeature(documentHeadingMenu, { root: overlayRoot, actions });
+
+    const reportCommentSelection = (view: EditorView) => {
+      const selection = view.state.selection;
+      if (selection.empty) return;
+      const doc = view.state.doc;
+      const quote = doc.textBetween(selection.from, selection.to, "\n").trim();
+      if (!quote) return;
+      const fullText = doc.textBetween(0, doc.content.size, "\n");
+      const start = fullText.indexOf(quote);
+      onCommentSelectionRef.current?.({
+        quote,
+        prefix: fullText.slice(Math.max(0, start - 80), start),
+        suffix: fullText.slice(start + quote.length, start + quote.length + 80),
+        from: selection.from,
+        to: selection.to,
+      });
+    };
+
+    crepe.addFeature(documentSelectionToolbar, {
+      root: overlayRoot,
+      onCommentSelection: onCommentSelectionRef.current
+        ? reportCommentSelection
+        : undefined,
+    });
+    if (!autoGrow) {
+      crepe.addFeature(documentBlockEdit, {
+        root: overlayRoot,
+        actions,
+        referenceCandidates: referenceCandidatesRef.current,
+        enableUploads: uploadsEnabled,
+        enableProjectReferences: Boolean(
+          referenceProviderRef.current && referenceContextRef.current,
+        ),
+      });
+    }
     crepe.setReadonly(readOnly);
     crepe.on((listener) => {
       listener.markdownUpdated((_ctx, markdown) => {
@@ -465,6 +532,7 @@ export function DocumentEditor({
         query: typed.slice(1),
         candidates: visibleCandidates,
         selectedIndex: 0,
+        anchor: getMenuAnchor(view),
       });
     };
 
@@ -550,6 +618,9 @@ export function DocumentEditor({
             query,
             candidates: visibleCandidates.slice(0, 30),
             selectedIndex: 0,
+            anchor: getMenuAnchor(
+              crepe.editor.action((ctx) => ctx.get(editorViewCtx)),
+            ),
           });
         })
         .catch(() => {
@@ -752,86 +823,8 @@ export function DocumentEditor({
     root.addEventListener("input", handleReferenceInput, true);
     root.addEventListener("click", handleReferenceClick, true);
 
-    let headingStyleToolbar: ReturnType<
-      typeof mountHeadingStyleToolbar
-    > | null = null;
-    let topBarOverflow: ReturnType<typeof mountTopBarOverflow> | null = null;
-    let selectionCommentButton: HTMLButtonElement | null = null;
-    let selectionToolbarObserver: MutationObserver | null = null;
     void crepe.create().then(() => {
       if (!mountedRef.current || crepeRef.current !== crepe) return;
-      topBarOverflow = mountTopBarOverflow({ root });
-      headingStyleToolbar = mountHeadingStyleToolbar({
-        root,
-        getActiveLevel: () =>
-          crepe.editor.action((ctx) => {
-            const node = ctx.get(editorViewCtx).state.selection.$from.parent;
-            if (node.type !== headingSchema.type(ctx)) return null;
-            return node.attrs.level as number;
-          }),
-        onSelect: (level) => {
-          crepe.editor.action((ctx) => {
-            const nodeType =
-              level === null
-                ? paragraphSchema.type(ctx)
-                : headingSchema.type(ctx);
-            ctx.get(commandsCtx).call(setBlockTypeCommand.key, {
-              nodeType,
-              ...(level === null ? {} : { attrs: { level } }),
-            });
-          });
-        },
-      });
-      if (onCommentSelectionRef.current) {
-        selectionCommentButton = document.createElement("button");
-        selectionCommentButton.type = "button";
-        selectionCommentButton.className = "document-comment-selection-button";
-        selectionCommentButton.title = "添加选区评论";
-        selectionCommentButton.setAttribute("aria-label", "添加选区评论");
-        selectionCommentButton.innerHTML =
-          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4zM12 8v6m-3-3h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-        selectionCommentButton.addEventListener("pointerdown", (event) => {
-          event.preventDefault();
-          const selection = crepe.editor.action(
-            (ctx) => ctx.get(editorViewCtx).state.selection,
-          );
-          if (selection.empty) return;
-          const doc = crepe.editor.action(
-            (ctx) => ctx.get(editorViewCtx).state.doc,
-          );
-          const quote = doc
-            .textBetween(selection.from, selection.to, "\n")
-            .trim();
-          if (!quote) return;
-          const fullText = doc.textBetween(0, doc.content.size, "\n");
-          const start = fullText.indexOf(quote);
-          onCommentSelectionRef.current?.({
-            quote,
-            prefix: fullText.slice(Math.max(0, start - 80), start),
-            suffix: fullText.slice(
-              start + quote.length,
-              start + quote.length + 80,
-            ),
-            from: selection.from,
-            to: selection.to,
-          });
-        });
-        const attach = () => {
-          const toolbar = root.querySelector<HTMLElement>(".milkdown-toolbar");
-          if (
-            toolbar &&
-            selectionCommentButton &&
-            !toolbar.contains(selectionCommentButton)
-          )
-            toolbar.append(selectionCommentButton);
-        };
-        attach();
-        selectionToolbarObserver = new MutationObserver(attach);
-        selectionToolbarObserver.observe(root, {
-          childList: true,
-          subtree: true,
-        });
-      }
       if (autoFocus) {
         queueMicrotask(() => {
           // StrictMode can leave a previous instance in this host while its
@@ -855,10 +848,6 @@ export function DocumentEditor({
       openReferenceMenuRef.current = null;
       insertReferenceCandidateRef.current = null;
       insertMentionCandidateRef.current = null;
-      headingStyleToolbar?.destroy();
-      topBarOverflow?.destroy();
-      selectionToolbarObserver?.disconnect();
-      selectionCommentButton?.remove();
       if (crepeRef.current === crepe) crepeRef.current = null;
       void crepe.destroy();
     };
@@ -870,8 +859,10 @@ export function DocumentEditor({
     referenceCandidateSignature,
     Boolean(referenceProvider),
     Boolean(referenceContext),
+    Boolean(onCommentSelection),
     openMarkdownImage,
     showTopBar,
+    autoGrow,
     autoFocus,
   ]);
 
@@ -913,8 +904,7 @@ export function DocumentEditor({
       // called with `from > to`, producing an invalid open slice that makes
       // ProseMirror's Fitter walk past the end of its fragment. Fall back to
       // the safe whole-document replacement for this structural case.
-      const canApplyDiff =
-        diffStart <= diffEnd.a && diffStart <= diffEnd.b;
+      const canApplyDiff = diffStart <= diffEnd.a && diffStart <= diffEnd.b;
 
       referenceTriggerRef.current = null;
       mentionTriggerRef.current = null;
@@ -966,76 +956,90 @@ export function DocumentEditor({
         data-auto-grow={autoGrow}
       >
         <div ref={rootRef} className="crepe h-full" />
-        {referenceMenu && referenceMenu.candidates.length > 0 && (
-          <div
-            className="document-reference-menu absolute z-50 mt-1 max-h-72 min-w-64 max-w-[min(90vw,28rem)] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-            role="listbox"
-            aria-label="项目引用候选"
-          >
-            {referenceMenu.candidates.map((candidate, index) => (
-              <button
-                key={`${candidate.target.kind}:${candidate.target.projectId}:${candidate.target.kind === "project" ? "" : candidate.target.kind === "page" ? candidate.target.pageId : candidate.target.docId}`}
-                type="button"
-                role="option"
-                aria-selected={index === referenceMenu.selectedIndex}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm",
-                  index === referenceMenu.selectedIndex
-                    ? "bg-accent text-accent-foreground"
-                    : "hover:bg-accent/60",
-                )}
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  insertReferenceCandidateRef.current?.(candidate);
-                }}
-              >
-                <span className="shrink-0 text-muted-foreground">@</span>
-                <span className="min-w-0 flex-1 truncate">
-                  {candidate.displayPath}
-                </span>
-                <span className="shrink-0 text-[10px] uppercase text-muted-foreground">
-                  {candidate.target.kind}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-        {mentionMenu && mentionMenu.candidates.length > 0 && (
-          <div
-            className="document-mention-menu absolute z-50 mt-1 max-h-72 min-w-56 max-w-[min(90vw,22rem)] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-            role="listbox"
-            aria-label="提及候选"
-          >
-            {mentionMenu.candidates.map((candidate, index) => (
-              <button
-                key={`${candidate.type}:${candidate.id}`}
-                type="button"
-                role="option"
-                aria-selected={index === mentionMenu.selectedIndex}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm",
-                  index === mentionMenu.selectedIndex
-                    ? "bg-accent text-accent-foreground"
-                    : "hover:bg-accent/60",
-                )}
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  insertMentionCandidateRef.current?.(candidate);
-                }}
-              >
-                <span className="shrink-0 text-muted-foreground">@</span>
-                <span className="min-w-0 flex-1 truncate">
-                  {candidate.name}
-                </span>
-                {candidate.type === "agent" && (
-                  <span className="shrink-0 rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-500">
-                    AI
+        <div
+          ref={overlayRootRef}
+          className="document-editor-overlays"
+          data-document-editor-overlays="true"
+        >
+          {referenceMenu && referenceMenu.candidates.length > 0 && (
+            <div
+              className="document-reference-menu absolute max-h-72 min-w-64 max-w-[min(90vw,28rem)] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+              style={{
+                left: referenceMenu.anchor.left,
+                top: referenceMenu.anchor.top,
+              }}
+              role="listbox"
+              aria-label="项目引用候选"
+            >
+              {referenceMenu.candidates.map((candidate, index) => (
+                <button
+                  key={`${candidate.target.kind}:${candidate.target.projectId}:${candidate.target.kind === "project" ? "" : candidate.target.kind === "page" ? candidate.target.pageId : candidate.target.docId}`}
+                  type="button"
+                  role="option"
+                  aria-selected={index === referenceMenu.selectedIndex}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm",
+                    index === referenceMenu.selectedIndex
+                      ? "bg-accent text-accent-foreground"
+                      : "hover:bg-accent/60",
+                  )}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    insertReferenceCandidateRef.current?.(candidate);
+                  }}
+                >
+                  <span className="shrink-0 text-muted-foreground">@</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {candidate.displayPath}
                   </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+                  <span className="shrink-0 text-[10px] uppercase text-muted-foreground">
+                    {candidate.target.kind}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          {mentionMenu && mentionMenu.candidates.length > 0 && (
+            <div
+              className="document-mention-menu absolute max-h-72 min-w-56 max-w-[min(90vw,22rem)] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+              style={{
+                left: mentionMenu.anchor.left,
+                top: mentionMenu.anchor.top,
+              }}
+              role="listbox"
+              aria-label="提及候选"
+            >
+              {mentionMenu.candidates.map((candidate, index) => (
+                <button
+                  key={`${candidate.type}:${candidate.id}`}
+                  type="button"
+                  role="option"
+                  aria-selected={index === mentionMenu.selectedIndex}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm",
+                    index === mentionMenu.selectedIndex
+                      ? "bg-accent text-accent-foreground"
+                      : "hover:bg-accent/60",
+                  )}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    insertMentionCandidateRef.current?.(candidate);
+                  }}
+                >
+                  <span className="shrink-0 text-muted-foreground">@</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {candidate.name}
+                  </span>
+                  {candidate.type === "agent" && (
+                    <span className="shrink-0 rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-500">
+                      AI
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <input
           ref={videoInputRef}
           type="file"

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { Crepe } from "@milkdown/crepe";
+
 import { buildCrepeConfig, type CrepeProjectActions } from "./crepe-config";
+import { buildDocumentBlockMenuGroups } from "./document-block-menu";
 
 function createActions(): CrepeProjectActions {
   return {
@@ -8,11 +10,12 @@ function createActions(): CrepeProjectActions {
     uploadVideo: vi.fn(),
     uploadFile: vi.fn(),
     insertReference: vi.fn(),
+    openProjectReference: vi.fn(),
   };
 }
 
 describe("buildCrepeConfig", () => {
-  it("启用标准编辑能力与原生 TopBar，并明确关闭 Latex 与 AI", () => {
+  it("保留标准编辑能力与原生 TopBar，并关闭 Crepe 原生浮层", () => {
     const config = buildCrepeConfig({
       placeholder: "输入内容...",
       actions: createActions(),
@@ -20,13 +23,14 @@ describe("buildCrepeConfig", () => {
 
     expect(config.features?.[Crepe.Feature.Cursor]).toBe(true);
     expect(config.features?.[Crepe.Feature.ImageBlock]).toBe(true);
-    expect(config.features?.[Crepe.Feature.BlockEdit]).toBe(true);
+    expect(config.features?.[Crepe.Feature.BlockEdit]).toBe(false);
+    expect(config.features?.[Crepe.Feature.Toolbar]).toBe(false);
     expect(config.features?.[Crepe.Feature.Latex]).toBe(false);
     expect(config.features?.[Crepe.Feature.TopBar]).toBe(true);
     expect(config.features?.[Crepe.Feature.AI]).toBe(false);
   });
 
-  it("允许批注编辑器隐藏固定 TopBar，同时保留选区浮动 Toolbar", () => {
+  it("允许批注编辑器隐藏固定 TopBar，同时保留本地选区 feature", () => {
     const config = buildCrepeConfig({
       placeholder: "输入内容...",
       actions: createActions(),
@@ -34,111 +38,75 @@ describe("buildCrepeConfig", () => {
     });
 
     expect(config.features?.[Crepe.Feature.TopBar]).toBe(false);
-    expect(config.features?.[Crepe.Feature.Toolbar]).toBe(true);
+    expect(config.features?.[Crepe.Feature.Toolbar]).toBe(false);
   });
 
-  it("只在能力可用时向 Crepe 块菜单追加项目操作", () => {
+  it("将块菜单的中文分组与项目操作交给本地 menu API", () => {
     const actions = createActions();
-    const config = buildCrepeConfig({
-      placeholder: "输入内容...",
+    const groups = buildDocumentBlockMenuGroups({} as never, {
       actions,
       enableUploads: true,
+      enableProjectReferences: true,
       referenceCandidates: [{ key: "theme.primary", label: "主题色" }],
     });
-    const groups: Array<{
-      key: string;
-      label: string;
-      items: Array<{ key: string; label: string; onRun?: () => void }>;
-    }> = [];
-    const builder = {
-      addGroup(key: string, label: string) {
-        const group = {
-          key,
-          label,
-          items: [] as (typeof groups)[number]["items"],
-        };
-        groups.push(group);
-        return {
-          addItem(
-            itemKey: string,
-            item: Omit<(typeof group.items)[number], "key">,
-          ) {
-            group.items.push({ key: itemKey, ...item });
-            return this;
-          },
-        };
-      },
-    };
 
-    config.featureConfigs?.[Crepe.Feature.BlockEdit]?.buildMenu?.(
-      builder as never,
-    );
-
-    expect(groups.map((group) => group.key)).toEqual([
-      "project-references",
-      "project-uploads",
+    expect(groups.slice(0, 3).map((group) => group.label)).toEqual([
+      "文本",
+      "列表",
+      "插入",
     ]);
-    expect(groups[0]?.items.map((item) => item.label)).toEqual(["主题色"]);
-    expect(groups[1]?.items.map((item) => item.label)).toEqual([
+    expect(groups.map((group) => group.key)).toEqual([
+      "text",
+      "list",
+      "advanced",
+      "project-references",
+      "entity-references",
+      "more",
+    ]);
+    expect(groups[0]?.items.map((item) => item.label)).toEqual([
+      "正文",
+      "H1",
+      "H2",
+      "H3",
+      "引用",
+      "分隔线",
+    ]);
+    expect(groups[3]?.items[0]?.label).toBe("主题色");
+    expect(groups[4]?.items[0]?.label).toBe("选择项目 / 页面 / 文档");
+    expect(groups[5]?.label).toBe("更多");
+    expect(groups[5]?.items.map((item) => item.label)).toEqual([
+      "H4",
+      "H5",
+      "H6",
       "上传视频",
       "上传附件",
     ]);
-    groups[0]?.items[0]?.onRun?.();
-    expect(actions.insertReference).toHaveBeenCalledWith({
-      key: "theme.primary",
-      label: "主题色",
-    });
   });
 
-  it("将 Crepe 默认块菜单的分组和菜单项完整本地化为中文", () => {
+  it("支持菜单搜索，并保留原生 TopBar 的中文标题选择器", () => {
+    const actions = createActions();
+    const filtered = buildDocumentBlockMenuGroups(
+      {} as never,
+      { actions },
+      "列表",
+    );
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.items.map((item) => item.label)).toEqual([
+      "无序列表",
+      "有序列表",
+      "任务列表",
+    ]);
+
     const config = buildCrepeConfig({
       placeholder: "输入内容...",
-      actions: createActions(),
+      actions,
     });
-    const blockEdit = config.featureConfigs?.[Crepe.Feature.BlockEdit];
-
-    expect(blockEdit?.textGroup).toMatchObject({
-      label: "文本",
-      text: { label: "正文" },
-      h1: { label: "H1" },
-      h2: { label: "H2" },
-      h3: { label: "H3" },
-      h4: { label: "H4" },
-      h5: { label: "H5" },
-      h6: { label: "H6" },
-      quote: { label: "引用" },
-      divider: { label: "分隔线" },
-    });
-    expect(blockEdit?.listGroup).toMatchObject({
-      label: "列表",
-      bulletList: { label: "无序列表" },
-      orderedList: { label: "有序列表" },
-      taskList: { label: "任务列表" },
-    });
-    expect(blockEdit?.advancedGroup).toMatchObject({
-      label: "插入",
-      image: { label: "图片" },
-      codeBlock: { label: "代码块" },
-      table: { label: "表格" },
-      math: null,
-    });
-  });
-
-  it("将原生 TopBar 的标题选择器本地化为中文", () => {
-    const config = buildCrepeConfig({
-      placeholder: "输入内容...",
-      actions: createActions(),
-    });
-
     expect(config.featureConfigs?.[Crepe.Feature.TopBar]).toMatchObject({
       headingOptions: [
         { label: "正文", level: null },
         { label: "H1", level: 1 },
         { label: "H2", level: 2 },
         { label: "H3", level: 3 },
-        { label: "H4", level: 4 },
-        { label: "H5", level: 5 },
-        { label: "H6", level: 6 },
       ],
     });
   });
