@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
-import { findUserById } from "@/lib/user";
+import { findDingtalkIdentityByUserId, findUserById } from "@/lib/user";
 import { createApiError, createApiSuccess } from "@/lib/fs-utils";
 
 export async function GET() {
@@ -25,10 +25,15 @@ export async function GET() {
     });
   }
 
+  // 钉钉登录创建的本地 username 是稳定的内部标识（例如 dt_xxx），
+  // 对用户展示时优先使用钉钉返回的真实姓名；普通账号仍回退到 username。
+  const dingtalkIdentity = findDingtalkIdentityByUserId(user.id);
+
   return NextResponse.json(
     createApiSuccess({
       id: user.id,
       username: user.username,
+      displayName: dingtalkIdentity?.name || user.username,
       role: user.role,
     }),
   );

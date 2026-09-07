@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSafeRedirectPath } from "@/lib/auth/redirect";
 import {
   exchangeDingtalkBrowserAuthCode,
+  readDingtalkLoginConfig,
 } from "@/lib/dingtalk-login";
 import { createToken, setAuthCookieOnResponse } from "@/lib/auth/jwt";
 import { findOrCreateUserByDingtalkIdentity } from "@/lib/user";
@@ -16,12 +17,24 @@ function clearOAuthCookies(response: NextResponse): void {
   response.cookies.delete(STATE_COOKIE);
   response.cookies.delete(REDIRECT_COOKIE);
 }
+
+function getLoginOrigin(request: NextRequest): string {
+  const configuredRedirectUri = readDingtalkLoginConfig().redirectUri;
+  if (configuredRedirectUri) {
+    try {
+      return new URL(configuredRedirectUri).origin;
+    } catch {
+      // Fall back to the request origin when a local configuration is invalid.
+    }
+  }
+  return request.nextUrl.origin;
+}
 function redirectToLogin(
   request: NextRequest,
   message: string,
   redirectPath?: string,
 ): NextResponse {
-  const loginUrl = new URL("/login", request.url);
+  const loginUrl = new URL("/login", getLoginOrigin(request));
   loginUrl.searchParams.set(
     "redirect",
     getSafeRedirectPath(redirectPath),
@@ -79,7 +92,7 @@ export async function GET(request: NextRequest) {
     });
 
     const response = NextResponse.redirect(
-      new URL(getSafeRedirectPath(redirectPath), request.url),
+      new URL(getSafeRedirectPath(redirectPath), getLoginOrigin(request)),
     );
     setAuthCookieOnResponse(response, token);
     clearOAuthCookies(response);

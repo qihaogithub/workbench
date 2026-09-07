@@ -9,6 +9,9 @@ jest.mock("@/lib/user", () => ({
 }));
 jest.mock("@/lib/dingtalk-login", () => ({
   exchangeDingtalkBrowserAuthCode: jest.fn(),
+  readDingtalkLoginConfig: jest.fn(() => ({
+    redirectUri: process.env.DINGTALK_LOGIN_REDIRECT_URI,
+  })),
 }));
 
 describe("DingTalk browser OAuth callback route", () => {

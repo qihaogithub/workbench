@@ -74,8 +74,11 @@ describe("DingTalk enterprise login", () => {
       fetchMock as unknown as typeof fetch;
 
     const { exchangeDingtalkAuthCode } = await import("@/lib/dingtalk-login");
-    const { findOrCreateUserByDingtalkIdentity, findDingtalkIdentityByUserId } =
-      await import("@/lib/user");
+    const {
+      findOrCreateUserByDingtalkIdentity,
+      findDingtalkIdentityByUserId,
+      listAllUsers,
+    } = await import("@/lib/user");
 
     const profile = await exchangeDingtalkAuthCode("auth-code");
     expect(profile).toMatchObject({
@@ -112,6 +115,13 @@ describe("DingTalk enterprise login", () => {
       unionId: "union-1",
       name: "Ding User",
     });
+    expect(listAllUsers()).toContainEqual(
+      expect.objectContaining({
+        id: first.user.id,
+        username: first.user.username,
+        displayName: "Ding User",
+      }),
+    );
   });
 
   it("builds the browser OAuth authorization URL with the configured callback", async () => {

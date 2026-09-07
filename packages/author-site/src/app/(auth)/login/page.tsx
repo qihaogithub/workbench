@@ -43,7 +43,7 @@ export default function LoginPage() {
 
       toast({
         title: "钉钉登录成功",
-        description: `欢迎回来，${data.data.user.username}`,
+        description: `欢迎回来，${data.data.dingtalk?.name || data.data.user.username}`,
       });
       router.push(redirect);
       router.refresh();
