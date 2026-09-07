@@ -434,6 +434,8 @@ pnpm --filter @workbench/project-cli test
 
 Markdown 编辑器（DocumentEditor）：
 
+- TopBar 与选区标题入口共用 `DocumentHeadingPicker` 和 `buildHeadingTransaction`。Milkdown 列表项首节点必须为 paragraph，不能直接对其 setBlockType 为 heading；按产品契约先提升所选项，再以单事务转换并保留行内格式、后续编号和撤销语义。标题菜单不得重新引入原生 select，执行前需校验选区快照未过期。
+
 - Markdown 选区工具栏与块菜单使用不同的碰撞策略：选区工具栏允许覆盖邻近正文并提供停靠退路，不能把全篇正文设为障碍物而静默隐藏。回归需验证真实选区可见性、格式操作选区保持和 Escape 再激活，不能仅断言 DOM 挂载。
 - 自动聚焦必须通过当前 Crepe 实例的 `editorViewCtx`，不能查询宿主内第一个 `.ProseMirror`；StrictMode 重挂载时旧实例的异步销毁会短暂留下重复正文节点。焦点/挂载回归必须包含真实 Milkdown 与 StrictMode，模拟编辑器不能覆盖该竞态。
 

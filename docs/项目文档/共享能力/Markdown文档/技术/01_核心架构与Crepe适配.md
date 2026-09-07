@@ -7,6 +7,9 @@ covers:
   - packages/demo-ui/src/markdown/document-block-edit.ts
   - packages/demo-ui/src/markdown/document-block-menu.ts
   - packages/demo-ui/src/markdown/document-heading-menu.ts
+  - packages/demo-ui/src/markdown/document-heading-picker.ts
+  - packages/demo-ui/src/markdown/document-heading-command.ts
+  - packages/demo-ui/src/markdown/document-heading-command.test.ts
   - packages/demo-ui/src/markdown/document-overlay-positioning.ts
   - packages/demo-ui/src/markdown/document-selection-toolbar.ts
   - packages/demo-ui/src/markdown/crepe-theme.css
@@ -33,6 +36,10 @@ covers:
 Latex 与 Crepe AI 明确关闭。标题样式由 `heading-style-toolbar` 共享数据模块提供。TopBar 保留原生格式工具栏，通过公开 `buildTopBar` 注册本地标题按钮，由 `documentHeadingMenu` feature 管理当前标题标签和下拉生命周期；标题菜单与块菜单复用分组菜单组件、主题与定位器，前者转换当前段落，后者插入新块。标题 feature 仅维护自己注册的标记元素，不查找/隐藏原生选择器、不复制控件或转发合成事件、不用 DOM 观察器注入菜单。
 
 ## 三、TopBar 与布局适配
+
+两个标题入口统一使用 `DocumentHeadingPicker`，不再创建原生 select；Picker 复用 `DocumentBlockMenu` 的绘制和键盘机制，独立标题变体使用 216px 首选宽度、280px 最大高度与主题令牌。菜单项支持选中勾选、禁用和原因，标题菜单只包含正文与标题组。打开时保存文档与选区快照，操作前再次校验；与选区工具栏作为同一组浮层处理焦点和外部点击，Escape 优先关闭子菜单。
+
+`document-heading-command` 是两个入口的唯一转换实现。先收集选区涉及的段落并拒绝不支持结构；列表转换通过公开 `liftListItem` 逐层提升，在私有事务中累积结构步骤并校正有序尾段起始编号，再设定标题类型、映射原选区。完整校验成功后只派发一次事务，保证无部分提交且一次撤销恢复。行内格式通过节点内容保留；不可用选项由同一转换函数预检。测试包含有序/任务/嵌套列表、混合样式、Markdown 往返、两个入口的单次撤销及失效菜单目标。
 
 TopBar 相对 `.milkdown` 正文滚动容器吸顶，正文从 TopBar 下方开始布局。选区工具栏与块菜单统一挂载到当前 `DocumentEditor` 的独立 overlay root，由 `DocumentOverlayPositioner` 以当前 `EditorView` 的矩形为锚点。Floating UI 提供滚动/尺寸监听与裁剪祖先、视口的边界测量；本地纯策略是最终坐标和候选方向的唯一决策者。选区使用独立的 `chooseSelectionToolbarPosition` 策略，上方优先、下方翻转，只保护选区和 TopBar，不将整篇正文作为障碍物。实际编辑器作为边界，浮层 root 只负责坐标换算；窄栏根据边界宽度收起低频按钮并重新测量换行高度。无相邻空间时使用 `docked` 停靠到可见顶部、TopBar 下方，此退路允许与跨视口选区交叠。Escape/外部点击记住已关闭的选区，普通事务不重新打开；新选区或重新点击正文可以再次激活。块菜单只允许从当前块下方、右侧或左侧出现，当前块首行矩形是不可覆盖区域。
 
