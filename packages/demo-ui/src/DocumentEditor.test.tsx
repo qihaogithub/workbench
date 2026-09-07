@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { DocumentEditor } from "./DocumentEditor";
 
 if (!Range.prototype.getClientRects) {
@@ -11,7 +12,14 @@ if (!Range.prototype.getClientRects) {
 if (!Range.prototype.getBoundingClientRect) {
   Object.defineProperty(Range.prototype, "getBoundingClientRect", {
     configurable: true,
-    value: () => ({ top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 }),
+    value: () => ({
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: 0,
+    }),
   });
 }
 
@@ -19,7 +27,10 @@ describe("DocumentEditor（Milkdown 集成）", () => {
   it("挂载并实时渲染 Markdown 为富文本", async () => {
     const onChange = vi.fn();
     render(
-      <DocumentEditor value="# 标题\n\n这是**加粗**正文。" onChange={onChange} />,
+      <DocumentEditor
+        value="# 标题\n\n这是**加粗**正文。"
+        onChange={onChange}
+      />,
     );
 
     await waitFor(() => {
@@ -29,8 +40,34 @@ describe("DocumentEditor（Milkdown 集成）", () => {
     expect(document.querySelector("h1")?.tagName).toBe("H1");
     expect(document.body.textContent).toContain("标题");
     expect(document.body.textContent).toContain("加粗");
-    expect(document.querySelector("[data-document-editor='crepe']")).toBeTruthy();
+    expect(
+      document.querySelector("[data-document-editor='crepe']"),
+    ).toBeTruthy();
     expect(document.querySelector(".crepe")).toBeTruthy();
+    expect(document.querySelector(".document-editor-overlays")).toBeTruthy();
+    expect(document.querySelector(".document-selection-toolbar")).toBeTruthy();
+    await waitFor(() => {
+      expect(
+        document.querySelectorAll("[data-block-handle-trigger]"),
+      ).toHaveLength(1);
+      expect(document.querySelectorAll(".document-block-menu")).toHaveLength(1);
+    });
+    expect(document.querySelector(".operation-item")).toBeNull();
+  });
+
+  it("StrictMode 重挂载后只保留一个可编辑正文并恢复焦点", async () => {
+    render(
+      <StrictMode>
+        <DocumentEditor value="StrictMode 正文" onChange={() => {}} autoFocus />
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      const editor = document.querySelector<HTMLElement>(".ProseMirror");
+      expect(document.querySelectorAll(".ProseMirror")).toHaveLength(1);
+      expect(editor).toHaveAttribute("contenteditable", "true");
+      expect(document.activeElement).toBe(editor);
+    });
   });
 
   it("外部 value 更新时同步到现有编辑器", async () => {
@@ -85,9 +122,7 @@ describe("DocumentEditor（Milkdown 集成）", () => {
     await waitFor(() => expect(editor.textContent).toContain("继续编辑"));
     onChange.mockClear();
 
-    rerender(
-      <DocumentEditor value={`前缀：${initial}`} onChange={onChange} />,
-    );
+    rerender(<DocumentEditor value={`前缀：${initial}`} onChange={onChange} />);
 
     await waitFor(() => expect(editor.textContent).toContain("前缀："));
     await new Promise((resolve) => setTimeout(resolve, 250));
@@ -96,7 +131,9 @@ describe("DocumentEditor（Milkdown 集成）", () => {
 
   it("相同 Markdown 的父级重渲染保持当前光标位置", async () => {
     const value = "这是一段足够长的正文，用于放置光标。";
-    const { rerender } = render(<DocumentEditor value={value} onChange={() => {}} />);
+    const { rerender } = render(
+      <DocumentEditor value={value} onChange={() => {}} />,
+    );
     const editor = await waitFor(() => {
       const element = document.querySelector<HTMLElement>(".ProseMirror");
       expect(element).toBeTruthy();
@@ -122,7 +159,9 @@ describe("DocumentEditor（Milkdown 集成）", () => {
   });
 
   it("空内容时显示占位提示", async () => {
-    render(<DocumentEditor value="" onChange={() => {}} placeholder="输入内容..." />);
+    render(
+      <DocumentEditor value="" onChange={() => {}} placeholder="输入内容..." />,
+    );
 
     await waitFor(() => {
       expect(document.querySelector(".ProseMirror")).toBeTruthy();
@@ -136,16 +175,21 @@ describe("DocumentEditor（Milkdown 集成）", () => {
 
   it("只读模式不渲染占位", async () => {
     render(
-      <DocumentEditor value="正文" onChange={() => {}} readOnly placeholder="不要显示" />,
+      <DocumentEditor
+        value="正文"
+        onChange={() => {}}
+        readOnly
+        placeholder="不要显示"
+      />,
     );
 
     await waitFor(() => {
       expect(document.querySelector(".ProseMirror")).toBeTruthy();
     });
     expect(document.querySelector("[data-placeholder='不要显示']")).toBeNull();
-    expect(document.querySelector(".ProseMirror")?.getAttribute("contenteditable")).toBe(
-      "false",
-    );
+    expect(
+      document.querySelector(".ProseMirror")?.getAttribute("contenteditable"),
+    ).toBe("false");
   });
 
   it("在根节点暴露只读状态供原生 TopBar 样式切换", async () => {
@@ -157,19 +201,17 @@ describe("DocumentEditor（Milkdown 集成）", () => {
       expect(document.querySelector(".ProseMirror")).toBeTruthy();
     });
     expect(
-      document.querySelector("[data-document-editor='crepe']")?.getAttribute(
-        "data-readonly",
-      ),
+      document
+        .querySelector("[data-document-editor='crepe']")
+        ?.getAttribute("data-readonly"),
     ).toBe("false");
 
-    rerender(
-      <DocumentEditor value="正文" onChange={() => {}} readOnly />,
-    );
+    rerender(<DocumentEditor value="正文" onChange={() => {}} readOnly />);
 
     expect(
-      document.querySelector("[data-document-editor='crepe']")?.getAttribute(
-        "data-readonly",
-      ),
+      document
+        .querySelector("[data-document-editor='crepe']")
+        ?.getAttribute("data-readonly"),
     ).toBe("true");
   });
 
@@ -190,13 +232,13 @@ describe("DocumentEditor（Milkdown 集成）", () => {
     });
 
     expect(wrapper.style.width).toBe("min(360px, 100%)");
-    expect(
-      wrapper.querySelector("img")?.style.width,
-    ).toBe("100%");
+    expect(wrapper.querySelector("img")?.style.width).toBe("100%");
   });
 
   it("粘贴外网图片时先调用图床本地化处理器", async () => {
-    const localizeRemoteImage = vi.fn().mockResolvedValue("/api/images/img_local");
+    const localizeRemoteImage = vi
+      .fn()
+      .mockResolvedValue("/api/images/img_local");
     render(
       <DocumentEditor
         value=""
@@ -229,7 +271,9 @@ describe("DocumentEditor（Milkdown 集成）", () => {
   });
 
   it("富文本粘贴在本地化立即返回时替换编辑器当前 Markdown", async () => {
-    const localizeRemoteImage = vi.fn().mockResolvedValue("/api/images/hero-local.png");
+    const localizeRemoteImage = vi
+      .fn()
+      .mockResolvedValue("/api/images/hero-local.png");
     const onChange = vi.fn();
     render(
       <DocumentEditor
@@ -256,7 +300,9 @@ describe("DocumentEditor（Milkdown 集成）", () => {
     editor.dispatchEvent(event);
 
     await waitFor(() => {
-      expect(localizeRemoteImage).toHaveBeenCalledWith("https://cdn.example.com/hero.png");
+      expect(localizeRemoteImage).toHaveBeenCalledWith(
+        "https://cdn.example.com/hero.png",
+      );
     });
     await waitFor(() => {
       const markdown = onChange.mock.calls.at(-1)?.[0] as string | undefined;
@@ -266,7 +312,9 @@ describe("DocumentEditor（Milkdown 集成）", () => {
   });
 
   it("只读编辑器粘贴外链图片时不调用本地化处理器", async () => {
-    const localizeRemoteImage = vi.fn().mockResolvedValue("/api/images/should-not-use.png");
+    const localizeRemoteImage = vi
+      .fn()
+      .mockResolvedValue("/api/images/should-not-use.png");
     render(
       <DocumentEditor
         value="正文"
@@ -284,7 +332,9 @@ describe("DocumentEditor（Milkdown 集成）", () => {
     Object.defineProperty(event, "clipboardData", {
       value: {
         getData: (type: string) =>
-          type === "text/html" ? '<img src="https://cdn.example.com/hero.png">' : "",
+          type === "text/html"
+            ? '<img src="https://cdn.example.com/hero.png">'
+            : "",
       },
     });
     editor.dispatchEvent(event);

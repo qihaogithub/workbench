@@ -4,7 +4,10 @@ covers:
   - packages/demo-ui/src/DocumentEditor.test.tsx
   - packages/demo-ui/src/markdown/crepe-config.ts
   - packages/demo-ui/src/markdown/heading-style-toolbar.ts
-  - packages/demo-ui/src/markdown/top-bar-overflow.ts
+  - packages/demo-ui/src/markdown/document-block-edit.ts
+  - packages/demo-ui/src/markdown/document-block-menu.ts
+  - packages/demo-ui/src/markdown/document-overlay-positioning.ts
+  - packages/demo-ui/src/markdown/document-selection-toolbar.ts
   - packages/demo-ui/src/markdown/crepe-theme.css
   - packages/demo-ui/src/markdown/crepe-theme.test.ts
   - packages/demo-ui/src/index.ts
@@ -24,15 +27,19 @@ covers:
 
 ## 二、Crepe 实例与功能
 
-编辑器使用 Milkdown Crepe v7 创建实例，并启用 Cursor、ListItem、LinkTooltip、ImageBlock、BlockEdit、Placeholder、Toolbar、CodeMirror 和 Table 等 feature，覆盖标题、粗体/斜体/删除线、行内代码、代码块、有序/无序/任务列表、引用、表格、链接、图片、分隔线、选区工具条和块拖拽。
+编辑器使用 Milkdown Crepe v7 创建实例，并启用 Cursor、ListItem、LinkTooltip、ImageBlock、Placeholder、CodeMirror 和 Table 等基础 feature，覆盖标题、粗体/斜体/删除线、行内代码、代码块、有序/无序/任务列表、引用、表格、链接、图片、分隔线和块拖拽。Crepe 原生 `Toolbar` 与 `BlockEdit` 关闭后，由 `Crepe.addFeature()` 安装 `documentSelectionToolbar` 与 `documentBlockEdit` 两个本地 feature；它们通过公开的 `TooltipProvider`、`BlockProvider` 和 ProseMirror plugin 生命周期工作。块菜单不再与 `SlashProvider` 共同写坐标，避免两个定位器互相覆盖。
 
-Latex 与 Crepe AI 明确关闭。标题菜单统一使用“正文、一级标题至六级标题”的中文名称。TopBar 仅在可编辑状态出现，标题下拉和工具溢出菜单属于编辑器交互层，不改变宿主接口。
+Latex 与 Crepe AI 明确关闭。标题菜单统一使用“正文、一级标题至六级标题”的中文名称。TopBar 仅在可编辑状态出现，标题下拉由原生 Crepe TopBar 管理，并在窄容器中自然换行；编辑器不再隐藏原生控件、复制控件或转发合成事件。标题样式选项由共享的纯数据模块提供，不通过 DOM 观察器注入。
 
 ## 三、TopBar 与布局适配
 
-TopBar 需要相对 `.milkdown` 正文滚动容器吸顶。容器变窄时，超出宽度的工具按既有顺序收纳到“更多”菜单；容器恢复宽度后自动还原。适配器持续检查当前 `.top-bar-inner` 节点身份，Crepe 替换 TopBar DOM 后重新绑定，不能只保存一次性 Vue DOM 引用。
+TopBar 相对 `.milkdown` 正文滚动容器吸顶，正文从 TopBar 下方开始布局。选区工具栏与块菜单统一挂载到当前 `DocumentEditor` 的独立 overlay root，由 `DocumentOverlayPositioner` 以当前 `EditorView` 的矩形为锚点，并由 Floating UI 负责滚动、窗口变化、翻转和可用尺寸更新。选区候选顺序为 `bottom-start → top-start → right-start → left-start`，TopBar 下方保留 8px 安全间距；当前选区属于不可覆盖区域，没有安全位置时直接隐藏。块菜单只允许从当前块下方、右侧或左侧出现，当前块矩形是不可覆盖区域。
 
-恢复菜单由 React 外层宿主承载，与 Crepe `.crepe` 滚动容器平级，并保持高于原生 TopBar 的层级。被收纳项使用 `hidden` 退出布局，主题样式不能用 `display` 覆盖该语义。
+块操作入口只有一个可聚焦的 32px 手柄，图标约 16px。点击或 `Enter`/`Space` 打开独立中文插入菜单；原生 `mousedown`、`dragstart`、`dragend` 仍由公开 `BlockProvider` 处理拖拽，不隐藏加号、不转发事件、不合成 `PointerEvent`。菜单打开时保存当前块元素作为稳定锚点，插入的临时空段只承担 ProseMirror 命令上下文，关闭时按位置和空段条件清理。列表块的手柄锚定 `.label-wrapper`，普通块锚定首行矩形；正文沟槽、列表标记列和文字间距由主题 token 统一控制。批注简版编辑器不安装块手柄 feature，继续保持紧凑输入。
+
+块菜单由单一 `DocumentOverlayPositioner` 写入坐标，边界绑定当前编辑器实例而不是全屏 overlay；Floating UI 只负责滚动、翻转和可用尺寸测量，最终候选仍必须避开当前块。菜单使用不透明 surface、描边和阴影，顶部导航是实际分组 Tab，下方只渲染当前分组并在内部滚动；最大高度由 `--document-editor-block-menu-max-height` 统一控制，并继续受编辑器可用高度约束。H1-H3 保留在“文本”，H4-H6 与上传能力收进“更多”，配置项引用和项目/页面/文档引用保持独立分组。
+
+**编辑可见性红线：任何选区工具栏、块菜单、TopBar 下拉或编辑器辅助浮层都不得遮挡当前正在编辑的正文。** 定位器必须绑定当前编辑器 root 与 `EditorView`，不能跨实例查询全局 DOM；空间不足时缩小、滚动或隐藏，不能把 `z-index`、`transform` 或 DOM 观察器当作掩盖碰撞的手段。
 
 ## 四、主题与滚动
 
@@ -46,7 +53,7 @@ TopBar 需要相对 `.milkdown` 正文滚动容器吸顶。容器变窄时，超
 - `readOnly` 通过 Crepe 能力动态切换，不因状态切换重建实例。
 - 组件卸载时销毁实例和监听，避免编辑状态与 DOM 引用泄漏。
 - 自动聚焦必须在异步创建完成后确认实例仍是当前实例，再通过该实例的 `editorViewCtx` 聚焦。StrictMode 重挂载期间旧实例可能仍在异步销毁，同一宿主内短暂存在多个正文节点；不能查询宿主内第一个 `.ProseMirror` 来决定聚焦对象，否则旧节点销毁会使新编辑器丢失焦点。
-- `@milkdown/crepe` 与 `@milkdown/kit` 是生产依赖；React 由宿主提供。
+- `@milkdown/crepe`、`@milkdown/kit` 与 `@floating-ui/dom` 是生产依赖；React 由宿主提供。
 - TipTap、`prosemirror-markdown`、`@milkdown/react` 和 `@prosemirror-adapter/react` 不属于当前编辑器边界。
 
 自动聚焦回归使用真实 Milkdown，覆盖普通挂载和 StrictMode 重挂载，等待旧实例清理后再断言正文唯一、可编辑且持有焦点；仅用模拟 `contenteditable` 的测试无法覆盖异步实例竞态。配置批注集成测试同时验证输入到 Markdown 更新、真实失焦保存退出的链路。

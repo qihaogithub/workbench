@@ -8,6 +8,12 @@ describe("Crepe 宿主主题契约", () => {
     expect(theme).toMatch(
       /\[data-readonly=["']true["']\][^{]*\.milkdown-top-bar\s*\{[^}]*display:\s*none/s,
     );
+    expect(theme).toMatch(
+      /\[data-readonly=["']true["']\]\s+\.document-block-handle\s*\{[^}]*visibility:\s*hidden;[^}]*pointer-events:\s*none;/s,
+    );
+    expect(theme).toMatch(
+      /\[data-readonly=["']true["']\][\s\S]*?\.document-selection-toolbar\s*\{[^}]*display:\s*none\s*!important;/s,
+    );
   });
 
   it("提供完整且可随宿主明暗模式变化的 Frame 主题令牌", () => {
@@ -38,11 +44,11 @@ describe("Crepe 宿主主题契约", () => {
       /\.top-bar-heading-label\s*\{[^}]*min-width:\s*42px;/s,
     );
     expect(theme).toMatch(
-      /\.heading-style-trigger\s*\{[^}]*min-width:\s*48px;/s,
+      /\.document-selection-toolbar-heading\s*\{[^}]*min-width:\s*64px;/s,
     );
   });
 
-  it("让原生标题下拉菜单在正文与溢出工具之上，并保留完整点击热区", () => {
+  it("让原生标题下拉菜单在正文之上，并保留完整点击热区", () => {
     expect(theme).toMatch(
       /\.top-bar-heading-selector\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*30;/s,
     );
@@ -84,7 +90,7 @@ describe("Crepe 宿主主题契约", () => {
     );
   });
 
-  it("让编辑器宽度受宿主容器约束，并让工具栏浮层保持可交互", () => {
+  it("让编辑器宽度受宿主容器约束，并让原生 TopBar 自适应换行", () => {
     expect(theme).toMatch(
       /\.document-editor-crepe\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*100%;[^}]*overflow-x:\s*hidden;/s,
     );
@@ -98,23 +104,43 @@ describe("Crepe 宿主主题契约", () => {
       /\.milkdown-top-bar\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*100%;[^}]*overflow:\s*visible;/s,
     );
     expect(theme).toMatch(
-      /\.top-bar-inner\s*\{[^}]*position:\s*relative;[^}]*padding-right:\s*48px;[^}]*overflow:\s*visible;/s,
-    );
-    expect(theme).toMatch(
-      /\.document-editor-crepe\s*>\s*\.top-bar-overflow\s*\{[^}]*position:\s*absolute;[^}]*top:\s*6px;[^}]*right:\s*8px;[^}]*z-index:\s*(?:[2-9]\d|\d{3,});/s,
+      /\.top-bar-inner\s*\{[^}]*display:\s*flex;[^}]*overflow:\s*visible;[^}]*flex-wrap:\s*wrap;/s,
     );
   });
 
-  it("让收纳项真正退出布局，避免主题 display 覆盖 hidden 语义", () => {
+  it("让原生 TopBar 的隐藏节点遵循原生 hidden 语义", () => {
     expect(theme).toMatch(
       /\.top-bar-inner\s*>\s*\[hidden\]\s*\{[^}]*display:\s*none\s*!important;/s,
     );
   });
 
-  it("对齐浮动标题触发器，并允许其菜单逃离工具栏裁切", () => {
-    expect(theme).toMatch(/\.milkdown-toolbar\s*\{[^}]*overflow:\s*visible;/s);
+  it("对齐浮动标题选择器，并让选区工具栏支持横向滚动", () => {
     expect(theme).toMatch(
-      /\.heading-style-selector\s*\{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*margin:\s*6px;/s,
+      /\.document-selection-toolbar\s*\{[^}]*display:\s*inline-flex;[^}]*overflow-x:\s*auto;/s,
+    );
+  });
+
+  it("让编辑器浮层独立定位，并禁止使用位移补丁解决遮挡", () => {
+    expect(theme).toMatch(
+      /\.document-editor-overlays\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*0;[^}]*pointer-events:\s*none;/s,
+    );
+    expect(theme).toMatch(
+      /\.document-editor-crepe\s+\.document-selection-toolbar\s*\{[^}]*position:\s*absolute;/s,
+    );
+    expect(theme).not.toMatch(
+      /document-selection-toolbar-shift-y|transform:\s*translateY/,
+    );
+  });
+
+  it("为块菜单提供不透明表面、固定最大高度和独立滚动区", () => {
+    expect(theme).toMatch(
+      /\.document-editor-crepe\s+\.document-block-menu\s*\{[^}]*max-height:\s*min\([^}]*var\(--document-editor-block-menu-max-height\)[^}]*overflow:\s*hidden;[^}]*border:\s*1px\s+solid\s+var\(--crepe-color-outline\);[^}]*background:\s*var\(--crepe-color-surface\);[^}]*box-shadow:\s*var\(--crepe-shadow-2\);/s,
+    );
+    expect(theme).toMatch(
+      /\.document-block-menu-groups\s*\{[^}]*overflow-y:\s*auto;[^}]*min-height:\s*0;/s,
+    );
+    expect(theme).toMatch(
+      /--document-editor-block-menu-max-height:\s*360px;/,
     );
   });
 
@@ -130,36 +156,64 @@ describe("Crepe 宿主主题契约", () => {
     );
   });
 
-  it("让脱离 Milkdown 作用域的溢出工具图标仍使用主题色", () => {
-    expect(theme).toMatch(
-      /\.top-bar-overflow-item\s+svg[^{]*\{[^}]*color:\s*var\(--crepe-color-on-surface\);[^}]*fill:\s*var\(--crepe-color-on-surface\);/s,
-    );
-    expect(theme).toMatch(
-      /\.top-bar-overflow-item:hover\s+svg[^{]*\{[^}]*color:\s*var\(--crepe-color-primary\);[^}]*fill:\s*var\(--crepe-color-primary\);/s,
-    );
-  });
-
   it("保留 Crepe 对表格单元格和节点类型各自的选中反馈", () => {
     expect(theme).not.toMatch(/\.ProseMirror-selectednode\s*\{[^}]*outline:/s);
     expect(theme).not.toMatch(/\.selectedCell(?:::after)?\s*\{/s);
     expect(theme).not.toMatch(/\b(?:th|td)\s*\{[^}]*border:/s);
   });
 
-  it("将加号和拖拽入口统一收紧为 22px 按钮与 14px 图标", () => {
+  it("将单一块手柄统一为 32px 命中区与 16px 图标", () => {
     expect(theme).toMatch(
-      /\.milkdown-block-handle\s+\.operation-item\s*\{[^}]*width:\s*22px;[^}]*height:\s*22px;/s,
+      /\.document-block-handle\s*\{[^}]*width:\s*var\(--document-editor-handle-size\);[^}]*height:\s*var\(--document-editor-handle-size\);/s,
     );
     expect(theme).toMatch(
-      /\.milkdown-block-handle\s+\.operation-item\s+svg\s*\{[^}]*width:\s*14px;[^}]*height:\s*14px;/s,
+      /\.document-block-handle-icon,[\s\S]*?width:\s*var\(--document-editor-icon-size\);[\s\S]*?height:\s*var\(--document-editor-icon-size\);/s,
+    );
+    expect(theme).not.toMatch(/\.operation-item/);
+  });
+
+  it("隐藏块手柄时保留尺寸供 BlockProvider 测量", () => {
+    expect(theme).toMatch(
+      /\.document-block-handle\[data-show=["']false["']\]\s*\{[^}]*visibility:\s*hidden;[^}]*pointer-events:\s*none;/s,
+    );
+    expect(theme).not.toMatch(
+      /\.document-block-handle\[data-show=["']false["']\][^{]*\{[^}]*display:\s*none/s,
     );
   });
 
-  it("为两个块操作按钮保留不会被宿主裁切的左侧沟槽", () => {
+  it("保留单一手柄的键盘可操作性，并不再隐藏或转发原生控件", () => {
     expect(theme).toMatch(
-      /\.ProseMirror\s*\{[^}]*padding:\s*16px\s+64px\s+40px;/s,
+      /\.document-block-handle-trigger\s*\{[^}]*cursor:\s*grab;/s,
     );
     expect(theme).toMatch(
-      /@media\s*\(max-width:\s*640px\)[^{]*\{[\s\S]*?\.ProseMirror\s*\{[^}]*padding:\s*12px\s+56px\s+32px;/s,
+      /\.document-editor-overlays\s+\[data-safe="false"\]\s*\{[^}]*visibility:\s*hidden;/s,
+    );
+    expect(theme).not.toMatch(/operation-item|synthetic|MutationObserver/);
+  });
+
+  it("为紧凑正文保留 32px/28px 手柄沟槽并收紧编辑区内边距", () => {
+    expect(theme).toMatch(/--document-editor-gutter:\s*32px;/);
+    expect(theme).toMatch(/--document-editor-mobile-gutter:\s*28px;/);
+    expect(theme).toMatch(/--document-editor-padding-top:\s*12px;/);
+    expect(theme).toMatch(/--document-editor-padding-bottom:\s*24px;/);
+  });
+
+  it("收紧普通段落与连续列表项的垂直节奏并统一标记列", () => {
+    expect(theme).toMatch(
+      /\.ProseMirror\s*>\s*\*\s*\+\s*\*\s*\{[^}]*margin-top:\s*var\(--document-editor-block-gap\);/s,
+    );
+    expect(theme).toMatch(
+      /\.ProseMirror\s+p\s*\{[^}]*margin-block:\s*0\.25em;/s,
+    );
+    expect(theme).toMatch(
+      /\.milkdown-list-item-block\s+\.children\s*>\s*p\s*\{[^}]*margin:\s*0;/s,
+    );
+    expect(theme).toMatch(
+      /\.milkdown-list-item-block\s*\+\s*\.milkdown-list-item-block\s*\{[^}]*margin-top:\s*4px;/s,
+    );
+    expect(theme).toMatch(/--document-editor-list-marker-size:\s*24px;/);
+    expect(theme).toMatch(
+      /\.milkdown-list-item-block[\s\S]*?\.label-wrapper[\s\S]*?width:\s*var\(--document-editor-list-marker-size\);/s,
     );
   });
 
@@ -174,7 +228,7 @@ describe("Crepe 宿主主题契约", () => {
 
   it("隐藏批注编辑器左侧的块级拖拽手柄", () => {
     expect(theme).toMatch(
-      /\.document-editor-crepe\.config-comment-editor\s+\.milkdown\s+\.milkdown-block-handle\s*\{[^}]*display:\s*none\s*!important;/s,
+      /\.document-editor-crepe\.config-comment-editor\s+\.document-block-handle\s*\{[^}]*display:\s*none\s*!important;/s,
     );
   });
 });

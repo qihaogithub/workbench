@@ -78,6 +78,18 @@
     0 2px 6px color-mix(in srgb, hsl(var(--foreground)) 15%, transparent),
     0 1px 2px color-mix(in srgb, hsl(var(--foreground)) 10%, transparent);
 
+  --document-editor-gutter: 32px;
+  --document-editor-mobile-gutter: 28px;
+  --document-editor-padding-top: 12px;
+  --document-editor-padding-bottom: 24px;
+  --document-editor-handle-size: 32px;
+  --document-editor-icon-size: 16px;
+  --document-editor-list-marker-size: 24px;
+  --document-editor-overlay-gap: 8px;
+  --document-editor-block-menu-max-height: 360px;
+  --document-editor-line-height: 1.6;
+  --document-editor-block-gap: 8px;
+
   color: var(--crepe-color-on-background);
   min-width: 0;
   width: 100%;
@@ -101,6 +113,23 @@
   position: relative;
 }
 
+/* 浮层独立于正文滚动层；坐标由 editor-scoped positioner 写入，不能遮挡正文。 */
+.document-editor-overlays {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.document-editor-overlays > * {
+  pointer-events: auto;
+}
+
+.document-editor-overlays [data-safe="false"] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* 规范说明等嵌入式只读内容由父级统一滚动，避免产生嵌套滚动条。 */
 .document-editor-crepe[data-scrollable="false"] > .crepe,
 .document-editor-crepe[data-scrollable="false"] .milkdown {
@@ -121,12 +150,13 @@
   width: 100%;
   max-width: 880px;
   margin: 0 auto;
-  padding: 16px 64px 40px;
+  padding: var(--document-editor-padding-top) var(--document-editor-gutter)
+    var(--document-editor-padding-bottom);
   color: var(--crepe-color-on-background);
   caret-color: var(--crepe-color-primary);
   font-family: var(--crepe-font-default);
   font-size: 15px;
-  line-height: 1.75;
+  line-height: var(--document-editor-line-height);
   word-break: break-word;
   outline: none;
 }
@@ -173,7 +203,7 @@
 }
 
 /* 批注编辑器不需要块级拖拽手柄，避免紧凑输入框左侧出现无意义的操作入口。 */
-.document-editor-crepe.config-comment-editor .milkdown .milkdown-block-handle {
+.document-editor-crepe.config-comment-editor .document-block-handle {
   display: none !important;
 }
 
@@ -188,7 +218,6 @@
   min-height: 44px;
   padding: 0 8px;
   overflow: visible;
-  flex-wrap: nowrap;
   border-bottom: 1px solid var(--crepe-color-surface-low);
   background: var(--crepe-color-surface);
 }
@@ -197,15 +226,25 @@
   display: none;
 }
 
+.document-editor-crepe[data-readonly="true"] .document-block-handle {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.document-editor-crepe[data-readonly="true"] .document-block-menu,
+.document-editor-crepe[data-readonly="true"] .document-selection-toolbar {
+  display: none !important;
+}
+
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-inner {
   position: relative;
   box-sizing: border-box;
-  flex: 1 1 0;
+  display: flex;
+  flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
-  padding-right: 48px;
   overflow: visible;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-inner > * {
@@ -272,71 +311,8 @@
   text-align: left;
 }
 
-.document-editor-crepe > .top-bar-overflow {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  z-index: 20;
-}
-
-.document-editor-crepe .top-bar-overflow-trigger,
-.document-editor-crepe .top-bar-overflow-item {
-  display: inline-flex;
-  width: 32px;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--crepe-color-on-surface);
-}
-
-.document-editor-crepe .top-bar-overflow-trigger {
-  font-size: 20px;
-  line-height: 1;
-}
-
-.document-editor-crepe .top-bar-overflow-trigger:hover,
-.document-editor-crepe .top-bar-overflow-item:hover,
-.document-editor-crepe .top-bar-overflow-heading:hover,
-.document-editor-crepe .top-bar-overflow-heading-option:hover,
-.document-editor-crepe .top-bar-overflow-back:hover {
-  background: var(--crepe-color-hover);
-}
-
-.document-editor-crepe .top-bar-overflow-menu {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 4px);
-  right: 0;
-  display: flex;
-  min-width: 144px;
-  flex-wrap: wrap;
-  gap: 2px;
-  padding: 6px;
-  border: 1px solid var(--crepe-color-surface-low);
-  border-radius: 8px;
-  background: var(--crepe-color-surface);
-  box-shadow: var(--crepe-shadow-2);
-}
-
-.document-editor-crepe .top-bar-overflow-heading,
-.document-editor-crepe .top-bar-overflow-heading-option,
-.document-editor-crepe .top-bar-overflow-back {
-  width: 100%;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--crepe-color-on-surface);
-  font: inherit;
-  text-align: left;
-}
-
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item svg,
-.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item svg,
-.document-editor-crepe .top-bar-overflow-item svg {
+.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item svg {
   color: var(--crepe-color-on-surface);
   fill: var(--crepe-color-on-surface);
   opacity: 1;
@@ -361,103 +337,264 @@
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item:hover svg,
 .document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item:hover svg,
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item.active svg,
-.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item.active svg,
-.document-editor-crepe .top-bar-overflow-item:hover svg {
+.document-editor-crepe .milkdown .milkdown-toolbar .toolbar-item.active svg {
   color: var(--crepe-color-primary);
   fill: var(--crepe-color-primary);
   opacity: 1;
 }
 
-.document-editor-crepe .milkdown .milkdown-block-handle {
-  gap: 2px;
+.document-editor-crepe .document-block-handle {
+  position: absolute;
+  display: flex;
+  width: var(--document-editor-handle-size);
+  height: var(--document-editor-handle-size);
+  align-items: center;
+  justify-content: center;
 }
 
-.document-editor-crepe .milkdown .milkdown-block-handle .operation-item {
-  width: 22px;
-  height: 22px;
-  padding: 4px;
-  transition: background-color 160ms ease;
+.document-editor-crepe .document-block-handle[data-show="false"] {
+  visibility: hidden;
+  pointer-events: none;
 }
 
-.document-editor-crepe .milkdown .milkdown-block-handle .operation-item svg {
-  width: 14px;
-  height: 14px;
+.document-editor-crepe .document-block-menu[data-show="false"],
+.document-editor-crepe .document-selection-toolbar[data-show="false"] {
+  display: none;
+}
+
+.document-editor-crepe .document-block-handle-trigger {
+  display: inline-flex;
+  width: var(--document-editor-handle-size);
+  height: var(--document-editor-handle-size);
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: grab;
+  color: var(--crepe-color-on-surface);
+}
+
+.document-editor-crepe .document-block-handle-trigger:active {
+  cursor: grabbing;
+}
+
+.document-editor-crepe .document-block-handle-trigger:hover,
+.document-editor-crepe .document-block-handle-trigger:focus-visible {
+  background: var(--crepe-color-hover);
+}
+
+.document-editor-crepe .document-block-handle-icon,
+.document-editor-crepe .document-block-handle-icon svg {
+  display: inline-flex;
+  width: var(--document-editor-icon-size);
+  height: var(--document-editor-icon-size);
+  align-items: center;
+  justify-content: center;
   color: var(--crepe-color-on-surface);
   fill: var(--crepe-color-on-surface);
   opacity: 1;
 }
 
-.document-editor-crepe .milkdown .milkdown-slash-menu {
+.document-editor-crepe .document-block-menu {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  width: min(304px, calc(100vw - 16px));
+  min-height: 0;
+  flex-direction: column;
+  max-width: var(--document-overlay-max-width, min(304px, calc(100vw - 16px)));
+  max-height: min(
+    var(--document-editor-block-menu-max-height),
+    var(--document-overlay-max-height, var(--document-editor-block-menu-max-height))
+  );
+  overflow: hidden;
+  border: 1px solid var(--crepe-color-outline);
   border-radius: 8px;
+  background: var(--crepe-color-surface);
+  box-shadow: var(--crepe-shadow-2);
+  color: var(--crepe-color-on-surface);
+  font-family: var(--crepe-font-default);
 }
 
-.document-editor-crepe .milkdown .milkdown-slash-menu .tab-group {
+.document-editor-crepe .document-block-menu .document-block-menu-tabs {
+  flex: 0 0 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--crepe-color-surface);
   padding: 4px 6px 0;
 }
 
-.document-editor-crepe .milkdown .milkdown-slash-menu .tab-group ul {
-  gap: 2px;
-  padding: 2px;
+.document-editor-crepe
+  .document-block-menu
+  .document-block-menu-tabs::-webkit-scrollbar {
+  display: none;
 }
 
-.document-editor-crepe .milkdown .milkdown-slash-menu .tab-group ul li {
+.document-editor-crepe .document-block-menu .document-block-menu-tabs ul {
+  display: flex;
+  width: max-content;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+}
+
+.document-editor-crepe .document-block-menu .document-block-menu-tab {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--crepe-color-on-surface-variant);
+  cursor: pointer;
   padding: 4px 8px;
+  font: inherit;
   font-size: 13px;
   line-height: 18px;
 }
 
-.document-editor-crepe .milkdown .milkdown-slash-menu .menu-groups {
-  max-height: min(320px, 55vh);
+.document-editor-crepe
+  .document-block-menu
+  .document-block-menu-tab[aria-selected="true"],
+.document-editor-crepe .document-block-menu .document-block-menu-tab:hover {
+  background: var(--crepe-color-hover);
+  color: var(--crepe-color-on-surface);
+}
+
+.document-editor-crepe .document-block-menu .document-block-menu-groups {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  margin: 0;
   padding: 2px 6px 6px;
 }
 
-.document-editor-crepe
-  .milkdown
-  .milkdown-slash-menu
-  .menu-groups
-  .menu-group
-  h6 {
-  padding: 7px 8px 4px;
-  font-size: 12px;
-  line-height: 16px;
-  text-transform: none;
+.document-editor-crepe .document-block-menu .document-block-menu-panel {
+  overscroll-behavior: contain;
 }
 
-.document-editor-crepe
-  .milkdown
-  .milkdown-slash-menu
-  .menu-groups
-  .menu-group
-  li {
+.document-editor-crepe .document-block-menu .document-block-menu-group {
+  margin: 0;
+}
+
+.document-editor-crepe .document-block-menu .document-block-menu-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.document-editor-crepe .document-block-menu .document-block-menu-item {
+  display: flex;
+  width: 100%;
   min-width: 176px;
+  align-items: center;
   gap: 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--crepe-color-on-surface);
+  cursor: pointer;
   padding: 7px 8px;
+  font: inherit;
+  text-align: left;
 }
 
-.document-editor-crepe
-  .milkdown
-  .milkdown-slash-menu
-  .menu-groups
-  .menu-group
-  li
-  svg {
+.document-editor-crepe .document-block-menu .document-block-menu-item:hover,
+.document-editor-crepe .document-block-menu .document-block-menu-item.selected {
+  background: var(--crepe-color-hover);
+}
+
+.document-editor-crepe .document-block-menu .document-block-menu-icon,
+.document-editor-crepe .document-block-menu .document-block-menu-icon svg {
+  display: inline-flex;
   width: 18px;
   height: 18px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+  color: var(--crepe-color-on-surface);
+  fill: var(--crepe-color-on-surface);
 }
 
-.document-editor-crepe
-  .milkdown
-  .milkdown-slash-menu
-  .menu-groups
-  .menu-group
-  li
-  > span {
+.document-editor-crepe .document-block-menu .document-block-menu-item > span {
   font-size: 13px;
   line-height: 18px;
 }
 
+.document-editor-crepe .document-selection-toolbar {
+  position: absolute;
+  box-sizing: border-box;
+  display: inline-flex;
+  max-width: var(--document-overlay-max-width, calc(100vw - 16px));
+  min-height: 40px;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  border: 1px solid var(--crepe-color-surface-low);
+  border-radius: 8px;
+  background: var(--crepe-color-surface);
+  box-shadow: var(--crepe-shadow-2);
+  color: var(--crepe-color-on-surface);
+  white-space: nowrap;
+}
+
+.document-editor-crepe .document-selection-toolbar-heading,
+.document-editor-crepe .document-selection-toolbar-item {
+  box-sizing: border-box;
+  height: 32px;
+}
+
+.document-editor-crepe .document-selection-toolbar-heading {
+  min-width: 64px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--crepe-color-on-surface);
+  cursor: pointer;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.document-editor-crepe .document-selection-toolbar-heading:hover,
+.document-editor-crepe .document-selection-toolbar-item:hover,
+.document-editor-crepe .document-selection-toolbar-item.active {
+  background: var(--crepe-color-hover);
+}
+
+.document-editor-crepe .document-selection-toolbar-item {
+  display: inline-flex;
+  width: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--crepe-color-on-surface);
+  cursor: pointer;
+}
+
+.document-editor-crepe .document-selection-toolbar-icon,
+.document-editor-crepe .document-selection-toolbar-icon svg {
+  display: inline-flex;
+  width: var(--document-editor-icon-size);
+  height: var(--document-editor-icon-size);
+  align-items: center;
+  justify-content: center;
+  color: var(--crepe-color-on-surface);
+  fill: var(--crepe-color-on-surface);
+}
+
+.document-editor-crepe .document-selection-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  margin-inline: 3px;
+  background: var(--crepe-color-surface-low);
+}
+
 .document-editor-crepe .milkdown .ProseMirror > * + * {
-  margin-top: 0.8em;
+  margin-top: var(--document-editor-block-gap);
 }
 
 .document-editor-crepe .milkdown .ProseMirror h1,
@@ -484,7 +621,54 @@
   margin-top: 1.1em;
 }
 .document-editor-crepe .milkdown .ProseMirror p {
-  margin-block: 0.6em;
+  margin-block: 0.25em;
+}
+
+.document-editor-crepe .milkdown .ProseMirror > p {
+  margin-block: 0;
+}
+
+/* 列表项自带 32px 标签行，正文不再叠加段落外边距，避免项目之间被撑开。 */
+.document-editor-crepe
+  .milkdown
+  .ProseMirror
+  .milkdown-list-item-block
+  > .list-item {
+  gap: var(--document-editor-overlay-gap);
+}
+
+.document-editor-crepe
+  .milkdown
+  .ProseMirror
+  .milkdown-list-item-block
+  .label-wrapper {
+  width: var(--document-editor-list-marker-size);
+}
+
+.document-editor-crepe
+  .milkdown
+  .ProseMirror
+  .milkdown-list-item-block
+  .label-wrapper
+  .label {
+  width: var(--document-editor-list-marker-size);
+}
+
+.document-editor-crepe
+  .milkdown
+  .ProseMirror
+  .milkdown-list-item-block
+  .children
+  > p {
+  margin: 0;
+}
+
+.document-editor-crepe
+  .milkdown
+  .ProseMirror
+  .milkdown-list-item-block
+  + .milkdown-list-item-block {
+  margin-top: 4px;
 }
 .document-editor-crepe .milkdown .ProseMirror a {
   color: var(--crepe-color-primary);
@@ -499,79 +683,6 @@
 .document-editor-crepe .milkdown .ProseMirror hr {
   margin: 2em 0;
   border-color: var(--crepe-color-outline);
-}
-
-.document-editor-crepe .milkdown .heading-style-selector {
-  position: relative;
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  margin: 6px;
-}
-
-.document-editor-crepe .milkdown .heading-style-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 48px;
-  height: 30px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--crepe-color-on-surface);
-  font: inherit;
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.document-editor-crepe .milkdown .heading-style-chevron {
-  display: inline-flex;
-  width: 12px;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  pointer-events: none;
-}
-
-.document-editor-crepe .milkdown .heading-style-trigger:hover,
-.document-editor-crepe .milkdown .heading-style-trigger[aria-expanded="true"] {
-  background: var(--crepe-color-hover);
-}
-
-.document-editor-crepe .milkdown .heading-style-menu {
-  position: absolute;
-  z-index: 2;
-  top: calc(100% + 6px);
-  left: 0;
-  display: grid;
-  min-width: 128px;
-  padding: 4px;
-  border: 1px solid var(--crepe-color-surface-low);
-  border-radius: 8px;
-  background: var(--crepe-color-surface);
-  box-shadow: var(--crepe-shadow-2);
-}
-
-.document-editor-crepe .milkdown .milkdown-toolbar {
-  overflow: visible;
-}
-
-.document-editor-crepe .milkdown .heading-style-option {
-  min-height: 30px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--crepe-color-on-surface);
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-}
-
-.document-editor-crepe .milkdown .heading-style-option:hover,
-.document-editor-crepe .milkdown .heading-style-option[aria-checked="true"] {
-  background: var(--crepe-color-hover);
 }
 
 .document-editor-crepe .milkdown .ProseMirror:focus-visible {
@@ -610,7 +721,8 @@
 @media (max-width: 640px) {
   .document-editor-crepe .milkdown .ProseMirror {
     max-width: none;
-    padding: 12px 56px 32px;
+    padding: var(--document-editor-padding-top)
+      var(--document-editor-mobile-gutter) var(--document-editor-padding-bottom);
     font-size: 14px;
   }
 }

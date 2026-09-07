@@ -654,6 +654,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.3)
+      '@floating-ui/dom':
+        specifier: ^1.7.6
+        version: 1.7.6
       '@milkdown/crepe':
         specifier: ^7.22.0
         version: 7.22.0(typescript@5.9.3)
