@@ -1,10 +1,8 @@
 import type { DemoPageMeta } from "@workbench/shared/contracts";
 import type { KnowledgeItemMeta } from "../internal-types.js";
 
-export type MarkdownReferenceTarget =
-  | { kind: "project"; projectId: string }
-  | { kind: "page"; projectId: string; pageId: string }
-  | { kind: "document"; projectId: string; docId: string };
+import type { MarkdownReferenceTarget, MarkdownReferenceCandidate as SharedCandidate } from "@workbench/shared/markdown-reference";
+export type { MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
 
 export type MarkdownReferenceSource =
   | { kind: "knowledge-document"; projectId: string; workspaceId: string; docId: string }
@@ -21,6 +19,8 @@ export type ReferenceTargetState = "active" | "missing" | "deleted" | "forbidden
 export type ReferenceClientState = "resolved" | "unavailable";
 
 export interface ResourceDirectoryEntry {
+  hierarchy?: SharedCandidate["hierarchy"];
+  documentGroup?: string;
   target: MarkdownReferenceTarget;
   label: string;
   displayPath: string;
@@ -30,6 +30,7 @@ export interface ResourceDirectoryEntry {
 }
 
 export interface ResourceDirectorySnapshot {
+  entries?: readonly ResourceDirectoryEntry[];
   project: { id: string; name: string };
   pages?: readonly DemoPageMeta[];
   documents?: readonly KnowledgeItemMeta[];
@@ -42,6 +43,8 @@ export interface ReferencePolicy {
 }
 
 export interface MarkdownReferenceCandidate {
+  hierarchy?: SharedCandidate["hierarchy"];
+  documentGroup?: string;
   target: MarkdownReferenceTarget;
   label: string;
   displayPath: string;

@@ -2,12 +2,14 @@ import type { MarkdownReferenceTarget } from "./types";
 
 export const MARKDOWN_REFERENCE_PROTOCOL = "wb";
 export const MARKDOWN_REFERENCE_VERSION = 1;
+/** Derived-index capability version; independent of the stable wire format. */
+export const MARKDOWN_REFERENCE_INDEX_VERSION = "markdown-reference-v2";
 
-const KINDS = new Set<MarkdownReferenceTarget["kind"]>(["project", "page", "document"]);
+const KINDS = new Set<MarkdownReferenceTarget["kind"]>(["project", "page", "document", "config"]);
 
 function encodePart(value: string): string {
   if (!value) throw new Error("Workbench reference IDs must be non-empty");
-  return encodeURIComponent(value);
+  return encodeURIComponent(value).replace(/[!'()*]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
 function decodePart(value: string): string | undefined {
@@ -24,7 +26,11 @@ export function encodeMarkdownReferenceUri(target: MarkdownReferenceTarget): str
   switch (target.kind) {
     case "project": return `wb://project/${encodePart(target.projectId)}`;
     case "page": return `wb://page/${encodePart(target.projectId)}/${encodePart(target.pageId)}`;
-    case "document": return `wb://document/${encodePart(target.projectId)}/${encodePart(target.docId)}`;
+    case "config": return `wb://config/${encodePart(target.projectId)}/${encodePart(target.pageId)}/${encodePart(target.fieldPath)}`;
+    case "document": {
+      if ((target.documentKind === "memory" && target.docId !== "memory") || (target.documentKind === "project-convention" && target.docId !== "convention")) throw new Error("Invalid fixed document ID");
+      return `wb://document/${encodePart(target.projectId)}/${target.documentKind && target.documentKind !== "knowledge" ? `${encodePart(target.documentKind)}/` : ""}${encodePart(target.docId)}`;
+    }
   }
 }
 
@@ -38,6 +44,13 @@ export function decodeMarkdownReferenceUri(uri: string): MarkdownReferenceTarget
   if (kind === "project" && values.length === 1) return { kind, projectId: values[0]! };
   if (kind === "page" && values.length === 2) return { kind, projectId: values[0]!, pageId: values[1]! };
   if (kind === "document" && values.length === 2) return { kind, projectId: values[0]!, docId: values[1]! };
+  if (kind === "config" && values.length === 3) return { kind, projectId: values[0]!, pageId: values[1]!, fieldPath: values[2]! };
+  if (kind === "document" && values.length === 3) {
+    const documentKind = values[1];
+    if (documentKind !== "memory" && documentKind !== "project-convention" && documentKind !== "page-convention" && documentKind !== "design-spec") return undefined;
+    if ((documentKind === "memory" && values[2] !== "memory") || (documentKind === "project-convention" && values[2] !== "convention")) return undefined;
+    return { kind, projectId: values[0]!, documentKind, docId: values[2]! };
+  }
   return undefined;
 }
 

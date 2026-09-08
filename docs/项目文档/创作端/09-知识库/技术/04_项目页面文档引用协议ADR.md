@@ -11,11 +11,11 @@ covers:
 
 ## 状态
 
-已接受（2026-09-01）。该决策由 shared、project-core、author-site、demo-ui 和 viewer-site 的实现共同约束；后续变更应同步更新协议、索引和发布快照测试。
+已接受（2026-09-01），2026-09-08 扩展项目内配置定义和文档类别。该决策由 shared、project-core、author-site、demo-ui 和 viewer-site 的实现共同约束；后续变更应同步更新协议、索引和发布快照测试。
 
 ## 决策
 
-1. 用户可见的项目、页面和知识文档引用统一使用标准 Markdown 链接承载 `wb://` v1 URI。URI 只包含稳定 ID，显示标签是快照，不作为身份。
+1. 项目内容引用使用标准 Markdown 链接承载 `wb://` URI。新插入入口限定当前项目的页面、配置字段定义和文档，不提供项目自身或数组数据实例。URI 只包含稳定身份；标签保存插入时快照，编辑器以当前目录名称展示但不改写正文。文档类别及配置定义路径见[协议实现](03_项目页面文档引用与双向链接.md#协议)。
 2. 解析器使用 `@workbench/shared/markdown-reference` 内的轻量扫描器。它在识别 fenced/inline code、HTML 属性、嵌套括号和转义后解析 `wb://`，不引入 Markdown AST 运行时依赖，避免把编辑器首屏包体和服务端索引绑定到特定 Markdown 实现。Markdown-it、Streamdown 和 Milkdown 只消费共享解析结果或各自的薄渲染适配器。
 3. 权限和实体存在性不在 parser 中判断；`project-core` 的 `ResourceDirectory/EntityResolver` 负责同项目解析，并将无权获知的状态投影为 `unavailable`。
 4. outgoing/backlinks 使用位于 `DATA_DIR/derived/markdown-links.sqlite` 的可重建 generation 索引。Authority receipt 的 revision/root hash 只用于拒绝旧投影；正文和 manifest 不依赖索引才能读取。

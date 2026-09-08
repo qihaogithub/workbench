@@ -44,11 +44,11 @@ function isFence(line: string): boolean {
 function wbDiagnostic(text: string, destination: string, start: number, end: number): MarkdownReferenceDiagnostic {
   const raw = destination.slice(5);
   const kind = raw.split(/[/?#]/)[0];
-  if (!["project", "page", "document"].includes(kind)) {
+  if (!["project", "page", "document", "config"].includes(kind)) {
     return diagnostic(text, "unknown-target-kind", `Unknown wb target kind: ${kind || "(missing)"}`, start, end);
   }
   const segments = raw.split("/").slice(1);
-  if (segments.some((segment) => !segment) || (kind === "project" ? segments.length !== 1 : segments.length !== 2)) {
+  if (segments.some((segment) => !segment) || !(kind === "project" ? [1] : kind === "config" ? [3] : kind === "document" ? [2, 3] : [2]).includes(segments.length)) {
     return diagnostic(text, "missing-target-id", "Workbench reference has a missing or invalid target ID", start, end);
   }
   return diagnostic(text, "malformed-wb-uri", "Malformed Workbench reference URI", start, end);

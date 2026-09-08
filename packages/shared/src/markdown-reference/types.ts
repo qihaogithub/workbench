@@ -1,8 +1,10 @@
 /** The entities that can be addressed by a user-visible Workbench link. */
+export type MarkdownReferenceDocumentKind = "knowledge" | "memory" | "project-convention" | "page-convention" | "design-spec";
 export type MarkdownReferenceTarget =
   | { kind: "project"; projectId: string }
   | { kind: "page"; projectId: string; pageId: string }
-  | { kind: "document"; projectId: string; docId: string };
+  | { kind: "config"; projectId: string; pageId: string; fieldPath: string }
+  | { kind: "document"; projectId: string; docId: string; documentKind?: MarkdownReferenceDocumentKind };
 
 export type MarkdownReferenceSource =
   | { kind: "knowledge-document"; projectId: string; workspaceId: string; docId: string }
@@ -24,6 +26,9 @@ export interface ReferencePolicy {
 }
 
 export interface MarkdownReferenceCandidate {
+  label?: string;
+  hierarchy?: Array<{ id: string; label: string; kind: "folder" | "page" | "config" | "group" }>;
+  documentGroup?: string;
   target: MarkdownReferenceTarget;
   displayPath: string;
   aliases?: string[];

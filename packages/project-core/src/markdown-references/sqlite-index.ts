@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { encodeMarkdownReferenceUri, MARKDOWN_REFERENCE_INDEX_VERSION } from "@workbench/shared/markdown-reference";
 import path from "node:path";
 import Database from "better-sqlite3";
 
@@ -11,7 +12,7 @@ import type {
   MarkdownReferenceTarget,
 } from "./types.js";
 
-const DEFAULT_PARSER_VERSION = "markdown-reference-v1";
+const DEFAULT_PARSER_VERSION = MARKDOWN_REFERENCE_INDEX_VERSION;
 
 export interface SqliteMarkdownReferenceIndexOptions {
   /** The database is a derived cache and must live outside any workspace. */
@@ -82,6 +83,7 @@ export class SqliteMarkdownReferenceIndex {
     const scope = { projectId, workspaceId: input.workspaceId };
     const current = this.snapshot(scope);
     if (!current) return this.rebuild(input);
+    if (current.parserVersion !== (input.parserVersion ?? DEFAULT_PARSER_VERSION)) throw new Error("MARKDOWN_REFERENCE_REBUILD_REQUIRED");
     if (isIncomingReceiptOlder(input, current)) return current;
 
     const memory = buildMemorySnapshot(input);
@@ -140,7 +142,7 @@ export class SqliteMarkdownReferenceIndex {
 
   status(scope: MarkdownReferenceIndexScope): MarkdownReferenceIndexStatus {
     const snapshot = this.snapshot(scope);
-    return { status: snapshot ? "ready" : "stale", snapshot };
+    return { status: snapshot?.parserVersion === DEFAULT_PARSER_VERSION ? "ready" : "stale", snapshot };
   }
 
   outgoing(source: MarkdownReferenceSource): MarkdownLinkRecord[] {
@@ -333,11 +335,11 @@ function sourceKey(source: MarkdownReferenceSource): string {
 }
 
 function targetKey(target: MarkdownReferenceTarget): string {
-  return JSON.stringify(target);
+  return encodeMarkdownReferenceUri(target);
 }
 
 function targetResourceId(target: MarkdownReferenceTarget): string {
-  return target.kind === "project" ? target.projectId : target.kind === "page" ? target.pageId : target.docId;
+  return encodeMarkdownReferenceUri(target);
 }
 
 function sameSource(a: MarkdownReferenceSource, b: MarkdownReferenceSource): boolean {

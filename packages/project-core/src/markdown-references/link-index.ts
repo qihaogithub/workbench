@@ -1,7 +1,7 @@
 import type { MarkdownReferenceSourceDocument, MarkdownLinkIndexSnapshot, MarkdownLinkRecord, MarkdownReferenceTarget, MarkdownReferenceSource, ResourceDirectorySnapshot } from "./types.js";
 import { EntityResolver } from "./entity-resolver.js";
 import { ResourceDirectory } from "./resource-directory.js";
-import { parseMarkdownReferences } from "@workbench/shared/markdown-reference";
+import { parseMarkdownReferences, encodeMarkdownReferenceUri, MARKDOWN_REFERENCE_INDEX_VERSION } from "@workbench/shared/markdown-reference";
 
 export interface MarkdownReferenceIndexStore {
   rebuild(input: RebuildMarkdownReferenceIndexInput): MarkdownLinkIndexSnapshot;
@@ -111,7 +111,7 @@ export class InMemoryMarkdownReferenceIndex implements MarkdownReferenceIndexSto
       const position = positionAt(document.markdown, reference.start);
       return { ...reference, source: document.source, line: reference.line ?? position.line, column: reference.column ?? position.column, contentHash: document.contentHash, targetState: resolved.targetState };
     }));
-    this.current = { projectId, workspaceId: input.workspaceId, authorityMutationId: input.authorityMutationId, authorityRevision: input.authorityRevision, authorityRootHash: input.authorityRootHash, generatedAt: Date.now(), parserVersion: input.parserVersion ?? "markdown-reference-v1", records };
+    this.current = { projectId, workspaceId: input.workspaceId, authorityMutationId: input.authorityMutationId, authorityRevision: input.authorityRevision, authorityRootHash: input.authorityRootHash, generatedAt: Date.now(), parserVersion: input.parserVersion ?? MARKDOWN_REFERENCE_INDEX_VERSION, records };
     return this.current;
   }
   snapshot() { return this.current; }
@@ -134,28 +134,9 @@ function sameSource(a: MarkdownReferenceSource, b: MarkdownReferenceSource): boo
   }
 }
 function sameTarget(a: MarkdownReferenceTarget, b: MarkdownReferenceTarget): boolean {
-  if (a.kind !== b.kind || a.projectId !== b.projectId) return false;
-  return a.kind === "project"
-    ? b.kind === "project"
-    : a.kind === "page"
-      ? b.kind === "page" && a.pageId === b.pageId
-      : b.kind === "document" && a.docId === b.docId;
+  return encodeMarkdownReferenceUri(a) === encodeMarkdownReferenceUri(b);
 }
 function positionAt(markdown: string, offset: number) { const before = markdown.slice(0, offset); const line = before.split("\n").length; return { line, column: offset - (before.lastIndexOf("\n") + 1) + 1 }; }
 function parseCanonicalReferences(markdown: string): ParsedIndexReference[] {
-  const result: ParsedIndexReference[] = []; const pattern = /\[([^\]]*)\]\(wb:\/\/([^\s)]+)\)/g; let match: RegExpExecArray | null;
-  while ((match = pattern.exec(markdown))) { const target = decodeTarget(match[2]); if (target) result.push({ target, labelSnapshot: match[1], start: match.index, end: pattern.lastIndex }); }
-  return result;
-}
-function decodeTarget(value: string): MarkdownReferenceTarget | null {
-  try {
-    const parts = value.split("/").map((part) => decodeURIComponent(part));
-    if (parts.some((part) => !part)) return null;
-    if (parts[0] === "project" && parts.length === 2) return { kind: "project", projectId: parts[1] };
-    if (parts[0] === "page" && parts.length === 3) return { kind: "page", projectId: parts[1], pageId: parts[2] };
-    if (parts[0] === "document" && parts.length === 3) return { kind: "document", projectId: parts[1], docId: parts[2] };
-    return null;
-  } catch {
-    return null;
-  }
+  return parseMarkdownReferences(markdown).references;
 }
