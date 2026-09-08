@@ -1,6 +1,7 @@
 "use client";
 
 import MarkdownIt from "markdown-it";
+import "./markdown/project-reference-presentation.css";
 import {
   decodeMarkdownReferenceUri,
   parseMarkdownReferences,
@@ -58,6 +59,8 @@ const ALLOWED_ATTR = [
   "data-type",
   "data-checked",
   "data-reference-uri",
+  "data-reference-kind",
+  "aria-label",
   // 媒体属性
   "src",
   "alt",
@@ -73,10 +76,7 @@ const ALLOWED_ATTR = [
 ];
 
 /** 仅允许同源受控路径（/api/、/data/ 等），禁止协议相对 // 与外部绝对地址。 */
-function isSafeMediaSrc(
-  src: string,
-  allowExternalMedia = false,
-): boolean {
+function isSafeMediaSrc(src: string, allowExternalMedia = false): boolean {
   const trimmed = src.trim();
   if (!trimmed) return false;
   if (allowExternalMedia && /^https:\/\//i.test(trimmed)) return true;
@@ -109,9 +109,9 @@ export function sanitizeNoteHtml(
   const template = document.createElement("template");
   template.innerHTML = sanitized;
   template.content
-    .querySelectorAll<HTMLImageElement | HTMLMediaElement | HTMLSourceElement>(
-      "img, video, audio, source",
-    )
+    .querySelectorAll<
+      HTMLImageElement | HTMLMediaElement | HTMLSourceElement
+    >("img, video, audio, source")
     .forEach((node) => {
       const src = node.getAttribute("src");
       const resolvedSrc = node.getAttribute("src");
@@ -153,7 +153,8 @@ export function renderNoteMarkdown(markdown: string): string {
 }
 
 /** Replace only parser-approved wb:// links (never code or HTML attributes)
- * with inert chips before Markdown-it renders the rest of the document. */
+ * with inert inline references before Markdown-it renders the rest of the document.
+ * Read-only output uses the stored snapshot; no live directory is consulted. */
 function replaceCanonicalReferenceMarkup(markdown: string): string {
   const references = parseMarkdownReferences(markdown).references;
   let result = markdown;
@@ -163,8 +164,10 @@ function replaceCanonicalReferenceMarkup(markdown: string): string {
     const uriEnd = raw.lastIndexOf(")");
     if (uriStart < 0 || uriEnd <= uriStart) continue;
     const uri = raw.slice(uriStart + 1, uriEnd);
-    if (!decodeMarkdownReferenceUri(uri)) continue;
-    result = `${result.slice(0, reference.start)}<span class="pr-reference" data-reference-uri="${escapeHtml(uri)}">${escapeHtml(reference.labelSnapshot)}</span>${result.slice(reference.end)}`;
+    const target = decodeMarkdownReferenceUri(uri);
+    if (!target) continue;
+    const label = escapeHtml(reference.labelSnapshot);
+    result = `${result.slice(0, reference.start)}<span class="pr-reference wb-reference" data-reference-uri="${escapeHtml(uri)}" data-reference-kind="${target.kind}" aria-label="${label}">${label}</span>${result.slice(reference.end)}`;
   }
   return result;
 }
@@ -178,18 +181,26 @@ const DEFAULT_READONLY_IMAGE_WIDTH = "default";
  * 渲染不会创建 Crepe 图片块，需在安全清洗后把该元数据转为受限的展示属性。
  */
 function applyReadonlyImageSizing(html: string): string {
-  return html.replace(/<img\b([^>]*)>/gi, (tag, attributes: string) => {
-    const alt = attributes.match(/\balt=(['"])(.*?)\1/i)?.[2] ?? "";
+  if (typeof document === "undefined") return html;
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  // Query actual images: an aria-label may safely contain literal "<img ...>".
+  // Matching serialized HTML with a regex would corrupt that attribute.
+  template.content.querySelectorAll("img").forEach((image) => {
+    const alt = image.getAttribute("alt") ?? "";
     const width = alt.startsWith(IMAGE_WIDTH_MARKER)
       ? Number(alt.slice(IMAGE_WIDTH_MARKER.length))
       : 0;
     if (!Number.isFinite(width) || width <= 0) {
-      return `${tag.slice(0, -1)} data-image-width="${DEFAULT_READONLY_IMAGE_WIDTH}">`;
+      image.setAttribute("data-image-width", DEFAULT_READONLY_IMAGE_WIDTH);
+      return;
     }
 
     const targetWidth = Math.round(width);
-    return `${tag.slice(0, -1)} data-image-width="${targetWidth}" style="width: min(${targetWidth}px, 100%)">`;
+    image.setAttribute("data-image-width", String(targetWidth));
+    image.style.width = `min(${targetWidth}px, 100%)`;
   });
+  return template.innerHTML;
 }
 
 /**

@@ -1,0 +1,112 @@
+.project-reference-picker {
+  position: fixed;
+  z-index: 100;
+  width: min(352px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--crepe-color-outline);
+  border-radius: 8px;
+  background: var(--crepe-color-surface);
+  color: var(--crepe-color-on-surface);
+  box-shadow: 0 8px 28px #0003;
+  font: 14px/1.5 var(--crepe-font-default);
+}
+.project-reference-picker button {
+  font: inherit;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+.project-reference-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 8px;
+  font-weight: 600;
+}
+.project-reference-heading button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+}
+.project-reference-tabs {
+  display: flex;
+  gap: 20px;
+  border-bottom: 1px solid var(--crepe-color-outline);
+  padding: 0 16px;
+}
+.project-reference-tabs button {
+  padding: 8px 3px;
+  border-bottom: 2px solid transparent;
+  color: var(--crepe-color-on-surface-variant);
+}
+.project-reference-tabs button[aria-selected="true"] {
+  color: var(--crepe-color-on-surface);
+  border-bottom-color: currentColor;
+}
+.project-reference-content {
+  min-height: 100px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 6px;
+  overscroll-behavior: contain;
+}
+.project-reference-content p,
+.project-reference-content [role="alert"] {
+  padding: 16px;
+  text-align: center;
+  color: var(--crepe-color-on-surface-variant);
+}
+.project-reference-content [role="alert"] button {
+  text-decoration: underline;
+}
+.project-reference-row {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  border-radius: 5px;
+}
+.project-reference-row:hover,
+.project-reference-row:focus-within {
+  background: var(--crepe-color-hover);
+}
+.project-reference-expand {
+  display: grid;
+  place-items: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 28px;
+}
+.project-reference-name {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 0;
+  text-align: left;
+}
+.project-reference-name svg {
+  flex: none;
+  color: var(--crepe-color-on-surface-variant);
+}
+.project-reference-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-reference-picker button:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+.project-reference-footer {
+  padding: 10px 14px;
+  border-top: 1px solid var(--crepe-color-outline);
+  color: var(--crepe-color-on-surface-variant);
+  font-size: 12px;
+}

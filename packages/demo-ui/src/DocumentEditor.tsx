@@ -15,6 +15,9 @@ import {
 import { documentBlockEdit } from "./markdown/document-block-edit";
 import { documentHeadingMenu } from "./markdown/document-heading-menu";
 import { documentSelectionToolbar } from "./markdown/document-selection-toolbar";
+import { ProjectReferencePicker } from "./markdown/ProjectReferencePicker";
+import { projectReferencePresentation } from "./markdown/project-reference-presentation";
+import "./markdown/project-reference-presentation.css";
 import {
   decodeMarkdownReferenceUri,
   serializeMarkdownReference,
@@ -227,6 +230,7 @@ function DocumentEditorInstance({
     candidates: MarkdownReferenceCandidate[];
     selectedIndex: number;
     anchor: DocumentMenuAnchor;
+    status: "loading" | "ready" | "error";
   } | null>(null);
   const referenceMenuRef = useRef(referenceMenu);
   referenceMenuRef.current = referenceMenu;
@@ -235,6 +239,68 @@ function DocumentEditorInstance({
   const referenceAbortRef = useRef<AbortController | null>(null);
   const openReferenceMenuRef = useRef<(() => void) | null>(null);
   const forceReferenceMenuRef = useRef(false);
+  const referenceDirectoryRef = useRef<MarkdownReferenceCandidate[] | null>(
+    null,
+  );
+  const retryReferenceMenuRef = useRef<(() => void) | null>(null);
+  const closeReferenceMenuRef = useRef<(() => void) | null>(null);
+  const dismissReferenceMenu = useCallback(
+    () => closeReferenceMenuRef.current?.(),
+    [],
+  );
+  useEffect(() => {
+    if (
+      !editorReady ||
+      !referenceProvider ||
+      !referenceContext ||
+      !value.includes("wb://")
+    )
+      return;
+    let controller: AbortController | null = null;
+    let disposed = false;
+    const refresh = () => {
+      controller?.abort();
+      const request = new AbortController();
+      controller = request;
+      Promise.resolve()
+        .then(() =>
+          referenceProvider({
+            query: "",
+            trigger: "@",
+            context: referenceContext,
+            signal: request.signal,
+          }),
+        )
+        .then((candidates) => {
+          if (disposed || request.signal.aborted) return;
+          referenceDirectoryRef.current = candidates.filter(
+            (candidate) =>
+              candidate.target.projectId === referenceContext.source.projectId,
+          );
+          const current = crepeRef.current;
+          const view = current && getEditorView(current);
+          if (view)
+            view.dispatch(
+              view.state.tr.setMeta("project-reference-directory", true),
+            );
+        })
+        .catch(() => {
+          /* A transport failure is not evidence that a target was deleted. */
+        });
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => {
+      disposed = true;
+      controller?.abort();
+      window.removeEventListener("focus", refresh);
+    };
+  }, [
+    editorReady,
+    referenceProvider,
+    referenceContext,
+    value.includes("wb://"),
+  ]);
   const insertReferenceCandidateRef = useRef<
     ((candidate: MarkdownReferenceCandidate) => void) | null
   >(null);
@@ -328,6 +394,10 @@ function DocumentEditorInstance({
       ...config,
     });
     crepeRef.current = crepe;
+    crepe.addFeature(projectReferencePresentation, {
+      root,
+      getCandidates: () => referenceDirectoryRef.current,
+    });
     if (showTopBar)
       crepe.addFeature(documentHeadingMenu, { root: overlayRoot, actions });
 
@@ -468,11 +538,16 @@ function DocumentEditorInstance({
     root.addEventListener("paste", handlePaste, true);
 
     const closeReferenceMenu = () => {
+      referenceRequestRef.current += 1;
       referenceTriggerRef.current = null;
       forceReferenceMenuRef.current = false;
       referenceAbortRef.current?.abort();
       referenceAbortRef.current = null;
       setReferenceMenu(null);
+    };
+    closeReferenceMenuRef.current = () => {
+      closeReferenceMenu();
+      getEditorView(crepe)?.focus();
     };
 
     const closeMentionMenu = () => {
@@ -614,14 +689,27 @@ function DocumentEditorInstance({
       referenceAbortRef.current?.abort();
       const controller = new AbortController();
       referenceAbortRef.current = controller;
-      Promise.resolve(
-        provider({ query, trigger: "@", context, signal: controller.signal }),
-      )
+      setReferenceMenu({
+        query,
+        candidates: [],
+        selectedIndex: 0,
+        anchor: getMenuAnchor(view),
+        status: "loading",
+      });
+      Promise.resolve()
+        .then(() =>
+          provider({ query, trigger: "@", context, signal: controller.signal }),
+        )
         .then((candidates) => {
-          if (requestId !== referenceRequestRef.current || !mountedRef.current)
+          if (
+            controller.signal.aborted ||
+            requestId !== referenceRequestRef.current ||
+            !mountedRef.current
+          )
             return;
           const allowedKinds = context.policy.allowedTargetKinds;
           const visibleCandidates = candidates.filter((candidate) => {
+            if (candidate.target.kind === "project") return false;
             if (allowedKinds && !allowedKinds.includes(candidate.target.kind))
               return false;
             if (
@@ -635,15 +723,29 @@ function DocumentEditorInstance({
           if (!currentView) return;
           setReferenceMenu({
             query,
-            candidates: visibleCandidates.slice(0, 30),
+            candidates: visibleCandidates,
             selectedIndex: 0,
             anchor: getMenuAnchor(currentView),
+            status: "ready",
           });
+          if (!query) {
+            referenceDirectoryRef.current = visibleCandidates;
+            currentView.dispatch(
+              currentView.state.tr.setMeta("project-reference-directory", true),
+            );
+          }
         })
         .catch(() => {
-          if (requestId === referenceRequestRef.current) setReferenceMenu(null);
+          if (
+            !controller.signal.aborted &&
+            requestId === referenceRequestRef.current
+          )
+            setReferenceMenu((current) =>
+              current ? { ...current, status: "error" } : null,
+            );
         });
     };
+    retryReferenceMenuRef.current = updateReferenceMenu;
     openReferenceMenuRef.current = () => {
       const provider = referenceProviderRef.current;
       const context = referenceContextRef.current;
@@ -652,6 +754,15 @@ function DocumentEditorInstance({
       if (!view) return;
       if (!view.state.selection.empty) return;
       referenceTriggerRef.current = view.state.selection.from;
+      const preceding = view.state.selection.$from.parent.textBetween(
+        0,
+        view.state.selection.$from.parentOffset,
+        "",
+      );
+      if (preceding.startsWith("/")) {
+        // Opening is inert; consume a slash command only after selecting a target.
+        referenceTriggerRef.current -= preceding.length;
+      }
       forceReferenceMenuRef.current = true;
       updateReferenceMenu();
     };
@@ -665,18 +776,38 @@ function DocumentEditorInstance({
       if (!view) return;
       const markdown = serializeMarkdownReference(
         candidate.target,
-        candidate.displayPath.split(" / ").pop() || candidate.displayPath,
+        candidate.label ||
+          candidate.displayPath.split(" / ").pop() ||
+          candidate.displayPath,
       );
       // Delete the trigger/query, then let Milkdown parse canonical Markdown
       // into a link mark instead of inserting the syntax as literal text.
-      view.dispatch(view.state.tr.delete(trigger, view.state.selection.from));
-      insertMarkdown(crepe, markdown);
+      const parsed = crepe.editor.action((ctx) => ctx.get(parserCtx)(markdown));
+      const inline = parsed.firstChild?.content;
+      if (!inline) return;
+      const transaction = view.state.tr.replaceWith(
+        trigger,
+        view.state.selection.from,
+        inline,
+      );
+      // Keep typing outside the reference mark and insert in one undo step.
+      transaction.setStoredMarks([]);
+      view.dispatch(transaction.scrollIntoView());
       closeReferenceMenu();
+      view.focus();
       onReferenceInsertedRef.current?.(candidate);
     };
     insertReferenceCandidateRef.current = insertReferenceCandidate;
 
     const handleReferenceKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key === "Enter" &&
+        (event.target as HTMLElement).closest?.(".wb-reference")
+      ) {
+        event.preventDefault();
+        (event.target as HTMLElement).click();
+        return;
+      }
       if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
         event.preventDefault();
         onSubmitRef.current?.();
@@ -825,13 +956,30 @@ function DocumentEditorInstance({
         return;
       }
       const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>(
-        "a[href]",
+        "a",
       );
-      const href = anchor?.getAttribute("href");
+      // Milkdown sanitizes custom protocols in rendered href; the decoration
+      // preserves the canonical URI without exposing it to native navigation.
+      const reference =
+        (event.target as HTMLElement).closest<HTMLElement>(
+          "[data-reference-uri]",
+        ) ?? anchor?.querySelector<HTMLElement>("[data-reference-uri]");
+      const href =
+        reference?.dataset.referenceUri ?? anchor?.getAttribute("href");
       if (!href?.startsWith("wb://")) return;
       const target = decodeMarkdownReferenceUri(href);
       if (!target) return;
       event.preventDefault();
+      event.stopPropagation();
+      if (
+        referenceDirectoryRef.current &&
+        !referenceDirectoryRef.current.some(
+          (candidate) =>
+            serializeMarkdownReference(candidate.target, "") ===
+            serializeMarkdownReference(target, ""),
+        )
+      )
+        return;
       onReferenceClickRef.current?.({
         target,
         labelSnapshot: anchor?.textContent?.trim() || "",
@@ -878,6 +1026,9 @@ function DocumentEditorInstance({
       closeMentionMenu();
       externalSyncTargetRef.current = null;
       openReferenceMenuRef.current = null;
+      retryReferenceMenuRef.current = null;
+      closeReferenceMenuRef.current = null;
+      referenceDirectoryRef.current = null;
       insertReferenceCandidateRef.current = null;
       insertMentionCandidateRef.current = null;
       if (crepeRef.current === crepe) {
@@ -1003,43 +1154,17 @@ function DocumentEditorInstance({
           className="document-editor-overlays"
           data-document-editor-overlays="true"
         >
-          {referenceMenu && referenceMenu.candidates.length > 0 && (
-            <div
-              className="document-reference-menu absolute max-h-72 min-w-64 max-w-[min(90vw,28rem)] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-              style={{
-                left: referenceMenu.anchor.left,
-                top: referenceMenu.anchor.top,
-              }}
-              role="listbox"
-              aria-label="项目引用候选"
-            >
-              {referenceMenu.candidates.map((candidate, index) => (
-                <button
-                  key={`${candidate.target.kind}:${candidate.target.projectId}:${candidate.target.kind === "project" ? "" : candidate.target.kind === "page" ? candidate.target.pageId : candidate.target.docId}`}
-                  type="button"
-                  role="option"
-                  aria-selected={index === referenceMenu.selectedIndex}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm",
-                    index === referenceMenu.selectedIndex
-                      ? "bg-accent text-accent-foreground"
-                      : "hover:bg-accent/60",
-                  )}
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    insertReferenceCandidateRef.current?.(candidate);
-                  }}
-                >
-                  <span className="shrink-0 text-muted-foreground">@</span>
-                  <span className="min-w-0 flex-1 truncate">
-                    {candidate.displayPath}
-                  </span>
-                  <span className="shrink-0 text-[10px] uppercase text-muted-foreground">
-                    {candidate.target.kind}
-                  </span>
-                </button>
-              ))}
-            </div>
+          {referenceMenu && (
+            <ProjectReferencePicker
+              candidates={referenceMenu.candidates}
+              status={referenceMenu.status}
+              anchor={referenceMenu.anchor}
+              onSelect={(candidate) =>
+                insertReferenceCandidateRef.current?.(candidate)
+              }
+              onClose={dismissReferenceMenu}
+              onRetry={() => retryReferenceMenuRef.current?.()}
+            />
           )}
           {mentionMenu && mentionMenu.candidates.length > 0 && (
             <div

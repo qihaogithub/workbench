@@ -298,7 +298,11 @@ class DocumentBlockEditView implements PluginView {
     } else {
       // Host pickers keep their existing callback contract. Only a committed
       // command creates its insertion paragraph, never opening/cancelling a menu.
-      if (position !== null) {
+      if (position !== null && item.key === "insert-project-reference") {
+        // A reference picker is a read-only interaction until a target is chosen.
+        const transaction = state.tr.setSelection(TextSelection.near(state.doc.resolve(position)));
+        this.#view.dispatch(transaction);
+      } else if (position !== null) {
         const transaction = state.tr.insert(
           position,
           paragraphSchema.type(this.#ctx).create(),

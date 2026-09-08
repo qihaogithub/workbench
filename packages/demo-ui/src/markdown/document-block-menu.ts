@@ -277,7 +277,7 @@ export function buildDocumentBlockMenuGroups(
       items: [
         {
           key: "insert-project-reference",
-          label: "选择项目 / 页面 / 文档",
+          label: "选择页面 / 配置项 / 文档",
           icon: ICONS.reference,
           run: () => options.actions.openProjectReference?.(),
         },
@@ -512,6 +512,12 @@ export class DocumentBlockMenu {
         event.preventDefault();
       });
       tab.addEventListener("click", () => {
+        if (group.key === "entity-references") {
+          const item = group.items[0];
+          if (item) this.runItem(item);
+          this.hide();
+          return;
+        }
         this.#selectedGroupIndex = groupIndex;
         this.#selectedIndex = 0;
         this.render();
