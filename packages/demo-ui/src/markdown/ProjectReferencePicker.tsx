@@ -6,12 +6,24 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
+import {
+  autoUpdate,
+  computePosition,
+  flip,
+  offset,
+  shift,
+  size,
+} from "@floating-ui/dom";
 import {
   ChevronRight,
+  ChevronDown,
+  Check,
   FileText,
   Folder,
   Layers,
   Layout,
+  Search,
   X,
 } from "lucide-react";
 import {
@@ -95,6 +107,12 @@ export function ProjectReferencePicker({
   onSelect,
   onClose,
   onRetry,
+  projects,
+  projectId,
+  currentProjectId,
+  onProjectChange,
+  projectsStatus = "ready",
+  onProjectsRetry,
 }: {
   candidates: readonly MarkdownReferenceCandidate[];
   status: "loading" | "ready" | "error";
@@ -102,11 +120,41 @@ export function ProjectReferencePicker({
   onSelect: (candidate: MarkdownReferenceCandidate) => void;
   onClose: () => void;
   onRetry: () => void;
+  projects?: readonly { id: string; name: string }[];
+  projectId?: string;
+  currentProjectId?: string;
+  onProjectChange?: (id: string) => void;
+  projectsStatus?: "loading" | "ready" | "error";
+  onProjectsRetry?: () => void;
 }) {
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<"page" | "document">("page");
   const [collapsed, setCollapsed] = useState(new Set<string>());
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [projectSearch, setProjectSearch] = useState("");
+  const projectMenu = useRef<HTMLDivElement>(null);
+  const projectTrigger = useRef<HTMLButtonElement>(null);
+  const projectSearchInput = useRef<HTMLInputElement>(null);
+  const selectedProjectId = projectId ?? currentProjectId;
+  const selectedProject = projects?.find(
+    (project) => project.id === selectedProjectId,
+  );
+  const orderedProjects = useMemo(() => {
+    if (!projects) return [];
+    return [...projects].sort(
+      (left, right) =>
+        Number(right.id === currentProjectId) -
+        Number(left.id === currentProjectId),
+    );
+  }, [currentProjectId, projects]);
+  const filteredProjects = useMemo(() => {
+    const query = projectSearch.trim().toLocaleLowerCase();
+    if (!query) return orderedProjects;
+    return orderedProjects.filter((project) =>
+      project.name.toLocaleLowerCase().includes(query),
+    );
+  }, [orderedProjects, projectSearch]);
   const tree = useMemo(
     () => buildReferenceTree(candidates, tab),
     [candidates, tab],
@@ -137,12 +185,73 @@ export function ProjectReferencePicker({
       window.removeEventListener("scroll", place, true);
     };
   }, [anchor]);
+  useLayoutEffect(() => {
+    const trigger = projectTrigger.current;
+    const menu = projectMenu.current;
+    if (!projectMenuOpen || !trigger || !menu) return;
+    const theme = getComputedStyle(root.current!);
+    for (const variable of [
+      "--crepe-color-surface",
+      "--crepe-color-outline",
+      "--crepe-color-on-surface",
+      "--crepe-color-on-surface-variant",
+      "--crepe-color-hover",
+      "--crepe-font-default",
+    ]) {
+      menu.style.setProperty(variable, theme.getPropertyValue(variable));
+    }
+    let disposed = false;
+    let focused = false;
+    return (() => {
+      const cleanup = autoUpdate(trigger, menu, () => {
+        void computePosition(trigger, menu, {
+          placement: "bottom-start",
+          strategy: "fixed",
+          middleware: [
+            offset(4),
+            flip({ padding: 8 }),
+            shift({ padding: 8 }),
+            size({
+              padding: 8,
+              apply({ availableHeight, elements }) {
+                elements.floating.style.maxHeight = `${Math.max(0, Math.min(340, availableHeight))}px`;
+              },
+            }),
+          ],
+        })
+          .then(({ x, y }) => {
+            if (!disposed)
+              Object.assign(menu.style, {
+                left: `${x}px`,
+                top: `${y}px`,
+                width: `${Math.min(trigger.getBoundingClientRect().width, window.innerWidth - 16)}px`,
+                visibility: "visible",
+              });
+            if (!disposed && !focused) {
+              focused = true;
+              projectSearchInput.current?.focus({ preventScroll: true });
+            }
+          })
+          .catch(() => {
+            if (!disposed) setProjectMenuOpen(false);
+          });
+      });
+      return () => {
+        disposed = true;
+        cleanup();
+      };
+    })();
+  }, [projectMenuOpen]);
   useEffect(() => {
     root.current
       ?.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')
       ?.focus({ preventScroll: true });
     const outside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !root.current?.contains(event.target))
+      if (
+        event.target instanceof Node &&
+        !root.current?.contains(event.target) &&
+        !projectMenu.current?.contains(event.target)
+      )
         onClose();
     };
     document.addEventListener("pointerdown", outside);
@@ -155,6 +264,15 @@ export function ProjectReferencePicker({
       else next.add(nodeId);
       return next;
     });
+  const selectProject = (nextProjectId: string) => {
+    onProjectChange?.(nextProjectId);
+    setProjectMenuOpen(false);
+    setProjectSearch("");
+    setCollapsed(new Set<string>());
+    root.current
+      ?.querySelector<HTMLButtonElement>(".project-reference-project-trigger")
+      ?.focus();
+  };
   const renderNode = (node: ReferenceTreeNode, depth: number) => {
     const expanded = !collapsed.has(node.id);
     const Icon =
@@ -232,13 +350,32 @@ export function ProjectReferencePicker({
       style={position}
       role="dialog"
       aria-label="插入项目引用"
-      onMouseDown={(event) => event.preventDefault()}
+      onMouseDown={(event) => {
+        if (!(event.target instanceof HTMLInputElement)) event.preventDefault();
+      }}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
-          onClose();
+          if (projectMenuOpen) {
+            setProjectMenuOpen(false);
+            setProjectSearch("");
+            root.current
+              ?.querySelector<HTMLButtonElement>(
+                ".project-reference-project-trigger",
+              )
+              ?.focus();
+          } else {
+            onClose();
+          }
+          return;
         }
+        if (
+          event.target instanceof HTMLInputElement ||
+          (event.target instanceof HTMLButtonElement &&
+            event.target.closest(".project-reference-project-menu"))
+        )
+          return;
         if (
           event.key === "ArrowDown" ||
           event.key === "ArrowUp" ||
@@ -273,6 +410,118 @@ export function ProjectReferencePicker({
           <X size={16} />
         </button>
       </div>
+      {onProjectChange && (
+        <div className="project-reference-project-picker">
+          <button
+            ref={projectTrigger}
+            type="button"
+            className="project-reference-project-trigger"
+            aria-label={
+              selectedProject?.name || selectedProjectId || "选择项目"
+            }
+            aria-expanded={projectMenuOpen}
+            aria-haspopup="listbox"
+            onClick={() => setProjectMenuOpen((open) => !open)}
+          >
+            <span className="project-reference-project-trigger-copy">
+              <span className="project-reference-project-label">项目</span>
+              <span className="project-reference-project-value">
+                {selectedProject?.name || selectedProjectId || "选择项目"}
+              </span>
+              {selectedProjectId === currentProjectId && (
+                <span className="project-reference-current-badge">
+                  当前项目
+                </span>
+              )}
+            </span>
+            <ChevronDown
+              size={15}
+              aria-hidden="true"
+              className={projectMenuOpen ? "is-open" : undefined}
+            />
+          </button>
+          {projectMenuOpen &&
+            createPortal(
+              <div
+                ref={projectMenu}
+                className="project-reference-picker project-reference-project-menu"
+                style={{ visibility: "hidden" }}
+                role="dialog"
+                aria-label="选择项目"
+              >
+                <label className="project-reference-project-search">
+                  <Search size={14} aria-hidden="true" />
+                  <input
+                    ref={projectSearchInput}
+                    type="search"
+                    value={projectSearch}
+                    placeholder="搜索项目"
+                    aria-label="搜索项目"
+                    onChange={(event) => setProjectSearch(event.target.value)}
+                  />
+                </label>
+                {projectsStatus === "loading" ? (
+                  <p className="project-reference-project-state" role="status">
+                    正在加载项目…
+                  </p>
+                ) : projectsStatus === "error" ? (
+                  <div className="project-reference-project-state" role="alert">
+                    <span>项目列表加载失败</span>
+                    {onProjectsRetry && (
+                      <button type="button" onClick={onProjectsRetry}>
+                        重试
+                      </button>
+                    )}
+                  </div>
+                ) : filteredProjects.length ? (
+                  <div role="listbox" aria-label="项目列表">
+                    {filteredProjects.map((project, index) => (
+                      <div role="presentation" key={project.id}>
+                        {(index === 0 ||
+                          filteredProjects[index - 1].id ===
+                            currentProjectId) && (
+                          <div
+                            className="project-reference-project-group"
+                            role="presentation"
+                          >
+                            {project.id === currentProjectId
+                              ? "当前项目"
+                              : "其他项目"}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={project.id === selectedProjectId}
+                          className="project-reference-project-option"
+                          onClick={() => selectProject(project.id)}
+                        >
+                          <span>{project.name || project.id}</span>
+                          {project.id === currentProjectId && (
+                            <span className="project-reference-current-badge">
+                              当前
+                            </span>
+                          )}
+                          {project.id === selectedProjectId && (
+                            <Check size={14} aria-hidden="true" />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="project-reference-project-state" role="status">
+                    {projects?.length ? "没有匹配的项目" : "暂无可用项目"}
+                  </p>
+                )}
+                <div className="project-reference-project-state">
+                  仅显示有访问权限的项目
+                </div>
+              </div>,
+              root.current?.parentElement ?? document.body,
+            )}
+        </div>
+      )}
       <div
         className="project-reference-tabs"
         role="tablist"

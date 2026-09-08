@@ -54,6 +54,31 @@ const doc = schema.node("doc", null, [
 ]);
 
 describe("reference presentation", () => {
+  it("does not mark a different project's unresolved directory as missing", () => {
+    const attributes = (resolved: ReadonlySet<string>) =>
+      (
+        referenceDecorations(doc, [], resolved).find()[0] as unknown as {
+          type: { attrs: Record<string, string> };
+        }
+      ).type.attrs;
+    expect(attributes(new Set(["other"]))["data-reference-status"]).toBe(
+      "unknown",
+    );
+    expect(
+      attributes(new Set([target.projectId]))["data-reference-status"],
+    ).toBe("unavailable");
+    const sameIds = {
+      ...candidate,
+      target: { ...target, projectId: "other" },
+      label: "Wrong project",
+    };
+    const decoration = referenceDecorations(
+      doc,
+      [sameIds, candidate],
+      new Set(["other", target.projectId]),
+    ).find()[0] as unknown as { type: { attrs: Record<string, string> } };
+    expect(decoration.type.attrs["data-reference-label"]).toBe(candidate.label);
+  });
   it("uses canonical full target identity and distinguishes unknown from unavailable", () => {
     const attrs = (directory: readonly MarkdownReferenceCandidate[] | null) =>
       (

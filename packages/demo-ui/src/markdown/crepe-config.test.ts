@@ -72,7 +72,7 @@ describe("buildCrepeConfig", () => {
       "分隔线",
     ]);
     expect(groups[3]?.items[0]?.label).toBe("主题色");
-    expect(groups[4]?.items[0]?.label).toBe("选择项目 / 页面 / 文档");
+    expect(groups[4]?.items[0]?.label).toBe("选择页面 / 配置项 / 文档");
     expect(groups[5]?.label).toBe("更多");
     expect(groups[5]?.items.map((item) => item.label)).toEqual([
       "H4",

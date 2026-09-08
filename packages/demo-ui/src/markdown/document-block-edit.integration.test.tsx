@@ -78,6 +78,53 @@ function open() {
 }
 
 describe("shared editor block menu transactions", () => {
+  it("switches reference projects without editing and inserts the foreign identity in one undo", async () => {
+    const foreign = { target: { kind: "page" as const, projectId: "b", pageId: "home" }, label: "外部首页", displayPath: "品牌官网 / 外部首页" };
+    const provider = Object.assign(vi.fn(async ({ projectId }: { projectId?: string }) => projectId === "b" ? [foreign] : []), {
+      listProjects: vi.fn(async () => [{ id: "a", name: "当前活动" }, { id: "b", name: "品牌官网" }]),
+    });
+    const onReferenceClick = vi.fn();
+    render(<DocumentEditor value="说明" onChange={vi.fn()} onReferenceClick={onReferenceClick}
+      referenceContext={{ source: { kind: "knowledge-document", projectId: "a", workspaceId: "w", docId: "d" }, policy: { sameProjectOnly: false, allowedTargetKinds: ["page", "config", "document"] } }} referenceProvider={provider} />);
+    const view = await ready();
+    const before = view.state.doc;
+    const depth = undoDepth(view.state);
+    open(); fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    fireEvent.click(await screen.findByRole("button", { name: "当前活动" }));
+    fireEvent.click(await screen.findByRole("option", { name: /品牌官网/ }));
+    const row = await screen.findByRole("treeitem", { name: "外部首页" });
+    expect(view.state.doc.eq(before)).toBe(true);
+    expect(undoDepth(view.state)).toBe(depth);
+    expect(provider).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: "b", context: expect.objectContaining({ source: expect.objectContaining({ projectId: "a" }) }) }));
+    fireEvent.click(row);
+    const reference = document.querySelector('[data-reference-uri="wb://page/b/home"]')!;
+    expect(reference).toHaveAttribute("data-reference-path", "品牌官网 / 外部首页");
+    fireEvent.click(reference);
+    expect(onReferenceClick).toHaveBeenCalledWith(expect.objectContaining({ target: foreign.target }));
+    expect(undoDepth(view.state)).toBe(depth + 1);
+    undo(view.state, view.dispatch);
+    expect(view.state.doc.eq(before)).toBe(true);
+  });
+
+  it("refreshes referenced projects independently and revokes only an inaccessible project", async () => {
+    let denied = false;
+    const provider = vi.fn(async ({ projectId }: { projectId?: string }) => {
+      if (projectId === "b") throw Object.assign(new Error("failed"), { status: denied ? 403 : 503 });
+      return [{ target: { kind: "page" as const, projectId: "a", pageId: "home" }, label: "当前首页", displayPath: "当前活动 / 首页" }];
+    });
+    render(<DocumentEditor value="[当前](wb://page/a/home) [外部](wb://page/b/home)" onChange={vi.fn()}
+      referenceContext={{ source: { kind: "knowledge-document", projectId: "a", workspaceId: "w", docId: "d" }, policy: { sameProjectOnly: false, allowedTargetKinds: ["page", "config", "document"] } }} referenceProvider={provider} />);
+    const view = await ready();
+    const before = view.state.doc;
+    await waitFor(() => expect(document.querySelector('[data-reference-uri="wb://page/a/home"]')).toHaveAttribute("data-reference-status", "available"));
+    expect(document.querySelector('[data-reference-uri="wb://page/b/home"]')).toHaveAttribute("data-reference-status", "unknown");
+    denied = true;
+    fireEvent.focus(window);
+    await waitFor(() => expect(document.querySelector('[data-reference-uri="wb://page/b/home"]')).toHaveAttribute("data-reference-status", "unavailable"));
+    expect(document.querySelector('[data-reference-uri="wb://page/a/home"]')).toHaveAttribute("data-reference-status", "available");
+    expect(view.state.doc.eq(before)).toBe(true);
+  });
+
   it("blocks coordinate-based native previews for references but keeps ordinary link previews", async () => {
     render(<DocumentEditor value="[页面](wb://page/p/home) [网站](https://example.com)" onChange={vi.fn()} />);
     const view = await ready();

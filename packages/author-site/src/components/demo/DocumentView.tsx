@@ -43,7 +43,6 @@ import {
 } from "@workbench/demo-ui/DocumentEditor";
 import {
   serializeMarkdownReference,
-  type MarkdownReferenceCandidate,
   type MarkdownReferenceSource,
   type MarkdownReferenceTarget,
 } from "@workbench/shared/markdown-reference";
@@ -54,7 +53,7 @@ import {
   MarkdownReferenceLinksPanel,
   type MarkdownReferenceMention,
 } from "./MarkdownReferenceLinksPanel";
-import { navigateToMarkdownMention, type AuthorDocumentReference } from "./markdown-reference-navigation";
+import { createAuthorReferenceProvider, navigateToMarkdownMention, type AuthorDocumentReference } from "./markdown-reference-navigation";
 import { DocumentProposalReviewDialog } from "./DocumentProposalReviewDialog";
 import type { DesignSpecMeta, DesignSpecRef } from "@/lib/design-specs";
 import type { UserRole } from "@/lib/user";
@@ -279,21 +278,8 @@ export function DocumentView({
     onReferenceFocusConsumed?.();
   }, [referenceFocus, projectId, items, pages, designSpecs, onReferenceFocusConsumed]);
 
-  const referenceProvider = useCallback<MarkdownReferenceProvider>(
-    async ({ query, context, signal }) => {
-      if (!projectId) return [];
-      const params = new URLSearchParams({ q: query, kind: "page,config,document" });
-      if (sessionId) params.set("sessionId", sessionId);
-      const response = await fetch(
-        `/api/projects/${encodeURIComponent(projectId)}/markdown-references/candidates?${params.toString()}`,
-        { signal },
-      );
-      if (!response.ok) throw new Error("引用目录加载失败，请重试");
-      const payload = await response.json();
-      const candidates = payload?.data?.candidates ?? payload?.data;
-      if (payload?.success === false || !Array.isArray(candidates)) throw new Error("引用目录加载失败，请重试");
-      return candidates as MarkdownReferenceCandidate[];
-    },
+  const referenceProvider = useMemo<MarkdownReferenceProvider | undefined>(
+    () => projectId ? createAuthorReferenceProvider(projectId, sessionId) : undefined,
     [projectId, sessionId],
   );
 
@@ -321,7 +307,7 @@ export function DocumentView({
       source,
       policy: {
         allowedTargetKinds: ["page", "config", "document"],
-        sameProjectOnly: true,
+        sameProjectOnly: false,
         allowUnresolved: false,
       },
     };

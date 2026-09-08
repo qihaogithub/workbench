@@ -41,13 +41,12 @@ import type {
 import type {
   MarkdownReferenceClickHandler,
   MarkdownReferenceContext,
-  MarkdownReferenceProvider,
 } from "@workbench/demo-ui/DocumentEditor";
-import type { MarkdownReferenceCandidate } from "@workbench/shared/markdown-reference";
 import { resolveReferenceConfigDefinition } from "@/components/demo/markdown-reference-config-locator";
 import { ConfigDefinitionTree } from "@/components/demo/DesignSpecConfigPanel";
 import { useAuthorReferenceDeepLink } from "@/components/demo/use-author-reference-deep-link";
 import {
+  createAuthorReferenceProvider,
   openAuthorReference,
   type AuthorDocumentReference,
 } from "@/components/demo/markdown-reference-navigation";
@@ -1422,20 +1421,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       ? (configPanelDetailPageId ?? activeDemoId)
       : activeDemoId;
 
-  const markdownReferenceProvider = useCallback<MarkdownReferenceProvider>(
-    async ({ query, signal }) => {
-      const params = new URLSearchParams({ q: query, kind: "page,config,document" });
-      if (sessionId) params.set("sessionId", sessionId);
-      const response = await fetch(
-        `/api/projects/${encodeURIComponent(demoId)}/markdown-references/candidates?${params.toString()}`,
-        { signal },
-      );
-      if (!response.ok) throw new Error("引用目录加载失败，请重试");
-      const payload = await response.json();
-      const candidates = payload?.data?.candidates ?? payload?.data;
-      if (payload?.success === false || !Array.isArray(candidates)) throw new Error("引用目录加载失败，请重试");
-      return candidates as MarkdownReferenceCandidate[];
-    },
+  const markdownReferenceProvider = useMemo(
+    () => createAuthorReferenceProvider(demoId, sessionId),
     [demoId, sessionId],
   );
 
@@ -1450,7 +1437,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       },
       policy: {
         allowedTargetKinds: ["page", "config", "document"],
-        sameProjectOnly: true,
+        sameProjectOnly: false,
         allowUnresolved: false,
       },
     };
@@ -5860,7 +5847,6 @@ ${context.details}
   const [referenceConfigTreeFocus, setReferenceConfigTreeFocus] = useState<{ pageId: string; fieldKey: string; page: { id: string; name: string; schema: string } } | undefined>();
   const handleMarkdownReferenceClick = useCallback<MarkdownReferenceClickHandler>(
     ({ target }) => {
-      if (target.projectId !== demoId) return;
       try {
         openAuthorReference(demoId, target);
       } catch (error) {

@@ -1,5 +1,5 @@
 import { encodeMarkdownReferenceUri, type MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
-import { buildAuthorReferenceUrl, resolveAuthorReference, openAuthorReference, fetchAuthorReferenceCandidates } from "./markdown-reference-navigation";
+import { buildAuthorReferenceUrl, resolveAuthorReference, openAuthorReference, fetchAuthorReferenceCandidates, createAuthorReferenceProvider } from "./markdown-reference-navigation";
 
 const projectId = "项目 &%/?";
 const destinations: MarkdownReferenceTarget[] = [
@@ -23,7 +23,7 @@ describe("Author 项目引用导航", () => {
   });
   it("拒绝跨项目、缺失、不支持和格式错误的目标", () => {
     const target = destinations[0];
-    expect(() => buildAuthorReferenceUrl("other", target)).toThrow();
+    expect(new URL(buildAuthorReferenceUrl("other", { ...target, projectId: "other" }), "https://author.example").pathname).toBe("/demo/other/edit");
     expect(() => resolveAuthorReference("other", encodeMarkdownReferenceUri(target), [{ target, displayPath: "" }])).toThrow();
     expect(() => resolveAuthorReference(projectId, encodeMarkdownReferenceUri(target), [])).toThrow();
     expect(() => resolveAuthorReference(projectId, "javascript:alert(1)", [])).toThrow();
@@ -44,6 +44,20 @@ describe("Author 项目引用导航", () => {
     openAuthorReference(projectId, destinations[0]);
     expect(open).toHaveBeenCalledWith(buildAuthorReferenceUrl(projectId, destinations[0]), "_blank", "noopener,noreferrer");
     open.mockRestore();
+  });
+  it("跨项目 provider 只向源项目转发 session，并可列出授权项目", async () => {
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: { candidates: [] } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: [{ id: "p1", name: "项目一" }, { id: "p2", name: "项目二" }] }) });
+    const original = global.fetch;
+    global.fetch = fetchMock;
+    try {
+      const provider = createAuthorReferenceProvider("p1", "session-1");
+      await provider({ query: "", trigger: "@", context: { source: { kind: "page-requirements", projectId: "p1", workspaceId: "w", pageId: "page" }, policy: { allowedTargetKinds: ["page"], sameProjectOnly: false } }, projectId: "p2" });
+      const projects = await provider.listProjects?.();
+      expect(new URL(fetchMock.mock.calls[0][0], "https://author.example").searchParams.has("sessionId")).toBe(false);
+      expect(projects).toEqual([{ id: "p1", name: "项目一" }, { id: "p2", name: "项目二" }]);
+    } finally { global.fetch = original; }
   });
   it("空查询保留全部候选及层级元数据，没有客户端数量上限", async () => {
     const candidates = Array.from({ length: 300 }, (_, i) => ({ target: destinations[0], label: String(i), displayPath: "路径", hierarchy: [{ id: "f", label: "目录", kind: "folder" }] }));
@@ -67,6 +81,13 @@ describe("Author 项目引用导航", () => {
     global.fetch = jest.fn().mockResolvedValue(response);
     try {
       await expect(fetchAuthorReferenceCandidates(projectId, undefined, "")).rejects.toThrow();
+    } finally { global.fetch = original; }
+  });
+  it("保留鉴权状态码供宿主区分不可访问与暂时失败", async () => {
+    const original = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 403 });
+    try {
+      await expect(fetchAuthorReferenceCandidates(projectId, undefined, "")).rejects.toMatchObject({ status: 403 });
     } finally { global.fetch = original; }
   });
 });

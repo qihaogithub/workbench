@@ -4,6 +4,7 @@ import {
   type MarkdownReferenceCandidate,
   type MarkdownReferenceTarget,
 } from "@workbench/shared/markdown-reference";
+import type { MarkdownReferenceProvider } from "@workbench/demo-ui/DocumentEditor";
 
 export interface MarkdownReferenceMentionLocation {
   label: string;
@@ -106,15 +107,15 @@ export type AuthorDocumentReference = Extract<
 
 /** Only the canonical reference crosses tabs; session/workspace ownership is resolved by bootstrap. */
 export function buildAuthorReferenceUrl(
-  projectId: string,
+  _sourceProjectId: string,
   target: MarkdownReferenceTarget,
 ): string {
-  if (target.projectId !== projectId || target.kind === "project") {
-    throw new Error("引用不属于当前项目或目标类型不受支持");
+  if (target.kind === "project") {
+    throw new Error("目标类型不受支持");
   }
   const reference = encodeMarkdownReferenceUri(target);
   if (!decodeMarkdownReferenceUri(reference)) throw new Error("无效的项目引用");
-  return `/demo/${encodeURIComponent(projectId)}/edit?${new URLSearchParams({ reference })}`;
+  return `/demo/${encodeURIComponent(target.projectId)}/edit?${new URLSearchParams({ reference })}`;
 }
 
 export function openAuthorReference(
@@ -163,10 +164,40 @@ export async function fetchAuthorReferenceCandidates(
     `/api/projects/${encodeURIComponent(projectId)}/markdown-references/candidates?${params}`,
     { signal },
   );
-  if (!response.ok) throw new Error("引用目录加载失败，请重试");
+  if (!response.ok) {
+    const error = new Error("引用目录加载失败，请重试") as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
   const payload = await response.json();
   const candidates = payload?.data?.candidates ?? payload?.data;
   if (payload?.success === false || !Array.isArray(candidates))
     throw new Error("引用目录加载失败，请重试");
   return candidates;
+}
+
+export function createAuthorReferenceProvider(
+  sourceProjectId: string,
+  sessionId?: string,
+): MarkdownReferenceProvider {
+  const provider: MarkdownReferenceProvider = async ({ query, signal, projectId }) => {
+    const targetProjectId = projectId ?? sourceProjectId;
+    return fetchAuthorReferenceCandidates(
+      targetProjectId,
+      targetProjectId === sourceProjectId ? sessionId : undefined,
+      query,
+      signal,
+    );
+  };
+  provider.listProjects = async (signal?: AbortSignal) => {
+    const response = await fetch("/api/demos", { signal });
+    if (!response.ok) throw new Error("项目列表加载失败，请重试");
+    const payload = await response.json();
+    const projects = payload?.data;
+    if (payload?.success === false || !Array.isArray(projects)) throw new Error("项目列表加载失败，请重试");
+    return projects
+      .filter((project): project is { id: string; name: string } => Boolean(project && typeof project.id === "string" && typeof project.name === "string"))
+      .map(({ id, name }) => ({ id, name }));
+  };
+  return provider;
 }

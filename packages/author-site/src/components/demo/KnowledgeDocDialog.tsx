@@ -19,7 +19,7 @@ import {
   type MarkdownReferenceProvider,
 } from "@workbench/demo-ui/DocumentEditor";
 import type { CollabRoomDescriptor } from "@workbench/shared";
-import type { MarkdownReferenceCandidate, MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
+import type { MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
 import { decodeMarkdownReferenceUri, serializeMarkdownReference } from "@workbench/shared/markdown-reference";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
@@ -29,7 +29,7 @@ import {
   MarkdownReferenceLinksPanel,
   type MarkdownReferenceMention,
 } from "./MarkdownReferenceLinksPanel";
-import { navigateToMarkdownMention } from "./markdown-reference-navigation";
+import { createAuthorReferenceProvider, navigateToMarkdownMention } from "./markdown-reference-navigation";
 import { toKnowledgeItem } from "./document-api-adapter";
 import { localizeRemoteImageForSession } from "@workbench/demo-ui/markdown/remote-image-localizer";
 
@@ -138,29 +138,17 @@ export function KnowledgeDocDialog({
     },
     [sessionId],
   );
-  const referenceProvider = useMemo<MarkdownReferenceProvider>(() => {
-    return async ({ query, signal }) => {
-      if (!projectId) return [];
-      const params = new URLSearchParams({ q: query, kind: "page,config,document" });
-      if (sessionId) params.set("sessionId", sessionId);
-      const response = await fetch(
-        `/api/projects/${encodeURIComponent(projectId)}/markdown-references/candidates?${params.toString()}`,
-        { signal },
-      );
-      if (!response.ok) throw new Error("引用目录加载失败，请重试");
-      const payload = await response.json();
-      const candidates = payload?.data?.candidates ?? payload?.data;
-      if (payload?.success === false || !Array.isArray(candidates)) throw new Error("引用目录加载失败，请重试");
-      return candidates as MarkdownReferenceCandidate[];
-    };
-  }, [projectId, sessionId]);
+  const referenceProvider = useMemo<MarkdownReferenceProvider | undefined>(
+    () => projectId ? createAuthorReferenceProvider(projectId, sessionId) : undefined,
+    [projectId, sessionId],
+  );
   const referenceContext = useMemo<MarkdownReferenceContext | undefined>(() => {
     if (!projectId || !workspaceId || !item || item.source === "system") return undefined;
     return {
       source: { kind: "knowledge-document", projectId, workspaceId, docId: item.id },
       policy: {
         allowedTargetKinds: ["page", "config", "document"],
-        sameProjectOnly: true,
+        sameProjectOnly: false,
         allowUnresolved: false,
       },
     };

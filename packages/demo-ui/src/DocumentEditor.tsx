@@ -20,6 +20,7 @@ import { projectReferencePresentation } from "./markdown/project-reference-prese
 import "./markdown/project-reference-presentation.css";
 import {
   decodeMarkdownReferenceUri,
+  parseMarkdownReferences,
   serializeMarkdownReference,
   type MarkdownReferenceCandidate,
   type MarkdownReferenceSource,
@@ -62,12 +63,18 @@ export interface MarkdownReferenceContext {
   policy: ReferencePolicy;
 }
 
-export type MarkdownReferenceProvider = (input: {
+export type MarkdownReferenceProvider = ((input: {
   query: string;
   trigger: "@";
   context: MarkdownReferenceContext;
   signal?: AbortSignal;
-}) => Promise<MarkdownReferenceCandidate[]> | MarkdownReferenceCandidate[];
+  /** Target project; the source context never changes when browsing projects. */
+  projectId?: string;
+}) => Promise<MarkdownReferenceCandidate[]> | MarkdownReferenceCandidate[]) & {
+  listProjects?: (
+    signal?: AbortSignal,
+  ) => Promise<Array<{ id: string; name: string }>>;
+};
 
 export type MarkdownReferenceClickHandler = (input: {
   target: MarkdownReferenceTarget;
@@ -239,8 +246,29 @@ function DocumentEditorInstance({
   const referenceAbortRef = useRef<AbortController | null>(null);
   const openReferenceMenuRef = useRef<(() => void) | null>(null);
   const forceReferenceMenuRef = useRef(false);
-  const referenceDirectoryRef = useRef<MarkdownReferenceCandidate[] | null>(
-    null,
+  const referenceDirectoriesRef = useRef(
+    new Map<string, MarkdownReferenceCandidate[]>(),
+  );
+  const referenceDirectoryVersionsRef = useRef(new Map<string, symbol>());
+  const selectedReferenceProjectRef = useRef<string | undefined>(undefined);
+  const [selectedReferenceProject, setSelectedReferenceProject] = useState<
+    string | undefined
+  >();
+  const [referenceProjects, setReferenceProjects] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [referenceProjectsStatus, setReferenceProjectsStatus] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [referenceProjectsRetry, setReferenceProjectsRetry] = useState(0);
+  const referenceProjectIds = JSON.stringify(
+    [
+      ...new Set(
+        parseMarkdownReferences(value).references.map(
+          ({ target }) => target.projectId,
+        ),
+      ),
+    ].sort(),
   );
   const retryReferenceMenuRef = useRef<(() => void) | null>(null);
   const closeReferenceMenuRef = useRef<(() => void) | null>(null);
@@ -249,11 +277,27 @@ function DocumentEditorInstance({
     [],
   );
   useEffect(() => {
+    referenceDirectoriesRef.current.clear();
+    referenceDirectoryVersionsRef.current.clear();
+    referenceAbortRef.current?.abort();
+    referenceRequestRef.current += 1;
+    setReferenceMenu(null);
+    setReferenceProjects([]);
+    selectedReferenceProjectRef.current = referenceContext?.source.projectId;
+    const current = crepeRef.current;
+    const view = current && getEditorView(current);
+    view?.dispatch(view.state.tr.setMeta("project-reference-directory", true));
+  }, [
+    referenceProvider,
+    referenceContext?.source.projectId,
+    referenceContext?.source.workspaceId,
+  ]);
+  useEffect(() => {
     if (
       !editorReady ||
       !referenceProvider ||
       !referenceContext ||
-      !value.includes("wb://")
+      referenceProjectIds === "[]"
     )
       return;
     let controller: AbortController | null = null;
@@ -262,31 +306,64 @@ function DocumentEditorInstance({
       controller?.abort();
       const request = new AbortController();
       controller = request;
-      Promise.resolve()
-        .then(() =>
-          referenceProvider({
-            query: "",
-            trigger: "@",
-            context: referenceContext,
-            signal: request.signal,
-          }),
+      const projectIds: string[] = JSON.parse(referenceProjectIds);
+      for (const projectId of projectIds) {
+        if (
+          referenceContext.policy.sameProjectOnly &&
+          projectId !== referenceContext.source.projectId
         )
-        .then((candidates) => {
-          if (disposed || request.signal.aborted) return;
-          referenceDirectoryRef.current = candidates.filter(
-            (candidate) =>
-              candidate.target.projectId === referenceContext.source.projectId,
-          );
-          const current = crepeRef.current;
-          const view = current && getEditorView(current);
-          if (view)
-            view.dispatch(
-              view.state.tr.setMeta("project-reference-directory", true),
+          continue;
+        const version = Symbol();
+        referenceDirectoryVersionsRef.current.set(projectId, version);
+        Promise.resolve()
+          .then(() =>
+            referenceProvider({
+              query: "",
+              trigger: "@",
+              context: referenceContext,
+              signal: request.signal,
+              projectId,
+            }),
+          )
+          .then((candidates) => {
+            if (
+              disposed ||
+              request.signal.aborted ||
+              referenceDirectoryVersionsRef.current.get(projectId) !== version
+            )
+              return;
+            referenceDirectoriesRef.current.set(
+              projectId,
+              candidates.filter(
+                (candidate) => candidate.target.projectId === projectId,
+              ),
             );
-        })
-        .catch(() => {
-          /* A transport failure is not evidence that a target was deleted. */
-        });
+            const current = crepeRef.current;
+            const view = current && getEditorView(current);
+            if (view)
+              view.dispatch(
+                view.state.tr.setMeta("project-reference-directory", true),
+              );
+          })
+          .catch((error: unknown) => {
+            if (
+              disposed ||
+              request.signal.aborted ||
+              referenceDirectoryVersionsRef.current.get(projectId) !== version
+            )
+              return;
+            const status = (error as { status?: number })?.status;
+            if (status && [401, 403, 404].includes(status)) {
+              referenceDirectoriesRef.current.set(projectId, []);
+              const current = crepeRef.current;
+              const view = current && getEditorView(current);
+              view?.dispatch(
+                view.state.tr.setMeta("project-reference-directory", true),
+              );
+            }
+            /* Transient failures do not turn other projects into missing targets. */
+          });
+      }
     };
     refresh();
     window.addEventListener("focus", refresh);
@@ -295,11 +372,35 @@ function DocumentEditorInstance({
       controller?.abort();
       window.removeEventListener("focus", refresh);
     };
+  }, [editorReady, referenceProvider, referenceContext, referenceProjectIds]);
+  useEffect(() => {
+    if (
+      !referenceMenu ||
+      !referenceProvider?.listProjects ||
+      referenceContext?.policy.sameProjectOnly
+    )
+      return;
+    const controller = new AbortController();
+    setReferenceProjectsStatus("loading");
+    Promise.resolve()
+      .then(() => referenceProvider.listProjects!(controller.signal))
+      .then((projects) => {
+        if (controller.signal.aborted) return;
+        setReferenceProjects(projects);
+        setReferenceProjectsStatus("ready");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setReferenceProjects([]);
+          setReferenceProjectsStatus("error");
+        }
+      });
+    return () => controller.abort();
   }, [
-    editorReady,
+    Boolean(referenceMenu),
     referenceProvider,
-    referenceContext,
-    value.includes("wb://"),
+    referenceContext?.policy.sameProjectOnly,
+    referenceProjectsRetry,
   ]);
   const insertReferenceCandidateRef = useRef<
     ((candidate: MarkdownReferenceCandidate) => void) | null
@@ -396,7 +497,9 @@ function DocumentEditorInstance({
     crepeRef.current = crepe;
     crepe.addFeature(projectReferencePresentation, {
       root,
-      getCandidates: () => referenceDirectoryRef.current,
+      getCandidates: () => [...referenceDirectoriesRef.current.values()].flat(),
+      getResolvedProjectIds: () =>
+        new Set(referenceDirectoriesRef.current.keys()),
     });
     if (showTopBar)
       crepe.addFeature(documentHeadingMenu, { root: overlayRoot, actions });
@@ -538,6 +641,8 @@ function DocumentEditorInstance({
     root.addEventListener("paste", handlePaste, true);
 
     const closeReferenceMenu = () => {
+      selectedReferenceProjectRef.current =
+        referenceContextRef.current?.source.projectId;
       referenceRequestRef.current += 1;
       referenceTriggerRef.current = null;
       forceReferenceMenuRef.current = false;
@@ -685,6 +790,11 @@ function DocumentEditorInstance({
         return;
       }
       const query = forceReferenceMenuRef.current ? "" : typed.slice(1);
+      const projectId =
+        selectedReferenceProjectRef.current ?? context.source.projectId;
+      const directoryVersion = Symbol();
+      if (!query)
+        referenceDirectoryVersionsRef.current.set(projectId, directoryVersion);
       const requestId = ++referenceRequestRef.current;
       referenceAbortRef.current?.abort();
       const controller = new AbortController();
@@ -698,7 +808,13 @@ function DocumentEditorInstance({
       });
       Promise.resolve()
         .then(() =>
-          provider({ query, trigger: "@", context, signal: controller.signal }),
+          provider({
+            query,
+            trigger: "@",
+            context,
+            signal: controller.signal,
+            projectId,
+          }),
         )
         .then((candidates) => {
           if (
@@ -709,6 +825,7 @@ function DocumentEditorInstance({
             return;
           const allowedKinds = context.policy.allowedTargetKinds;
           const visibleCandidates = candidates.filter((candidate) => {
+            if (candidate.target.projectId !== projectId) return false;
             if (candidate.target.kind === "project") return false;
             if (allowedKinds && !allowedKinds.includes(candidate.target.kind))
               return false;
@@ -728,21 +845,43 @@ function DocumentEditorInstance({
             anchor: getMenuAnchor(currentView),
             status: "ready",
           });
-          if (!query) {
-            referenceDirectoryRef.current = visibleCandidates;
+          if (
+            !query &&
+            referenceDirectoryVersionsRef.current.get(projectId) ===
+              directoryVersion
+          ) {
+            referenceDirectoriesRef.current.set(projectId, visibleCandidates);
             currentView.dispatch(
               currentView.state.tr.setMeta("project-reference-directory", true),
             );
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (
             !controller.signal.aborted &&
             requestId === referenceRequestRef.current
-          )
+          ) {
+            if (
+              !query &&
+              referenceDirectoryVersionsRef.current.get(projectId) ===
+                directoryVersion &&
+              [401, 403, 404].includes(
+                (error as { status?: number })?.status ?? 0,
+              )
+            ) {
+              referenceDirectoriesRef.current.set(projectId, []);
+              const currentView = getEditorView(crepe);
+              currentView?.dispatch(
+                currentView.state.tr.setMeta(
+                  "project-reference-directory",
+                  true,
+                ),
+              );
+            }
             setReferenceMenu((current) =>
               current ? { ...current, status: "error" } : null,
             );
+          }
         });
     };
     retryReferenceMenuRef.current = updateReferenceMenu;
@@ -753,6 +892,8 @@ function DocumentEditorInstance({
       const view = getEditorView(crepe);
       if (!view) return;
       if (!view.state.selection.empty) return;
+      selectedReferenceProjectRef.current = context.source.projectId;
+      setSelectedReferenceProject(context.source.projectId);
       referenceTriggerRef.current = view.state.selection.from;
       const preceding = view.state.selection.$from.parent.textBetween(
         0,
@@ -972,12 +1113,14 @@ function DocumentEditorInstance({
       event.preventDefault();
       event.stopPropagation();
       if (
-        referenceDirectoryRef.current &&
-        !referenceDirectoryRef.current.some(
-          (candidate) =>
-            serializeMarkdownReference(candidate.target, "") ===
-            serializeMarkdownReference(target, ""),
-        )
+        referenceDirectoriesRef.current.has(target.projectId) &&
+        !referenceDirectoriesRef.current
+          .get(target.projectId)!
+          .some(
+            (candidate) =>
+              serializeMarkdownReference(candidate.target, "") ===
+              serializeMarkdownReference(target, ""),
+          )
       )
         return;
       onReferenceClickRef.current?.({
@@ -1028,7 +1171,9 @@ function DocumentEditorInstance({
       openReferenceMenuRef.current = null;
       retryReferenceMenuRef.current = null;
       closeReferenceMenuRef.current = null;
-      referenceDirectoryRef.current = null;
+      referenceDirectoriesRef.current.clear();
+      referenceDirectoryVersionsRef.current.clear();
+      selectedReferenceProjectRef.current = undefined;
       insertReferenceCandidateRef.current = null;
       insertMentionCandidateRef.current = null;
       if (crepeRef.current === crepe) {
@@ -1156,6 +1301,25 @@ function DocumentEditorInstance({
         >
           {referenceMenu && (
             <ProjectReferencePicker
+              projects={referenceProjects}
+              projectId={
+                selectedReferenceProject ?? referenceContext?.source.projectId
+              }
+              currentProjectId={referenceContext?.source.projectId}
+              projectsStatus={referenceProjectsStatus}
+              onProjectsRetry={() =>
+                setReferenceProjectsRetry((value) => value + 1)
+              }
+              onProjectChange={
+                referenceProvider?.listProjects &&
+                !referenceContext?.policy.sameProjectOnly
+                  ? (projectId) => {
+                      selectedReferenceProjectRef.current = projectId;
+                      setSelectedReferenceProject(projectId);
+                      retryReferenceMenuRef.current?.();
+                    }
+                  : undefined
+              }
               candidates={referenceMenu.candidates}
               status={referenceMenu.status}
               anchor={referenceMenu.anchor}

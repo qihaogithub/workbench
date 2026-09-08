@@ -6,6 +6,8 @@ let proxy: typeof import("./proxy").proxy;
 let config: typeof import("./proxy").config;
 
 const verifyToken = jest.fn();
+const findUserById = jest.fn();
+jest.mock("@/lib/user", () => ({ findUserById }));
 const getAuthCookieName = jest.fn(() => "auth_token");
 const extractBearerToken = jest.fn((authorization: string | null | undefined) => {
   const match = authorization?.match(/^Bearer\s+(\S+)$/i);
@@ -80,6 +82,7 @@ describe("proxy authentication and CORS contract", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    findUserById.mockReturnValue({ id: "u1", username: "alice", role: "editor" });
     delete process.env.CORS_ORIGINS;
     extractBearerToken.mockImplementation((authorization) => {
       const match = authorization?.match(/^Bearer\s+(\S+)$/i);
@@ -105,6 +108,19 @@ describe("proxy authentication and CORS contract", () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost/workbench");
+  });
+
+  it("allows login when a signed token refers to a missing user", async () => {
+    verifyToken.mockResolvedValue({ userId: "deleted", username: "old" });
+    findUserById.mockReturnValue(null);
+    const options = { cookie: "auth_token=valid" };
+    const workbench = await proxy(request("/workbench", options));
+    expect(workbench.headers.get("location")).toBe("http://localhost/login?redirect=%2Fworkbench");
+    const login = await proxy(request("/login?redirect=%2Fworkbench", options));
+    expect(login.status).toBe(200);
+    expect(login.headers.get("location")).toBeNull();
+    const home = await proxy(request("/", options));
+    expect(home.status).toBe(200);
   });
 
   it("does not treat the removed registration page as an auth route", async () => {

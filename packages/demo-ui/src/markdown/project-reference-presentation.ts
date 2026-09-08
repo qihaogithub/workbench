@@ -19,6 +19,8 @@ export interface ProjectReferencePresentationOptions {
   root: HTMLElement;
   /** null includes loading and failed requests; [] means successfully loaded empty. */
   getCandidates: () => readonly MarkdownReferenceCandidate[] | null;
+  /** Only these projects have an authoritative response; all others stay unknown. */
+  getResolvedProjectIds?: () => ReadonlySet<string>;
 }
 
 export const projectReferenceDirectoryMeta = "project-reference-directory";
@@ -29,6 +31,7 @@ export const projectReferencePresentationKey = new PluginKey<DecorationSet>(
 export function referenceDecorations(
   doc: Node,
   candidates: readonly MarkdownReferenceCandidate[] | null,
+  resolvedProjectIds?: ReadonlySet<string>,
 ): DecorationSet {
   const directory = new Map<string, MarkdownReferenceCandidate>();
   for (const candidate of candidates ?? []) {
@@ -67,7 +70,10 @@ export function referenceDecorations(
         candidate?.label ||
         candidate?.displayPath.split("/").filter(Boolean).pop()?.trim() ||
         label;
-      const unavailable = candidates !== null && !candidate;
+      const unavailable =
+        (resolvedProjectIds
+          ? resolvedProjectIds.has(target.projectId)
+          : candidates !== null) && !candidate;
       return parts.map(({ from, to }, index) =>
         Decoration.inline(from, to, {
           nodeName: "span",
@@ -150,7 +156,11 @@ export function createProjectReferencePresentationPlugin(
     } catch {
       /* Failed directory is unknown, never deleted. */
     }
-    return referenceDecorations(doc, candidates);
+    return referenceDecorations(
+      doc,
+      candidates,
+      options.getResolvedProjectIds?.(),
+    );
   };
   return new Plugin<DecorationSet>({
     key: projectReferencePresentationKey,
