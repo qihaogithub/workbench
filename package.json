@@ -121,7 +121,8 @@
       "prosemirror-state": "1.4.4"
     },
     "patchedDependencies": {
-      "@milkdown/components@7.22.0": "patches/@milkdown__components@7.22.0.patch"
+      "@milkdown/components@7.22.0": "patches/@milkdown__components@7.22.0.patch",
+      "@milkdown/crepe@7.22.0": "patches/@milkdown__crepe@7.22.0.patch"
     }
   },
   "packageManager": "pnpm@8.15.0",

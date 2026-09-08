@@ -244,7 +244,59 @@
   min-width: 0;
   max-width: 100%;
   overflow: visible;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
+.document-editor-crepe .milkdown-top-bar .top-bar-measure {
+  position: absolute;
+  display: flex;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+  height: 0;
+  overflow: hidden;
+}
+
+.document-editor-crepe .milkdown-top-bar .top-bar-measure > * {
+  flex-shrink: 0;
+}
+
+.document-editor-crepe .milkdown-top-bar .top-bar-more {
+  margin-left: auto;
+  flex: 0 0 32px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.document-editor-crepe .milkdown-top-bar .top-bar-overflow-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 30;
+  width: 180px;
+  max-width: 100%;
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--crepe-color-outline);
+  border-radius: 8px;
+  background: var(--crepe-color-surface);
+  box-shadow: 0 4px 16px #0003;
+}
+
+.document-editor-crepe .milkdown .milkdown-top-bar .top-bar-overflow-item {
+  display: flex;
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.document-editor-crepe .top-bar-overflow-label {
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-inner > * {

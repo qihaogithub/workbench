@@ -94,7 +94,7 @@ describe("Crepe 宿主主题契约", () => {
       /\.milkdown-top-bar\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*max-width:\s*100%;[^}]*overflow:\s*visible;/s,
     );
     expect(theme).toMatch(
-      /\.top-bar-inner\s*\{[^}]*display:\s*flex;[^}]*overflow:\s*visible;[^}]*flex-wrap:\s*wrap;/s,
+      /\.top-bar-inner\s*\{[^}]*display:\s*flex;[^}]*overflow:\s*visible;[^}]*flex-wrap:\s*nowrap;/s,
     );
   });
 

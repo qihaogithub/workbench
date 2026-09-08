@@ -4,7 +4,7 @@ covers:
   - packages/demo-ui/src/DocumentEditor.test.tsx
   - packages/demo-ui/src/markdown/crepe-config.ts
   - packages/demo-ui/src/markdown/heading-style-toolbar.ts
-  - packages/demo-ui/src/markdown/top-bar-overflow.ts
+  - patches/@milkdown__crepe@7.22.0.patch
   - packages/demo-ui/src/markdown/crepe-theme.css
   - packages/demo-ui/src/markdown/crepe-theme.test.ts
   - packages/demo-ui/src/index.ts
@@ -30,9 +30,9 @@ Latex 与 Crepe AI 明确关闭。标题菜单统一使用“正文、一级标�
 
 ## 三、TopBar 与布局适配
 
-TopBar 需要相对 `.milkdown` 正文滚动容器吸顶。容器变窄时，超出宽度的工具按既有顺序收纳到“更多”菜单；容器恢复宽度后自动还原。适配器持续检查当前 `.top-bar-inner` 节点身份，Crepe 替换 TopBar DOM 后重新绑定，不能只保存一次性 Vue DOM 引用。
+TopBar 相对 `.milkdown` 正文滚动容器吸顶。通过 pnpm 管理的 Crepe 7.22.0 补丁在原生 Vue 渲染层实现单行收纳，工具继续使用原生配置、命令与选中态。ResizeObserver 测量容器和不可交互的测量行，为 `···` 预留位置后按原顺序划分可见项和溢出项；容器恢复宽度后自动还原。
 
-恢复菜单由 React 外层宿主承载，与 Crepe `.crepe` 滚动容器平级，并保持高于原生 TopBar 的层级。被收纳项使用 `hidden` 退出布局，主题样式不能用 `display` 覆盖该语义。
+更多菜单由同一原生组件承载，定位在工具栏右下方，限制高度并内部滚动。测量行使用 inert 和 aria-hidden 排除交互与可访问树。按钮阻止指针按下改变选区，点击直接执行原命令；Escape 关闭并返回更多按钮，方向键切换菜单项。卸载时清理尺寸观察器和外部点击监听；升级 Crepe 时需同时检查源码及 ESM/CJS 两种入口的补丁与真实编辑器回归。
 
 ## 四、主题与滚动
 
