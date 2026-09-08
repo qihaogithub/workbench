@@ -54,7 +54,7 @@ import {
   MarkdownReferenceLinksPanel,
   type MarkdownReferenceMention,
 } from "./MarkdownReferenceLinksPanel";
-import { navigateToMarkdownMention } from "./markdown-reference-navigation";
+import { navigateToMarkdownMention, type AuthorDocumentReference } from "./markdown-reference-navigation";
 import { DocumentProposalReviewDialog } from "./DocumentProposalReviewDialog";
 import type { DesignSpecMeta, DesignSpecRef } from "@/lib/design-specs";
 import type { UserRole } from "@/lib/user";
@@ -165,6 +165,8 @@ function getContentCacheKey(target: ActiveTarget): string {
 }
 
 export interface DocumentViewProps {
+  referenceFocus?: AuthorDocumentReference | null;
+  onReferenceFocusConsumed?: () => void;
   workingDir?: string;
   projectId?: string;
   documentApiMode?: "legacy" | "project";
@@ -184,6 +186,8 @@ export interface DocumentViewProps {
 }
 
 export function DocumentView({
+  referenceFocus,
+  onReferenceFocusConsumed,
   workingDir,
   projectId,
   documentApiMode = "legacy",
@@ -241,20 +245,54 @@ export function DocumentView({
   // 同一视图内切换文档时复用已读取的正文；资源列表刷新时会清空该缓存。
   const contentCacheRef = useRef(new Map<string, string>());
   const referenceEditorContainerRef = useRef<HTMLDivElement>(null);
+  const referenceDirectoryRef = useRef<HTMLDivElement>(null);
+  const consumedReferenceFocusRef = useRef<AuthorDocumentReference | null>(null);
+
+  useEffect(() => {
+    if (!referenceFocus || referenceFocus.projectId !== projectId || consumedReferenceFocusRef.current === referenceFocus) return;
+    let next: ActiveTarget | undefined;
+    switch (referenceFocus.documentKind ?? "knowledge") {
+      case "knowledge": {
+        const item = items.find((entry) => entry.id === referenceFocus.docId);
+        if (item) next = { kind: "knowledge", item };
+        break;
+      }
+      case "memory": next = { kind: "memory" }; break;
+      case "project-convention": next = { kind: "convention" }; break;
+      case "page-convention": {
+        const page = pages.find((entry) => entry.id === referenceFocus.docId);
+        if (page) next = { kind: "pageConvention", page };
+        break;
+      }
+      case "design-spec": {
+        const doc = designSpecs.find((entry) => entry.id === referenceFocus.docId);
+        if (doc) next = { kind: "designSpec", doc };
+        break;
+      }
+    }
+    if (!next) return;
+    consumedReferenceFocusRef.current = referenceFocus;
+    setActiveTarget(next);
+    setUserExpanded(true);
+    setConventionExpanded(true);
+    setDesignSpecExpanded(true);
+    onReferenceFocusConsumed?.();
+  }, [referenceFocus, projectId, items, pages, designSpecs, onReferenceFocusConsumed]);
 
   const referenceProvider = useCallback<MarkdownReferenceProvider>(
     async ({ query, context, signal }) => {
       if (!projectId) return [];
-      const params = new URLSearchParams({ q: query, kind: "project,page,document" });
+      const params = new URLSearchParams({ q: query, kind: "page,config,document" });
       if (sessionId) params.set("sessionId", sessionId);
       const response = await fetch(
         `/api/projects/${encodeURIComponent(projectId)}/markdown-references/candidates?${params.toString()}`,
         { signal },
       );
-      if (!response.ok) return [];
+      if (!response.ok) throw new Error("引用目录加载失败，请重试");
       const payload = await response.json();
       const candidates = payload?.data?.candidates ?? payload?.data;
-      return Array.isArray(candidates) ? (candidates as MarkdownReferenceCandidate[]) : [];
+      if (payload?.success === false || !Array.isArray(candidates)) throw new Error("引用目录加载失败，请重试");
+      return candidates as MarkdownReferenceCandidate[];
     },
     [projectId, sessionId],
   );
@@ -282,7 +320,7 @@ export function DocumentView({
     return {
       source,
       policy: {
-        allowedTargetKinds: ["project", "page", "document"],
+        allowedTargetKinds: ["page", "config", "document"],
         sameProjectOnly: true,
         allowUnresolved: false,
       },
@@ -468,10 +506,10 @@ export function DocumentView({
 
   // 默认选中第一个用户文档
   useEffect(() => {
-    if (!activeTarget && userItems.length > 0 && !loading) {
+    if (!referenceFocus && !activeTarget && userItems.length > 0 && !loading) {
       setActiveTarget({ kind: "knowledge", item: userItems[0] });
     }
-  }, [activeTarget, userItems, loading]);
+  }, [activeTarget, userItems, loading, referenceFocus]);
 
   const blockWorkspaceSaves = useCallback(() => {
     workspaceSaveBlockedRef.current = true;
@@ -1057,8 +1095,14 @@ export function DocumentView({
   }, [activeTarget, documentApiMode, onCommentTargetChange]);
 
   const activeDocumentTarget = useMemo<MarkdownReferenceTarget | undefined>(() => {
-    if (activeTarget?.kind !== "knowledge" || !projectId) return undefined;
-    return { kind: "document", projectId, docId: activeTarget.item.id };
+    if (!activeTarget || !projectId) return undefined;
+    switch (activeTarget.kind) {
+      case "knowledge": return { kind: "document", projectId, docId: activeTarget.item.id };
+      case "memory": return { kind: "document", projectId, documentKind: "memory", docId: "memory" };
+      case "convention": return { kind: "document", projectId, documentKind: "project-convention", docId: "convention" };
+      case "pageConvention": return { kind: "document", projectId, documentKind: "page-convention", docId: activeTarget.page.id };
+      case "designSpec": return { kind: "document", projectId, documentKind: "design-spec", docId: activeTarget.doc.id };
+    }
   }, [activeTarget, projectId]);
   const handleReferenceSourceClick = useCallback((source: MarkdownReferenceSource) => {
     if (source.kind !== "knowledge-document") return;
@@ -1083,10 +1127,17 @@ export function DocumentView({
       !canManageGovernance,
   );
 
+  useEffect(() => {
+    if (!activeTarget) return;
+    // Every directory category uses the same active-row highlight.
+    referenceDirectoryRef.current?.querySelector<HTMLElement>(".bg-accent.text-accent-foreground")
+      ?.scrollIntoView?.({ block: "nearest" });
+  }, [activeTarget, existingConventionPaths, designSpecExpanded, conventionExpanded, userExpanded]);
+
   return (
     <div className="flex h-full min-h-0">
       {/* 目录区 */}
-      <div className="flex w-1/4 shrink-0 flex-col overflow-hidden border-r bg-card">
+      <div ref={referenceDirectoryRef} className="flex w-1/4 shrink-0 flex-col overflow-hidden border-r bg-card">
         <div className="flex items-center justify-between border-b px-3 py-2.5">
           <h2 className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <FolderOpen className="h-3.5 w-3.5" />

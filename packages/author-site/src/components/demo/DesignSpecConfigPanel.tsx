@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState, useMemo } from "react";
+import { buildConfigPool, type ConfigPoolPageInput } from "@/lib/design-specs/config-pool";
+
 import { ChevronDown, FileText, Folder, ListFilter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConfigPoolItem } from "@/lib/design-specs";
@@ -163,6 +166,47 @@ export function DesignSpecConfigPanel() {
         ) : (
           <EmptyState>无匹配规范项</EmptyState>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** The existing definition tree can also locate a schema without requiring a design-spec document. */
+export function ConfigDefinitionTree({ page, fieldKey, onClose }: {
+  page: ConfigPoolPageInput;
+  fieldKey: string;
+  onClose: () => void;
+}) {
+  const directoryRef = useRef<HTMLDivElement>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState(new Set<string>());
+  const tree = useMemo(() => buildConfigTree(buildConfigPool(undefined, [page])), [page]);
+  useEffect(() => { setCollapsedGroups(new Set()); }, [page.id, fieldKey]);
+  useEffect(() => {
+    const row = Array.from(directoryRef.current?.querySelectorAll<HTMLElement>("[data-config-definition-key]") ?? [])
+      .find((node) => node.dataset.configDefinitionKey === fieldKey && node.dataset.configDefinitionPage === page.id);
+    if (!row) return;
+    row.setAttribute("aria-selected", "true");
+    row.classList.add("bg-accent", "ring-1", "ring-ring");
+    row.scrollIntoView?.({ block: "center" });
+    row.focus({ preventScroll: true });
+    return () => {
+      row.setAttribute("aria-selected", "false");
+      row.classList.remove("bg-accent", "ring-1", "ring-ring");
+    };
+  }, [page.id, fieldKey, tree, collapsedGroups]);
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex items-center justify-between border-b px-3 py-2.5 text-sm">
+        <span>{page.name}</span><button type="button" onClick={onClose}>返回配置</button>
+      </div>
+      <div ref={directoryRef} role="tree" aria-label="配置项树" className="min-h-0 flex-1 overflow-auto p-2">
+        {tree.map((node) => <ConfigTreeNode key={node.key} node={node} pageKey={page.id} level={1}
+          boundIds={new Set()} collapsedGroups={collapsedGroups}
+          toggleGroup={(key) => setCollapsedGroups((current) => {
+            const next = new Set(current);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+          })} setHoverPop={() => {}} setZoomed={() => {}} />)}
       </div>
     </div>
   );
@@ -388,6 +432,8 @@ function ConfigTreeNode({
   return (
     <div data-design-spec-tree-node>
       <div
+        data-config-definition-key={item?.key}
+        data-config-definition-page={item?.pageId}
         role="treeitem"
         aria-level={level}
         aria-selected={false}

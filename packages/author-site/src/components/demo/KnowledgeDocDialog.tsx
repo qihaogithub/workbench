@@ -141,16 +141,17 @@ export function KnowledgeDocDialog({
   const referenceProvider = useMemo<MarkdownReferenceProvider>(() => {
     return async ({ query, signal }) => {
       if (!projectId) return [];
-      const params = new URLSearchParams({ q: query, kind: "project,page,document" });
+      const params = new URLSearchParams({ q: query, kind: "page,config,document" });
       if (sessionId) params.set("sessionId", sessionId);
       const response = await fetch(
         `/api/projects/${encodeURIComponent(projectId)}/markdown-references/candidates?${params.toString()}`,
         { signal },
       );
-      if (!response.ok) return [];
+      if (!response.ok) throw new Error("引用目录加载失败，请重试");
       const payload = await response.json();
       const candidates = payload?.data?.candidates ?? payload?.data;
-      return Array.isArray(candidates) ? (candidates as MarkdownReferenceCandidate[]) : [];
+      if (payload?.success === false || !Array.isArray(candidates)) throw new Error("引用目录加载失败，请重试");
+      return candidates as MarkdownReferenceCandidate[];
     };
   }, [projectId, sessionId]);
   const referenceContext = useMemo<MarkdownReferenceContext | undefined>(() => {
@@ -158,7 +159,7 @@ export function KnowledgeDocDialog({
     return {
       source: { kind: "knowledge-document", projectId, workspaceId, docId: item.id },
       policy: {
-        allowedTargetKinds: ["project", "page", "document"],
+        allowedTargetKinds: ["page", "config", "document"],
         sameProjectOnly: true,
         allowUnresolved: false,
       },
@@ -173,9 +174,9 @@ export function KnowledgeDocDialog({
       const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>("a[href]");
       const href = anchor?.getAttribute("href");
       if (!href?.startsWith("wb://")) return;
+      event.preventDefault();
       const target = decodeMarkdownReferenceUri(href);
       if (!target) return;
-      event.preventDefault();
       onReferenceClick?.({ target, labelSnapshot: anchor?.textContent?.trim() || "" });
     },
     [onReferenceClick],

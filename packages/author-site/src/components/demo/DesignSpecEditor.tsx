@@ -564,7 +564,7 @@ function EntryCard({
                         entryId: entry.id,
                       },
                       policy: {
-                        allowedTargetKinds: ["project", "page", "document"],
+                        allowedTargetKinds: ["page", "config", "document"],
                         sameProjectOnly: true,
                         allowUnresolved: false,
                       },

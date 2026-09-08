@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import type { MarkdownReferenceSource, MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
+import { encodeMarkdownReferenceUri, type MarkdownReferenceSource, type MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
 
 interface LinkRecord {
   source: MarkdownReferenceSource;
@@ -155,7 +155,7 @@ export function MarkdownReferenceLinksPanel({
     if (target) {
       const backlinkQuery = new URLSearchParams({
         targetKind: target.kind,
-        targetId: target.kind === "project" ? target.projectId : target.kind === "page" ? target.pageId : target.docId,
+        targetId: target.kind === "config" || (target.kind === "document" && target.documentKind && target.documentKind !== "knowledge") ? encodeMarkdownReferenceUri(target) : target.kind === "project" ? target.projectId : target.kind === "page" ? target.pageId : target.docId,
       });
       if (sessionId) backlinkQuery.set("sessionId", sessionId);
       requests.push(fetch(`/api/projects/${encodeURIComponent(projectId)}/markdown-references/backlinks?${backlinkQuery.toString()}`, { signal: controller.signal }));

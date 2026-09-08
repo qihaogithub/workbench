@@ -17,6 +17,14 @@ describe("published markdown reference snapshot", () => {
     sanitizeDesignSpecs = require("../publish-markdown-references").sanitizePublishedDesignSpecFiles;
   });
 
+  it("downgrades config and governance documents without colliding with knowledge IDs", () => {
+    const markdown = "[Field](wb://config/p/home/color) [Memory](wb://document/p/memory/memory) [Convention](wb://document/p/project-convention/convention) [Page](wb://document/p/page-convention/home) [Spec](wb://document/p/design-spec/spec)";
+    const snapshot = buildSnapshot({ projectId: "p", projectName: "P", publishedVersion: "v", canonicalSnapshot: { versionId: "v" }, publishedProjectDir: tempDir, pages: [{ id: "home", name: "Home", requirements: markdown }] });
+    expect(snapshot.edges).toHaveLength(5);
+    expect(snapshot.edges.every(edge => !edge.target && edge.targetState === "publish-unavailable")).toBe(true);
+    expect(sanitize(markdown, snapshot)).toBe("Field Memory Convention Page Spec");
+  });
+
   it("publishes only snapshot targets and projects unresolved links as unavailable", () => {
     const publishedDir = path.join(tempDir, "published", "project-1");
     fs.mkdirSync(path.join(publishedDir, "knowledge"), { recursive: true });

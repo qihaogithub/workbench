@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { enumerateSchemaFields } from "@workbench/shared/demo/config-schema-fields";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
@@ -922,10 +923,13 @@ export function PageConfigPanel({
       return;
     }
     consumedConfigDefinitionFocusRef.current = focusKey;
-    openDefinitionEditor(
-      configDefinitionFocus.scope,
-      configDefinitionFocus.fieldKey,
-    );
+    const focusSchema = configDefinitionFocus.scope === "project"
+      ? selectedProjectConfigSchema || EMPTY_SCHEMA
+      : selectedPage.schema || EMPTY_SCHEMA;
+    const catalogField = enumerateSchemaFields(focusSchema).find((field) => field.key === configDefinitionFocus.fieldKey);
+    if (catalogField && !catalogField.isBranch) {
+      openDefinitionEditor(configDefinitionFocus.scope, catalogField.key);
+    }
     onConfigDefinitionFocusConsumed?.();
     // The focus request is consumed immediately; the parent clears it so a
     // normal rerender cannot reopen the same dialog.

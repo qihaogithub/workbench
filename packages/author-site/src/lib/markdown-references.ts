@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { readReferenceText, readReferenceJson, referenceFile } from "./markdown-reference-directory-io";
 import path from "node:path";
 import type { NextRequest } from "next/server";
 import {
@@ -15,13 +16,14 @@ import {
   type ResourceDirectorySnapshot,
   type ParsedIndexReference,
 } from "@workbench/project-core";
-import { parseMarkdownReferences } from "@workbench/shared/markdown-reference";
+import { buildCandidateDirectoryEntries } from "@workbench/project-core/markdown-references";
+import { parseMarkdownReferences, decodeMarkdownReferenceUri, MARKDOWN_REFERENCE_INDEX_VERSION } from "@workbench/shared/markdown-reference";
+import { isValidWorkspacePathSegment } from "@workbench/shared/workspace-path";
 import {
   findWorkspacePath,
   getProjectPath,
   getSessionMeta,
   isSessionExpired,
-  listDemoPages,
   readProjectMeta,
 } from "@/lib/fs-utils";
 
@@ -58,27 +60,11 @@ function sourceKey(source: MarkdownReferenceSource): string {
 }
 
 function readWorkspaceMarkdown(workspacePath: string, relativePath: string): string {
-  const root = path.resolve(workspacePath);
-  const filePath = path.resolve(root, relativePath);
-  if (filePath !== root && !filePath.startsWith(`${root}${path.sep}`)) return "";
-  try {
-    return fs.readFileSync(filePath, "utf-8");
-  } catch {
-    return "";
-  }
+  return readReferenceText(workspacePath, relativePath) ?? "";
 }
 
 function readWorkspaceJson(workspacePath: string, relativePath: string): Record<string, unknown> | null {
-  const text = readWorkspaceMarkdown(workspacePath, relativePath);
-  if (!text) return null;
-  try {
-    const value = JSON.parse(text) as unknown;
-    return value && typeof value === "object" && !Array.isArray(value)
-      ? value as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
+  return readReferenceJson(workspacePath, relativePath);
 }
 
 function schemaFields(schema: unknown, prefix: string[] = []): Array<{
@@ -154,23 +140,24 @@ export function buildMarkdownReferenceIndex(
 ): MarkdownReferenceIndexResult {
   const readMarkdown = options.readMarkdown !== false;
   const project = readProjectMeta(context.projectId);
-  const pages = listDemoPages(context.workspacePath);
-  const manifestPath = path.join(context.workspacePath, "knowledge", "manifest.json");
-  let documents: Array<Record<string, unknown>> = [];
-  try {
-    const parsed = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as { items?: unknown };
-    documents = Array.isArray(parsed.items)
+  const tree = readWorkspaceJson(context.workspacePath, "workspace-tree.json");
+  if (tree && (!Array.isArray(tree.pages) || !Array.isArray(tree.folders))) throw new Error("REFERENCE_DIRECTORY_INVALID_TREE");
+  const pages = (tree?.pages ?? []) as NonNullable<ResourceDirectorySnapshot["pages"]>;
+  const folders = (tree?.folders ?? []) as Array<{ id: string; name: string; parentId?: string | null }>;
+  for (const node of [...pages, ...folders]) {
+    if (!node || typeof node.id !== "string" || !isValidWorkspacePathSegment(node.id) || typeof node.name !== "string") throw new Error("REFERENCE_DIRECTORY_INVALID_TREE");
+  }
+  const parsed = readWorkspaceJson(context.workspacePath, "knowledge/manifest.json");
+  if (parsed && !Array.isArray(parsed.items)) throw new Error("REFERENCE_DIRECTORY_INVALID_MANIFEST");
+  const documents: Array<Record<string, unknown>> = Array.isArray(parsed?.items)
       ? parsed.items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
       : [];
-  } catch {
-    documents = [];
-  }
 
   const snapshot: ResourceDirectorySnapshot = {
     project: { id: context.projectId, name: project?.name || context.projectId },
     pages,
     documents: documents
-      .filter((item) => typeof item.id === "string" && typeof item.title === "string" && typeof item.fileName === "string")
+      .filter((item) => item.source !== "system" && typeof item.id === "string" && typeof item.title === "string" && typeof item.fileName === "string" && isValidWorkspacePathSegment(item.fileName))
       .map((item) => ({
         id: item.id as string,
         title: item.title as string,
@@ -183,6 +170,34 @@ export function buildMarkdownReferenceIndex(
       })),
   };
   const directory = createResourceDirectory(snapshot);
+  for (const document of snapshot.documents ?? []) {
+    const target = { kind: "document" as const, projectId: context.projectId, docId: document.id };
+    if (!referenceFile(context.workspacePath, `knowledge/${document.fileName}`)) {
+      const entry = directory.get(target);
+      if (entry) directory.add({ ...entry, state: "missing" });
+    }
+  }
+  for (const entry of buildCandidateDirectoryEntries({
+    projectId: context.projectId,
+    pages: pages.map(page => ({ ...page, schema: JSON.stringify(readWorkspaceJson(context.workspacePath, `demos/${page.id}/config.schema.json`)) })),
+    folders,
+  })) directory.add({ ...directory.get(entry.target), ...entry, displayPath: `${snapshot.project.name} / ${entry.displayPath}` });
+  const addDocument = (documentKind: "memory" | "project-convention" | "page-convention" | "design-spec", docId: string, label: string, relativePath: string) => {
+    if (!referenceFile(context.workspacePath, relativePath)) return;
+    const groupLabels = { memory: "AI 记忆", "project-convention": "公约", "page-convention": "公约", "design-spec": "设计规范" };
+    const group = groupLabels[documentKind];
+    directory.add({ target: { kind: "document", projectId: context.projectId, documentKind, docId }, label, displayPath: `${snapshot.project.name} / ${group} / ${label}`, documentGroup: group, hierarchy: [{ id: `group:documents:${context.projectId}:${documentKind}`, label: group, kind: "group" }] });
+  };
+  addDocument("memory", "memory", "AI 记忆", "memory.md");
+  addDocument("project-convention", "convention", "项目公约", "convention.md");
+  for (const page of pages) addDocument("page-convention", page.id, `${page.name} 页面公约`, `demos/${page.id}/convention.md`);
+  const specManifest = readWorkspaceJson(context.workspacePath, "design-spec/manifest.json");
+  if (specManifest && !Array.isArray(specManifest.items)) throw new Error("REFERENCE_DIRECTORY_INVALID_MANIFEST");
+  for (const item of Array.isArray(specManifest?.items) ? specManifest.items : []) {
+    if (!item || typeof item !== "object" || typeof item.id !== "string" || !/^[A-Za-z0-9_-]{1,120}$/.test(item.id)) continue;
+    addDocument("design-spec", item.id, typeof item.title === "string" ? item.title : item.id, `design-spec/spec-${item.id}.json`);
+  }
+  snapshot.entries = directory.values();
   const index = new InMemoryMarkdownReferenceIndex();
   const sourceDocs: Array<{ source: MarkdownReferenceSource; markdown: string; contentHash?: string }> = [];
   const sourceLabels = new Map<string, string>();
@@ -379,11 +394,12 @@ export function openPersistentMarkdownReferenceIndex(
   return { ...collected, index, status: isCurrentSnapshot(current, context) ? "ready" : "stale" };
 }
 
-function isCurrentSnapshot(
-  snapshot: { authorityRevision?: number; authorityRootHash?: string } | null,
+export function isCurrentSnapshot(
+  snapshot: { authorityRevision?: number; authorityRootHash?: string; parserVersion?: string } | null,
   context: MarkdownReferenceWorkspaceContext,
 ): boolean {
   if (!snapshot) return false;
+  if (snapshot.parserVersion !== MARKDOWN_REFERENCE_INDEX_VERSION) return false;
   if (typeof context.observedRevision === "number" && typeof snapshot.authorityRevision === "number") {
     if (snapshot.authorityRevision < context.observedRevision) return false;
     if (snapshot.authorityRevision === context.observedRevision && context.observedRootHash && snapshot.authorityRootHash !== context.observedRootHash) return false;
@@ -409,7 +425,7 @@ export function toCandidateList(
   kinds?: MarkdownReferenceTarget["kind"][],
 ): MarkdownReferenceCandidate[] {
   const resolver = createEntityResolver(result.directory, result.context.projectId);
-  return resolver.candidates({ allowedTargetKinds: kinds, sameProjectOnly: true }, query);
+  return resolver.candidates({ allowedTargetKinds: kinds, sameProjectOnly: true }, query).filter(candidate => candidate.target.kind !== "project");
 }
 
 export function serializeLinkRecord(record: MarkdownLinkRecord, sourceLabels: Map<string, string>) {
@@ -429,8 +445,14 @@ export function serializeLinkRecord(record: MarkdownLinkRecord, sourceLabels: Ma
   };
 }
 
-export function parseTarget(kind: string | null, id: string | null, projectId: string): MarkdownReferenceTarget | null {
+export function parseTarget(kind: string | null, id: string | null, projectId: string, options: { pageId?: string; fieldPath?: string; documentKind?: string } = {}): MarkdownReferenceTarget | null {
   if (!kind || !id) return null;
+  if (id.startsWith("wb://")) {
+    const target = decodeMarkdownReferenceUri(id);
+    return target?.projectId === projectId && target.kind === kind ? target : null;
+  }
+  if (kind === "config" && options.pageId && options.fieldPath) return { kind, projectId, pageId: options.pageId, fieldPath: options.fieldPath };
+  if (kind === "document" && options.documentKind && options.documentKind !== "knowledge") return decodeMarkdownReferenceUri(`wb://document/${encodeURIComponent(projectId)}/${encodeURIComponent(options.documentKind)}/${encodeURIComponent(id)}`) ?? null;
   if (kind === "project") return { kind, projectId: id };
   if (kind === "page") return { kind, projectId, pageId: id };
   if (kind === "document") return { kind, projectId, docId: id };

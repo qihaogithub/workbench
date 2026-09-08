@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { DesignSpecConfigPanel } from "./DesignSpecConfigPanel";
+import { DesignSpecConfigPanel, ConfigDefinitionTree } from "./DesignSpecConfigPanel";
 import { useDesignSpecWorkspace } from "./DesignSpecWorkspace";
 
 jest.mock("./DesignSpecWorkspace", () => ({
@@ -22,6 +22,24 @@ jest.mock("./DesignSpecVisuals", () => ({
 const useWorkspace = useDesignSpecWorkspace as jest.Mock;
 
 describe("DesignSpecConfigPanel", () => {
+  it("无设计规范文档时仍用同一配置树精确高亮合成分支，关闭后返回原配置", () => {
+    const onClose = jest.fn();
+    const page = { id: "page-a", name: "页面 A", schema: JSON.stringify({ type: "object", properties: {
+      cards: { type: "array", title: "卡片", items: { oneOf: [
+        { title: "图文分支", properties: { kind: { const: "image" }, title: { type: "string", title: "图文标题" } } },
+        { title: "文字分支", properties: { kind: { const: "text" }, title: { type: "string", title: "文字标题" } } },
+      ] } },
+    } }) };
+    render(<ConfigDefinitionTree page={page} fieldKey="cards[kind=image]" onClose={onClose} />);
+    const selected = screen.getByRole("tree").querySelector('[aria-selected="true"]');
+    expect(selected).toHaveAttribute("data-config-definition-key", "cards[kind=image]");
+    expect(selected).toHaveAttribute("data-config-definition-page", "page-a");
+    expect(selected).toHaveClass("bg-accent", "ring-ring");
+    expect(selected).toHaveFocus();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("返回配置"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
   it("复用配置项分组节点作为页面绑定入口", () => {
     const setSearch = jest.fn();
     const setBindFilter = jest.fn();
