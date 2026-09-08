@@ -18,7 +18,7 @@ import {
 
 const PROTECTED_PAGE_ROUTES = ["/workbench", "/demo", "/cli"];
 const PROTECTED_API_ROUTES = ["/api/sessions"];
-const AUTH_ROUTES = ["/login", "/register"];
+const AUTH_ROUTES = ["/login"];
 const ADMIN_ROUTES = ["/admin"];
 const ADMIN_API_ROUTES = ["/api/admin"];
 const DEFAULT_CORS_ORIGINS = ["http://localhost:3300", "http://127.0.0.1:3300"];

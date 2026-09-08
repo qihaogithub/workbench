@@ -18,8 +18,13 @@ import { KeyRound, Loader2, RefreshCw, Trash2 } from "lucide-react";
 interface User {
   id: string;
   username: string;
+  displayName: string;
   createdAt: number;
   role: "admin" | "editor";
+}
+
+function getUserLabel(user: User | null): string {
+  return user?.displayName || user?.username || "";
 }
 
 function formatDate(ts: number): string {
@@ -56,7 +61,7 @@ export default function AdminUsersPage() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error?.message || "角色更新失败");
       setUsers((current) => current.map((item) => item.id === user.id ? { ...item, role } : item));
-      toast({ title: "角色已更新", description: `${user.username} 已设为${role === "admin" ? "管理员" : "编辑者"}` });
+      toast({ title: "角色已更新", description: `${getUserLabel(user)} 已设为${role === "admin" ? "管理员" : "编辑者"}` });
     } catch (error) {
       toast({ title: "角色更新失败", description: error instanceof Error ? error.message : "请求失败", variant: "destructive" });
     } finally {
@@ -126,7 +131,7 @@ export default function AdminUsersPage() {
       if (data.success) {
         toast({
           title: "重置成功",
-          description: `已为用户 ${resetTarget.username} 重置密码`,
+          description: `已为用户 ${getUserLabel(resetTarget)} 重置密码`,
         });
         setResetTarget(null);
         setNewPassword("");
@@ -208,14 +213,14 @@ export default function AdminUsersPage() {
                   className="border-b border-neutral-800/80 last:border-0 hover:bg-neutral-800/50"
                 >
                   <td className="px-5 py-4 font-medium text-neutral-100">
-                    {user.username}
+                    {getUserLabel(user)}
                   </td>
                   <td className="px-5 py-4 text-neutral-400">
                     {formatDate(user.createdAt)}
                   </td>
                   <td className="px-5 py-4">
                     <select
-                      aria-label={`${user.username} 角色`}
+                      aria-label={`${getUserLabel(user)} 角色`}
                       value={user.role}
                       disabled={updatingRole === user.id}
                       onChange={(event) => handleRoleChange(user, event.target.value as User["role"])}
@@ -270,7 +275,7 @@ export default function AdminUsersPage() {
           <DialogHeader>
             <DialogTitle className="text-neutral-50">重置密码</DialogTitle>
             <DialogDescription>
-              将为用户 <strong className="text-neutral-200">{resetTarget?.username}</strong> 设置新密码
+              将为用户 <strong className="text-neutral-200">{getUserLabel(resetTarget)}</strong> 设置新密码
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -339,7 +344,7 @@ export default function AdminUsersPage() {
             <DialogTitle className="text-neutral-50">确认删除用户</DialogTitle>
             <DialogDescription>
               即将删除用户{" "}
-              <strong className="text-red-300">{deleteTarget?.username}</strong>
+              <strong className="text-red-300">{getUserLabel(deleteTarget)}</strong>
               ，此操作不可撤销。
             </DialogDescription>
           </DialogHeader>
@@ -378,7 +383,7 @@ export default function AdminUsersPage() {
                   if (data.success) {
                     toast({
                       title: "删除成功",
-                      description: `用户 ${deleteTarget.username} 已被删除`,
+                      description: `用户 ${getUserLabel(deleteTarget)} 已被删除`,
                     });
                     setDeleteTarget(null);
                     fetchUsers();

@@ -7,6 +7,7 @@ import type {
   StreamEvent,
   FileAttachment,
   ImageAttachment,
+  MessageAcceptedAck,
   ViewerContext,
 } from "@workbench/agent-client";
 import { normalizeAiError } from "@workbench/shared";
@@ -33,10 +34,14 @@ import {
 } from "../utils/chat-file-utils";
 import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
 import {
-  persistMessages,
   updateSessionTitle,
   fetchSessionFiles,
 } from "../services/message-service";
+import {
+  cancelConversationRun,
+  flushConversationOutbox,
+  submitConversationCommand,
+} from "../services/conversation-outbox";
 import {
   deriveConversationTitle,
   requestConversationTitle,
@@ -61,7 +66,9 @@ export function mergeWorkspaceProjectionAck(
   summary: RunSummary,
   ack: WorkspaceProjectionAck,
 ): RunSummary {
-  if (!summary.mutations.some((mutation) => mutation.revision === ack.revision)) {
+  if (
+    !summary.mutations.some((mutation) => mutation.revision === ack.revision)
+  ) {
     return summary;
   }
 
@@ -286,7 +293,8 @@ function extractProjectIdFromTag(tag: {
 interface StartMessageRunOptions {
   appendDisplayMessage?: boolean;
   displayMessageId?: string;
-  skipHistoryPrefix?: boolean;
+  ledgerAck?: MessageAcceptedAck;
+  skipBeforeSend?: boolean;
   skipUserMessageDisplay?: boolean;
 }
 
@@ -326,6 +334,22 @@ export function buildAttachmentParts(
         textExtracted: file.textExtracted,
       })) || []),
   ];
+}
+
+export function buildLedgerAttachmentParts(
+  files?: FileAttachment[],
+): NonNullable<ChatMessage["parts"]> {
+  return (
+    files?.map((file) => ({
+      type: "file" as const,
+      name: file.name,
+      url: "",
+      size: file.size,
+      attachmentId: file.id,
+      mimeType: file.mimeType,
+      textExtracted: file.textExtracted,
+    })) ?? []
+  );
 }
 
 function extractImagesFromMessage(
@@ -439,10 +463,7 @@ function finalizeAssistantMessageBeforeQueued(
   const mergedMessage: ChatMessage = {
     ...existingMessage,
     ...message,
-    parts: [
-      ...(existingMessage.parts || []),
-      ...(message.parts || []),
-    ],
+    parts: [...(existingMessage.parts || []), ...(message.parts || [])],
   };
 
   return messages.map((item, index) =>
@@ -468,15 +489,6 @@ function hasToolCallId(message: ChatMessage, toolCallId: string): boolean {
       message.parts?.some(
         (part) => part.type === "tool" && part.toolCallId === toolCallId,
       ),
-  );
-}
-
-function isTerminalToolUpdateStatus(status?: string): boolean {
-  return (
-    status === "completed" ||
-    status === "success" ||
-    status === "failed" ||
-    status === "error"
   );
 }
 
@@ -559,26 +571,6 @@ export function useChatStream(options: UseChatStreamOptions) {
     externalStreamServiceRef,
   } = options;
 
-  // 页面隐藏时兜底持久化（比 beforeunload 更可靠）
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        if (throttlePersistTimerRef.current) {
-          clearTimeout(throttlePersistTimerRef.current);
-          throttlePersistTimerRef.current = null;
-        }
-        void persistMessages(
-          sessionId,
-          messagesRef.current.filter((m) => !m.queueStatus),
-        ).catch(() => {});
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [sessionId, messagesRef]);
-
   const [plan, setPlan] = useState<PlanState>(EMPTY_PLAN);
   const [contextCompactionNotice, setContextCompactionNotice] = useState(false);
   const [pendingPermissionRequest, setPendingPermissionRequest] =
@@ -592,14 +584,20 @@ export function useChatStream(options: UseChatStreamOptions) {
   const memoryFilePathsRef = useRef<Set<string>>(new Set());
   const queuedMessagesRef = useRef<QueuedChatMessage[]>([]);
   const activeRunRef = useRef(false);
+  const activeLedgerRunRef = useRef<{
+    conversationId: string;
+    runId: string;
+  } | null>(null);
   const pendingPermissionRef = useRef<PermissionRequest | null>(null);
   const previousIsStreamingRef = useRef(isStreaming);
   const activeRunDedupeKeyRef = useRef<string | null>(null);
   const busyRetryAttemptedRef = useRef(false);
   const drainQueueRef = useRef<() => void>(() => {});
   const previousSessionIdRef = useRef(sessionId);
-  const lastPersistAtRef = useRef<number>(0);
-  const throttlePersistTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const outboxRecoveryRef = useRef<{
+    sessionId: string;
+    promise: Promise<number>;
+  } | null>(null);
   const currentRunSummaryRef = useRef<RunSummary | null>(null);
   const pendingProjectionAcksRef = useRef<WorkspaceProjectionAck[]>([]);
   const checkpointVersionRef = useRef<number | undefined>(undefined);
@@ -609,11 +607,13 @@ export function useChatStream(options: UseChatStreamOptions) {
     if (typeof window === "undefined" || !projectId) return;
 
     const handleProjectionAck = (event: Event) => {
-      const detail = (event as CustomEvent<{
-        projectId?: string;
-        sessionId?: string;
-        ack?: WorkspaceProjectionAck;
-      }>).detail;
+      const detail = (
+        event as CustomEvent<{
+          projectId?: string;
+          sessionId?: string;
+          ack?: WorkspaceProjectionAck;
+        }>
+      ).detail;
       if (
         detail?.projectId !== projectId ||
         detail.sessionId !== sessionId ||
@@ -651,19 +651,19 @@ export function useChatStream(options: UseChatStreamOptions) {
           changed = true;
           return { ...message, runSummary: nextSummary };
         });
-        if (changed) {
-          void persistMessages(
-            sessionId,
-            next.filter((message) => !message.queueStatus),
-          ).catch(() => {});
-        }
         return changed ? next : previous;
       });
     };
 
-    window.addEventListener(WORKSPACE_PROJECTION_ACK_EVENT, handleProjectionAck);
+    window.addEventListener(
+      WORKSPACE_PROJECTION_ACK_EVENT,
+      handleProjectionAck,
+    );
     return () => {
-      window.removeEventListener(WORKSPACE_PROJECTION_ACK_EVENT, handleProjectionAck);
+      window.removeEventListener(
+        WORKSPACE_PROJECTION_ACK_EVENT,
+        handleProjectionAck,
+      );
     };
   }, [projectId, sessionId, setMessages]);
 
@@ -673,6 +673,56 @@ export function useChatStream(options: UseChatStreamOptions) {
       titleGenerationKeyRef.current = null;
     };
   }, [agentSessionId, sessionId]);
+
+  const recoverConversationOutbox = useCallback((): Promise<number> => {
+    if (mode !== "workbench" || !sessionId) return Promise.resolve(0);
+    if (outboxRecoveryRef.current?.sessionId === sessionId) {
+      return outboxRecoveryRef.current.promise;
+    }
+    const client = getConfiguredAgentClient();
+    const promise = flushConversationOutbox(client, sessionId).finally(() => {
+      if (outboxRecoveryRef.current?.promise === promise) {
+        outboxRecoveryRef.current = null;
+      }
+    });
+    outboxRecoveryRef.current = { sessionId, promise };
+    return promise;
+  }, [mode, sessionId]);
+
+  useEffect(() => {
+    if (mode !== "workbench" || !sessionId) return;
+    let disposed = false;
+    const client = getConfiguredAgentClient();
+    void recoverConversationOutbox()
+      .then(async (recoveredCount) => {
+        if (disposed || recoveredCount === 0) return;
+        const projection = await client.loadConversation(sessionId);
+        if (disposed) return;
+        const canonicalMessages = projection.messages.map((message) => ({
+          ...message,
+          parts: message.displayParts,
+        })) as ChatMessage[];
+        const canonicalIds = new Set(
+          canonicalMessages.flatMap((message) =>
+            message.id ? [message.id] : [],
+          ),
+        );
+        setMessages((current) => [
+          ...canonicalMessages,
+          ...current.filter(
+            (message) => !message.id || !canonicalIds.has(message.id),
+          ),
+        ]);
+      })
+      .catch((error) => {
+        if (!disposed) {
+          console.warn("[ConversationLedger] outbox recovery failed", error);
+        }
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [mode, recoverConversationOutbox, sessionId, setMessages]);
 
   const startTitleGeneration = useCallback(
     (userMessage: string) => {
@@ -697,36 +747,8 @@ export function useChatStream(options: UseChatStreamOptions) {
         void updateSessionTitle(sessionId, title);
       });
     },
-    [
-      agentSessionId,
-      onSessionTitleChange,
-      selectedModelId,
-      sessionId,
-    ],
+    [agentSessionId, onSessionTitleChange, selectedModelId, sessionId],
   );
-
-  const throttledPersistRef = useRef<() => void>(() => {});
-  throttledPersistRef.current = () => {
-    const now = Date.now();
-    if (now - lastPersistAtRef.current < 5000) {
-      if (!throttlePersistTimerRef.current) {
-        throttlePersistTimerRef.current = setTimeout(() => {
-          throttlePersistTimerRef.current = null;
-          lastPersistAtRef.current = Date.now();
-          void persistMessages(
-            sessionId,
-            messagesRef.current.filter((m) => !m.queueStatus),
-          ).catch(() => {});
-        }, 5000);
-      }
-      return;
-    }
-    lastPersistAtRef.current = now;
-    void persistMessages(
-      sessionId,
-      messagesRef.current.filter((m) => !m.queueStatus),
-    ).catch(() => {});
-  };
 
   const SILENCE_THRESHOLD_MS = 30000;
   const SILENCE_TICK_MS = 1000;
@@ -761,7 +783,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     }
   }, []);
 
-  // 清理流 + 组件卸载时持久化
+  // 对话账本按命令持久化；卸载只需要释放流和本地运行状态。
   useEffect(() => {
     return () => {
       activeRunRef.current = false;
@@ -769,34 +791,12 @@ export function useChatStream(options: UseChatStreamOptions) {
       queuedMessagesRef.current = [];
       streamServiceRef.current?.close();
       stopSilenceTracking();
-      if (throttlePersistTimerRef.current) {
-        clearTimeout(throttlePersistTimerRef.current);
-        throttlePersistTimerRef.current = null;
-      }
-      // 组件卸载时持久化当前消息，确保切换页面后对话可恢复
-      void persistMessages(
-        sessionId,
-        messagesRef.current.filter((m) => !m.queueStatus),
-      ).catch(() => {});
     };
-  }, [sessionId, messagesRef, stopSilenceTracking]);
+  }, [stopSilenceTracking]);
 
   // 会话切换时关闭旧流
   useEffect(() => {
     if (previousSessionIdRef.current !== sessionId) {
-      // 切换前对旧 session 的消息做一次持久化
-      const oldSessionId = previousSessionIdRef.current;
-      if (oldSessionId) {
-        void persistMessages(
-          oldSessionId,
-          messagesRef.current.filter((m) => !m.queueStatus),
-        ).catch(() => {});
-      }
-      // 清理旧 session 的节流定时器
-      if (throttlePersistTimerRef.current) {
-        clearTimeout(throttlePersistTimerRef.current);
-        throttlePersistTimerRef.current = null;
-      }
       previousSessionIdRef.current = sessionId;
       queuedMessagesRef.current = [];
       activeRunRef.current = false;
@@ -848,37 +848,34 @@ export function useChatStream(options: UseChatStreamOptions) {
         ) {
           return prev;
         }
-        const next = prev.map((message) =>
+        return prev.map((message) =>
           hasToolCallId(message, update.toolCallId)
             ? { ...message, parts: updateToolPart(message.parts || [], update) }
             : message,
         );
-        // 计划审批卡可能已从当前流消息移入历史；取消、拒绝和超时
-        // 都必须立即把其终态写入持久化历史。
-        void persistMessages(
-          sessionId,
-          next.filter((message) => !message.queueStatus),
-        ).catch(() => {});
-        return next;
       });
     },
-    [sessionId, setMessages],
+    [setMessages],
   );
 
-  const completeRunAndDrain = useCallback((permissionError?: string) => {
-    clearPendingPermission(permissionError);
-    activeRunRef.current = false;
-    activeRunDedupeKeyRef.current = null;
-    setIsStreaming(false);
-    setTimeout(() => {
-      drainQueueRef.current();
-    }, 0);
-  }, [clearPendingPermission, setIsStreaming]);
+  const completeRunAndDrain = useCallback(
+    (permissionError?: string) => {
+      clearPendingPermission(permissionError);
+      activeRunRef.current = false;
+      activeRunDedupeKeyRef.current = null;
+      setIsStreaming(false);
+      setTimeout(() => {
+        drainQueueRef.current();
+      }, 0);
+    },
+    [clearPendingPermission, setIsStreaming],
+  );
 
   // 编辑页的状态探测会在 Agent 已不再处理时把受控 isStreaming 置为 false。
   // 这必须同时结束 Hook 内部的运行锁，否则已展示的等待消息永远不会被 drain。
   useEffect(() => {
-    const transitionedToStopped = previousIsStreamingRef.current && !isStreaming;
+    const transitionedToStopped =
+      previousIsStreamingRef.current && !isStreaming;
     previousIsStreamingRef.current = isStreaming;
     if (
       !transitionedToStopped ||
@@ -912,12 +909,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       const traceId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const isSystemAutoRepair = source === "system_auto_repair";
       const isVisualProperty = source === "visual_property";
-      const conversationHistoryPrefix = startOptions.skipHistoryPrefix
-        ? ""
-        : buildConversationHistoryPrefix(messagesRef.current);
-      const outboundMessage = conversationHistoryPrefix
-        ? `${conversationHistoryPrefix}${userMessage}`
-        : userMessage;
+      const outboundMessage = userMessage;
       const referencedProjects = (() => {
         const refs = extractReferencedProjects(runOptions?.inlineRefs);
         return refs.length > 0 ? refs : undefined;
@@ -990,16 +982,18 @@ export function useChatStream(options: UseChatStreamOptions) {
                     id: displayMessageId,
                     role: "user",
                     content: trimmedMessage,
-                    visualProperty: runOptions?.visualPropertyDisplayMessage ?? {
-                      title: "可视化修改已发送给 AI",
-                      summary: "AI 将根据当前选区和属性变更修改页面。",
-                      hiddenPrompt: trimmedMessage,
-                    },
+                    visualProperty:
+                      runOptions?.visualPropertyDisplayMessage ?? {
+                        title: "可视化修改已发送给 AI",
+                        summary: "AI 将根据当前选区和属性变更修改页面。",
+                        hiddenPrompt: trimmedMessage,
+                      },
                   }
                 : {
                     id: displayMessageId,
                     role: "user",
                     content: trimmedMessage,
+                    syncStatus: mode === "workbench" ? "pending" : undefined,
                     inlineRefs: runOptions?.inlineRefs,
                     parts: buildAttachmentParts(images, files),
                   };
@@ -1016,14 +1010,9 @@ export function useChatStream(options: UseChatStreamOptions) {
         }
       }
 
-      // 用户消息加入 state 后立即持久化（fire-and-forget）
-      void persistMessages(
-        sessionId,
-        messagesRef.current.filter((m) => !m.queueStatus),
-      ).catch(() => {});
-
       let beforeSendFailed = false;
-      const assistantMessageId = createLocalId("assistant");
+      let assistantMessageId = createLocalId("assistant");
+      let acceptedLedgerAck: MessageAcceptedAck | null = null;
 
       try {
         memoryFilePathsRef.current.clear();
@@ -1037,18 +1026,61 @@ export function useChatStream(options: UseChatStreamOptions) {
           parts: [],
         });
 
-        try {
-          await beforeSend?.();
-        } catch (error) {
-          beforeSendFailed = true;
-          throw error;
+        if (!startOptions.skipBeforeSend) {
+          try {
+            await beforeSend?.();
+          } catch (error) {
+            beforeSendFailed = true;
+            throw error;
+          }
         }
+
+        const ledgerAck =
+          mode === "workbench"
+            ? (startOptions.ledgerAck ??
+              (await (async () => {
+                const conversationClient = getConfiguredAgentClient();
+                await recoverConversationOutbox();
+                return submitConversationCommand(conversationClient, {
+                  conversationId: sessionId,
+                  clientMessageId: displayMessageId,
+                  content: trimmedMessage,
+                  displayParts: buildLedgerAttachmentParts(files),
+                  attachmentIds: files?.map((file) => file.id),
+                  kind: isSystemAutoRepair ? "auto_repair" : undefined,
+                  createdAt: Date.now(),
+                });
+              })()))
+            : null;
+        acceptedLedgerAck = ledgerAck;
+        if (ledgerAck) {
+          assistantMessageId = ledgerAck.assistantMessageId;
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === displayMessageId && message.role === "user"
+                ? {
+                    ...message,
+                    id: ledgerAck.messageId,
+                    syncStatus: "accepted",
+                  }
+                : message,
+            ),
+          );
+          setCurrentMessage((prev) => ({
+            ...prev,
+            id: ledgerAck.assistantMessageId,
+          }));
+        }
+        activeLedgerRunRef.current = ledgerAck
+          ? { conversationId: ledgerAck.conversationId, runId: ledgerAck.runId }
+          : null;
 
         // 工作区同步成功、消息即将交给 StreamService 时，才为首条真实用户消息启动标题生成。
         // 标题请求 fire-and-forget，不阻塞 WebSocket 连接和 AI 输出。
         if (isFirstUserMessage && !isVisualProperty) {
           // @引用消息的 content 包含供 Agent 使用的隐藏上下文；标题只使用用户实际输入文本。
-          const titleSource = runOptions?.inlineRefs?.text?.trim() || trimmedMessage;
+          const titleSource =
+            runOptions?.inlineRefs?.text?.trim() || trimmedMessage;
           startTitleGeneration(titleSource);
         }
 
@@ -1085,13 +1117,8 @@ export function useChatStream(options: UseChatStreamOptions) {
             setCurrentMessage((prev) => ({
               ...prev,
               content: accumulatedContent,
-              parts: updateTextPart(
-                prev.parts || [],
-                content,
-              ),
+              parts: updateTextPart(prev.parts || [], content),
             }));
-            // 流式回复过程中节流持久化中间状态
-            throttledPersistRef.current();
           },
 
           onThought: (content) => {
@@ -1158,32 +1185,37 @@ export function useChatStream(options: UseChatStreamOptions) {
                     }
                   : message,
               );
-              if (isTerminalToolUpdateStatus(update.toolCallStatus)) {
-                void persistMessages(
-                  sessionId,
-                  next.filter((message) => !message.queueStatus),
-                ).catch(() => {});
-              }
               return next;
             });
             // 知识库文档创建后通知前端刷新
-            const details = update.details as { knowledgeDocumentCreated?: boolean } | undefined;
+            const details = update.details as
+              | { knowledgeDocumentCreated?: boolean }
+              | undefined;
             if (details?.knowledgeDocumentCreated) {
               window.dispatchEvent(new Event("knowledge-updated"));
             }
-            const proposalId = (update.details as { proposalId?: unknown } | undefined)?.proposalId;
+            const proposalId = (
+              update.details as { proposalId?: unknown } | undefined
+            )?.proposalId;
             if (typeof proposalId === "string") {
-              window.dispatchEvent(new CustomEvent("document-proposal-created", { detail: { proposalId } }));
+              window.dispatchEvent(
+                new CustomEvent("document-proposal-created", {
+                  detail: { proposalId },
+                }),
+              );
             }
-            const receipt = (update.details as { receipt?: unknown } | undefined)
-              ?.receipt;
+            const receipt = (
+              update.details as { receipt?: unknown } | undefined
+            )?.receipt;
             if (
               receipt &&
               typeof receipt === "object" &&
               (receipt as { committed?: unknown }).committed === true &&
               Array.isArray((receipt as { resources?: unknown }).resources)
             ) {
-              onWorkspaceMutationCommitted?.(receipt as WorkspaceMutationReceipt);
+              onWorkspaceMutationCommitted?.(
+                receipt as WorkspaceMutationReceipt,
+              );
             }
           },
 
@@ -1220,14 +1252,15 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onRunSummary: (runSummary) => {
-            currentRunSummaryRef.current = pendingProjectionAcksRef.current.reduce(
-              (summary, ack) => mergeWorkspaceProjectionAck(summary, ack),
-              runSummary,
-            );
+            currentRunSummaryRef.current =
+              pendingProjectionAcksRef.current.reduce(
+                (summary, ack) => mergeWorkspaceProjectionAck(summary, ack),
+                runSummary,
+              );
           },
 
           onFinish: async (result) => {
-            checkpointVersionRef.current = result.metadata?.checkpointVersion;
+            activeLedgerRunRef.current = null;
             streamService.stopKeepalive();
             onDiagnosticEvent?.({
               name: "ai.stream_finish_event",
@@ -1242,11 +1275,15 @@ export function useChatStream(options: UseChatStreamOptions) {
               const currentMsg = currentMessageRef.current;
               const hasStructuredParts =
                 currentMsg.parts !== undefined && currentMsg.parts.length > 0;
-              const finalParts = extractImageUrlsFromParts(currentMsg.parts || []);
+              const finalParts = extractImageUrlsFromParts(
+                currentMsg.parts || [],
+              );
               const finalRunSummary = pendingProjectionAcksRef.current.reduce(
                 (summary, ack) =>
                   summary ? mergeWorkspaceProjectionAck(summary, ack) : summary,
-                currentRunSummaryRef.current ?? result.metadata?.runSummary ?? null,
+                currentRunSummaryRef.current ??
+                  result.metadata?.runSummary ??
+                  null,
               );
               const assistantMessage: ChatMessage = {
                 id: currentMsg.id || assistantMessageId,
@@ -1284,24 +1321,17 @@ export function useChatStream(options: UseChatStreamOptions) {
                 (p) =>
                   p.type === "tool" &&
                   (
-                    p.details as {
-                      knowledgeDocumentCreated?: boolean;
-                    } | undefined
+                    p.details as
+                      | {
+                          knowledgeDocumentCreated?: boolean;
+                        }
+                      | undefined
                   )?.knowledgeDocumentCreated,
               );
               if (hasKnowledgeDoc) {
                 window.dispatchEvent(new Event("knowledge-updated"));
               }
 
-              // 先清理节流定时器，避免冗余并发写入
-              if (throttlePersistTimerRef.current) {
-                clearTimeout(throttlePersistTimerRef.current);
-                throttlePersistTimerRef.current = null;
-              }
-              await persistMessages(
-                sessionId,
-                updatedMessages.filter((message) => !message.queueStatus),
-              );
               const finalFiles = result.files ?? [];
 
               if (finalFiles.length > 0) {
@@ -1379,6 +1409,19 @@ export function useChatStream(options: UseChatStreamOptions) {
 
           onConnectionError: () => {
             // 连接未建立时的错误处理：重置状态并显示错误
+            if (ledgerAck) {
+              void cancelConversationRun(
+                getConfiguredAgentClient(),
+                ledgerAck.conversationId,
+                ledgerAck.runId,
+              ).catch((error) => {
+                console.warn(
+                  "[ConversationLedger] failed to cancel run after connection loss",
+                  error,
+                );
+              });
+            }
+            activeLedgerRunRef.current = null;
             stopSilenceTracking();
             const normalized = normalizeAiError("WebSocket connection error", {
               fallbackCode: "AGENT_CONNECTION_ERROR",
@@ -1398,12 +1441,10 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onError: (error) => {
+            activeLedgerRunRef.current = null;
             streamService.stopKeepalive();
             // P5 Layer 3: auto-retry once on AGENT_BUSY
-            if (
-              error.code === "AGENT_BUSY" &&
-              !busyRetryAttemptedRef.current
-            ) {
+            if (error.code === "AGENT_BUSY" && !busyRetryAttemptedRef.current) {
               busyRetryAttemptedRef.current = true;
               streamService.close();
               completeRunAndDrain();
@@ -1480,10 +1521,6 @@ export function useChatStream(options: UseChatStreamOptions) {
             setCurrentMessage(DEFAULT_CURRENT_MESSAGE);
             stopSilenceTracking();
             completeRunAndDrain(normalizedMessage);
-            void persistMessages(
-              sessionId,
-              messagesRef.current.filter((m) => !m.queueStatus),
-            ).catch(() => {});
           },
         });
 
@@ -1501,7 +1538,15 @@ export function useChatStream(options: UseChatStreamOptions) {
           files?.length ? files : undefined,
           viewerContext,
           referencedProjects,
-          { assistantMessageId },
+          ledgerAck
+            ? {
+                conversationId: ledgerAck.conversationId,
+                messageId: ledgerAck.messageId,
+                runId: ledgerAck.runId,
+                assistantMessageId: ledgerAck.assistantMessageId,
+                conversationRevision: ledgerAck.conversationRevision,
+              }
+            : undefined,
         );
         onDiagnosticEvent?.({
           name: "ai.message_sent",
@@ -1514,6 +1559,15 @@ export function useChatStream(options: UseChatStreamOptions) {
         streamService.startKeepalive();
         startSilenceTracking();
       } catch (error) {
+        if (mode === "workbench" && !acceptedLedgerAck) {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === displayMessageId && message.role === "user"
+                ? { ...message, syncStatus: "failed" }
+                : message,
+            ),
+          );
+        }
         if (beforeSendFailed) {
           const diagnosticDetails = getErrorDiagnosticDetails(
             error,
@@ -1545,6 +1599,21 @@ export function useChatStream(options: UseChatStreamOptions) {
           return;
         }
 
+        if (mode === "workbench" && acceptedLedgerAck) {
+          try {
+            await cancelConversationRun(
+              getConfiguredAgentClient(),
+              acceptedLedgerAck.conversationId,
+              acceptedLedgerAck.runId,
+            );
+          } catch (cancelError) {
+            console.warn(
+              "[ConversationLedger] failed to cancel an ACKed run after delivery failure",
+              cancelError,
+            );
+          }
+        }
+
         onDiagnosticEvent?.({
           name: "ai.websocket_failed",
           traceId,
@@ -1568,6 +1637,27 @@ export function useChatStream(options: UseChatStreamOptions) {
           ]);
           setStreamContent("");
           stopSilenceTracking();
+          completeRunAndDrain();
+          return;
+        }
+
+        if (mode === "workbench") {
+          const normalized = normalizeAiError(error, {
+            fallbackMessage: "消息未能通过可靠对话通道执行，请重试。",
+          });
+          setMessages((prev) => [
+            ...appendMessageBeforeQueued(
+              updateAutoRepairStatus(prev, autoRepairMessageId, "failed"),
+              {
+                id: createLocalId("error"),
+                role: "assistant",
+                content: normalized.userMessage,
+              },
+            ),
+          ]);
+          setStreamContent("");
+          stopSilenceTracking();
+          streamServiceRef.current?.close();
           completeRunAndDrain();
           return;
         }
@@ -1650,11 +1740,6 @@ export function useChatStream(options: UseChatStreamOptions) {
           );
           setMessages(httpUpdatedMessages);
 
-          await persistMessages(
-            sessionId,
-            httpUpdatedMessages.filter((message) => !message.queueStatus),
-          );
-
           if (result.data?.files && result.data.files.length > 0) {
             for (const f of result.data.files) {
               if (f.path && f.path.endsWith(".md")) {
@@ -1733,6 +1818,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       stopSilenceTracking,
       completeRunAndDrain,
       startTitleGeneration,
+      recoverConversationOutbox,
     ],
   );
 
@@ -1874,7 +1960,13 @@ export function useChatStream(options: UseChatStreamOptions) {
         return;
       }
 
-      void startMessageRun(trimmedMessage, images, files, runOptions, startOptions);
+      void startMessageRun(
+        trimmedMessage,
+        images,
+        files,
+        runOptions,
+        startOptions,
+      );
     },
     [
       agentSessionId,
@@ -1951,35 +2043,29 @@ export function useChatStream(options: UseChatStreamOptions) {
   );
 
   const handleCancel = useCallback(
-    (streamContent: string, currentMessage: ChatMessage) => {
+    (_streamContent: string, _currentMessage: ChatMessage) => {
+      const activeLedgerRun = activeLedgerRunRef.current;
+      if (activeLedgerRun) {
+        void getConfiguredAgentClient()
+          .cancelRun(activeLedgerRun.conversationId, activeLedgerRun.runId)
+          .catch((error) => {
+            console.warn(
+              "[ConversationLedger] Failed to persist cancellation request:",
+              error,
+            );
+          });
+      }
       streamServiceRef.current?.close();
       stopSilenceTracking();
       setPlan(EMPTY_PLAN);
-      if (
-        streamContent ||
-        (currentMessage.parts && currentMessage.parts.length > 0)
-      ) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: currentMessage.id || createLocalId("assistant"),
-            role: "assistant",
-            content: streamContent || "已取消",
-            parts: currentMessage.parts,
-          },
-        ]);
-        setStreamContent("");
-      }
+      setStreamContent("");
       setCurrentMessage({
         role: "assistant",
         content: "",
         parts: [],
       });
       completeRunAndDrain("用户已取消当前运行。");
-      void persistMessages(
-        sessionId,
-        messagesRef.current.filter((m) => !m.queueStatus),
-      ).catch(() => {});
+      activeLedgerRunRef.current = null;
     },
     [
       setMessages,
@@ -1994,93 +2080,53 @@ export function useChatStream(options: UseChatStreamOptions) {
     async (targetAssistantId: string) => {
       const msgs = messagesRef.current;
       const targetIndex = msgs.findIndex((m) => m.id === targetAssistantId);
+      const currentAssistantMatches =
+        targetIndex < 1 && currentMessageRef.current?.id === targetAssistantId;
+      if (targetIndex < 1 && !currentAssistantMatches) return;
+      const truncated = targetIndex >= 1 ? msgs.slice(0, targetIndex) : msgs;
+      const userMsg = truncated
+        .slice()
+        .reverse()
+        .find((m) => m.role === "user");
+      if (!userMsg?.id) return;
+      const images = extractImagesFromMessage(userMsg);
 
-      if (targetIndex < 1) {
-        const currentAssistantId = currentMessageRef.current?.id;
-        if (currentAssistantId !== targetAssistantId) return;
+      if (userMsg.syncStatus === "failed") {
+        const failedUserIndex = msgs.findIndex(
+          (message) => message.id === userMsg.id,
+        );
+        setMessages(
+          failedUserIndex >= 0 ? msgs.slice(0, failedUserIndex) : msgs,
+        );
+        handleSend(userMsg.content, images);
+        return;
+      }
 
-        const userMsg = msgs
-          .slice()
-          .reverse()
-          .find((m) => m.role === "user");
-        if (!userMsg) return;
-
+      try {
+        await beforeSend?.();
+        const client = getConfiguredAgentClient();
+        const current = await client.loadConversation(sessionId);
+        await client.supersede({
+          conversationId: sessionId,
+          afterMessageId: userMsg.id,
+          expectedRevision: current.conversation.revision,
+        });
+        const retryAck = await client.retryRun(sessionId, userMsg.id);
         streamServiceRef.current?.close();
         stopSilenceTracking();
         activeRunRef.current = false;
         setIsStreaming(false);
         setStreamContent("");
-        setCurrentMessage({
-          role: "assistant",
-          content: "",
-          parts: [],
-        });
-
-        const truncated = msgs;
-        const images = extractImagesFromMessage(userMsg);
-
-        try {
-          const syncService = new StreamService({ mode });
-          await syncService.connect(agentSessionId, sessionId);
-          checkpointVersionRef.current = await syncService.resyncHistory(
-            agentSessionId,
-            truncated
-              .filter((m) => m.role === "user" || m.role === "assistant")
-              .map((m) => ({ id: m.id, role: m.role, content: m.content })),
-            {
-              checkpointVersion: checkpointVersionRef.current,
-              truncateAfterMessageId: truncated.at(-1)?.id,
-            },
-          );
-          syncService.close();
-        } catch (error) {
-          console.error("resyncHistory failed, falling back to prefix-only", error);
-        }
-
+        setCurrentMessage(DEFAULT_CURRENT_MESSAGE);
+        setMessages(truncated);
         handleSend(userMsg.content, images, undefined, undefined, {
-          skipHistoryPrefix: true,
+          ledgerAck: retryAck,
+          skipBeforeSend: true,
           skipUserMessageDisplay: true,
         });
-        return;
-      }
-
-      const userMsg = msgs
-        .slice(0, targetIndex)
-        .reverse()
-        .find((m) => m.role === "user");
-      if (!userMsg) return;
-
-      const truncated = msgs.slice(0, targetIndex);
-      setMessages(truncated);
-      void persistMessages(
-        sessionId,
-        truncated.filter((m) => !m.queueStatus),
-      ).catch(() => {});
-
-      const images = extractImagesFromMessage(userMsg);
-
-      try {
-        const syncService = new StreamService({ mode });
-        await syncService.connect(agentSessionId, sessionId);
-        checkpointVersionRef.current = await syncService.resyncHistory(
-          agentSessionId,
-          truncated
-            .filter((m) => m.role === "user" || m.role === "assistant")
-            .map((m) => ({ id: m.id, role: m.role, content: m.content })),
-          {
-            checkpointVersion: checkpointVersionRef.current,
-            truncateAfterMessageId: truncated.at(-1)?.id,
-          },
-        );
-        syncService.close();
       } catch (error) {
-        console.error("resyncHistory failed, falling back to prefix-only", error);
+        console.error("[ConversationLedger] regenerate failed", error);
       }
-
-      handleSend(userMsg.content, images, undefined, undefined, {
-        skipHistoryPrefix: true,
-        skipUserMessageDisplay: true,
-      });
     },
     [
       currentMessageRef,
@@ -2092,8 +2138,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       sessionId,
       stopSilenceTracking,
       handleSend,
-      agentSessionId,
-      mode,
+      beforeSend,
     ],
   );
 
@@ -2114,8 +2159,19 @@ export function useChatStream(options: UseChatStreamOptions) {
       }
 
       const truncated = msgs.slice(0, targetIndex);
-      setMessages(truncated);
-      await persistMessages(sessionId, truncated);
+      const anchorMessageId = truncated.at(-1)?.id ?? null;
+      try {
+        const client = getConfiguredAgentClient();
+        const current = await client.loadConversation(sessionId);
+        await client.supersede({
+          conversationId: sessionId,
+          afterMessageId: anchorMessageId,
+          expectedRevision: current.conversation.revision,
+        });
+        setMessages(truncated);
+      } catch (error) {
+        console.error("[ConversationLedger] rollback history failed", error);
+      }
     },
     [messagesRef, setMessages, sessionId, agentSessionId],
   );
@@ -2129,39 +2185,27 @@ export function useChatStream(options: UseChatStreamOptions) {
       if (msgIndex < 0) return;
 
       const truncated = msgs.slice(0, msgIndex);
-      setMessages(truncated);
-      void persistMessages(
-        sessionId,
-        truncated.filter((m) => !m.queueStatus),
-      ).catch(() => {});
-
       const msg = msgs[msgIndex];
       const images = extractImagesFromMessage(msg);
 
-      // 重同步服务端历史：保留截断后的消息以正确 role 写入 session
       try {
-        const syncService = new StreamService({ mode });
-        await syncService.connect(agentSessionId, sessionId);
-        checkpointVersionRef.current = await syncService.resyncHistory(
-          agentSessionId,
-          truncated
-            .filter((m) => m.role === "user" || m.role === "assistant")
-            .map((m) => ({ id: m.id, role: m.role, content: m.content })),
-          {
-            checkpointVersion: checkpointVersionRef.current,
-            truncateAfterMessageId: truncated.at(-1)?.id,
-          },
-        );
-        syncService.close();
+        await beforeSend?.();
+        const client = getConfiguredAgentClient();
+        const current = await client.loadConversation(sessionId);
+        await client.supersede({
+          conversationId: sessionId,
+          afterMessageId: truncated.at(-1)?.id ?? null,
+          expectedRevision: current.conversation.revision,
+        });
+        setMessages(truncated);
+        handleSend(newContent, images, undefined, undefined, {
+          skipBeforeSend: true,
+        });
       } catch (error) {
-        console.error("resyncHistory failed, falling back to prefix-only", error);
+        console.error("[ConversationLedger] edit and resend failed", error);
       }
-
-      handleSend(newContent, images, undefined, undefined, {
-        skipHistoryPrefix: true,
-      });
     },
-    [messagesRef, setMessages, sessionId, agentSessionId, handleSend, mode],
+    [messagesRef, setMessages, sessionId, handleSend, beforeSend],
   );
 
   return {

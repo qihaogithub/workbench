@@ -9,17 +9,22 @@ jest.mock("@workbench/sketch-react", () => ({
     scene,
     onSceneChange,
     profile,
+    imageGeneration,
     initialViewport,
     onViewportChange,
   }: {
     scene: { nodes?: Array<{ id: string }> };
     onSceneChange: (next: unknown) => void;
     profile?: string;
+    imageGeneration?: unknown;
     initialViewport?: { scale: number; offsetX: number; offsetY: number };
     onViewportChange?: (viewport: { scale: number; offsetX: number; offsetY: number }, reason: "interaction") => void;
   }) => (
     <div>
       <output data-testid="editor-profile">{profile}</output>
+      <output data-testid="image-generation-adapter">
+        {imageGeneration ? "available" : "missing"}
+      </output>
       <output data-testid="editor-viewport">{JSON.stringify(initialViewport)}</output>
       <button type="button" onClick={() => onViewportChange?.({ scale: 2, offsetX: 10, offsetY: 20 }, "interaction")}>移动视口</button>
       <output data-testid="scene-node-ids">
@@ -74,6 +79,19 @@ describe("WhiteboardDialog", () => {
     renderDialog();
 
     expect(screen.getByTestId("editor-profile")).toHaveTextContent("whiteboard");
+  });
+
+  it("injects image generation and keeps diagnostics free of prompt or image data", () => {
+    const { onDiagnosticEvent } = renderDialog();
+    expect(screen.getByTestId("image-generation-adapter")).toHaveTextContent("available");
+    expect(onDiagnosticEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.objectContaining({
+          prompt: expect.anything(),
+          image: expect.anything(),
+        }),
+      }),
+    );
   });
 
   it("恢复手动视口，单独移动视口不会触发未保存内容确认", async () => {

@@ -44,15 +44,28 @@ describe("ConversationCheckpointStore", () => {
     });
   });
 
-  it("seeds only valid fallback history and removes injected legacy history", () => {
+  it("does not accept browser fallback history and removes injected legacy history", () => {
     const store = new ConversationCheckpointStore();
     expect(
       store.resolveResync("session-1", {
         fallbackMessages: [{ role: "tool", content: "not allowed" }],
       }),
-    ).toEqual({ ok: false, code: "CHECKPOINT_FALLBACK_INVALID" });
+    ).toEqual({ ok: false, code: "CHECKPOINT_FALLBACK_DISABLED" });
     expect(
       stripInjectedConversationHistory("[系统自动注入：历史]\n[历史结束]\n真实提问"),
     ).toBe("真实提问");
+  });
+
+  it("only returns cache entries for the matching conversation revision", () => {
+    const store = new ConversationCheckpointStore();
+    store.recordTurn(
+      "session-1",
+      { id: "u-1", role: "user", content: "one" },
+      { id: "a-1", role: "assistant", content: "two" },
+      { conversationId: "conversation-1", conversationRevision: 4 },
+    );
+    expect(store.getForRevision("session-1", "conversation-1", 4)).toBeDefined();
+    expect(store.getForRevision("session-1", "conversation-1", 5)).toBeUndefined();
+    expect(store.get("session-1")).toBeUndefined();
   });
 });

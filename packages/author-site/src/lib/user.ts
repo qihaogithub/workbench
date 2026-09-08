@@ -9,6 +9,10 @@ export interface User {
   role: UserRole;
 }
 
+export interface UserSummary extends User {
+  displayName: string;
+}
+
 export type UserRole = "admin" | "editor";
 
 export interface DingtalkIdentity {
@@ -290,13 +294,28 @@ export async function verifyUserPassword(
 /**
  * 获取所有用户列表
  */
-export function listAllUsers(): User[] {
+export function listAllUsers(): UserSummary[] {
   const db = getDb();
   return db
     .prepare(
-      "SELECT id, username, created_at as createdAt, role FROM users ORDER BY created_at ASC",
+      `SELECT u.id,
+              u.username,
+              u.created_at as createdAt,
+              u.role,
+              COALESCE(
+                NULLIF((
+                  SELECT identity.name
+                  FROM user_dingtalk_identities identity
+                  WHERE identity.user_id = u.id
+                  ORDER BY identity.last_login_at DESC
+                  LIMIT 1
+                ), ''),
+                u.username
+              ) as displayName
+       FROM users u
+       ORDER BY u.created_at ASC`,
     )
-    .all() as User[];
+    .all() as UserSummary[];
 }
 
 export function updateUserRole(userId: string, role: UserRole): boolean {

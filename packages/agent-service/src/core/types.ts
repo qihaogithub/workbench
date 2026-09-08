@@ -277,6 +277,15 @@ export interface ContextCompactedEvent {
   tokensBefore: number;
   contextWindow: number;
   durationMs: number;
+  /**
+   * Private checkpoint payload.  The websocket router consumes this field,
+   * but it must never be forwarded to the browser or persisted in run logs.
+   */
+  contextSummary?: {
+    summaryText: string;
+    tailMessages: Array<{ role: "user" | "assistant"; content: string }>;
+    summaryHash: string;
+  };
 }
 
 export interface CapabilityActivationEvent {

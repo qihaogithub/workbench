@@ -67,12 +67,12 @@ describe("session asset upload validation", () => {
     jest.mocked(getAuthCookie).mockResolvedValue("token");
     jest.mocked(verifyToken).mockResolvedValue({ userId: "user-1" } as never);
     jest.mocked(sessionExists).mockReturnValue(true);
-    jest.mocked(getSessionMeta).mockReturnValue({ demoId: "project-1" } as never);
+    jest.mocked(getSessionMeta).mockReturnValue({ demoId: "project-1", userId: "user-1" } as never);
     jest.mocked(getSessionWorkspacePath).mockReturnValue("/tmp/workspace-1");
   });
 
   it("commits Spine files and its page config ref in one Authority mutation", async () => {
-    jest.mocked(getSessionMeta).mockReturnValue({ demoId: "project-1", workspaceId: "workspace-1" } as never);
+    jest.mocked(getSessionMeta).mockReturnValue({ demoId: "project-1", userId: "user-1", workspaceId: "workspace-1" } as never);
     const ref = { kind: "spine", version: 1, assetId: `spine_${"a".repeat(64)}` } as const;
     jest.mocked(prepareSpineAsset).mockResolvedValue({
       ref,
@@ -258,6 +258,17 @@ describe("session asset upload validation", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({ success: false, error: { code: "SESSION_NOT_FOUND" } });
+  });
+
+  it("拒绝 owner 缺失或不匹配的 Session，且不读取上传内容", async () => {
+    jest.mocked(getSessionMeta).mockReturnValue({ demoId: "project-1" } as never);
+    const formData = jest.fn();
+    const request = { formData } as unknown as Request;
+
+    const response = await POST(request, params);
+
+    expect(response.status).toBe(403);
+    expect(formData).not.toHaveBeenCalled();
   });
 
   it("returns 401 when the session authentication has expired", async () => {

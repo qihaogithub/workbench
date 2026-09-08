@@ -2,15 +2,10 @@ import { NextResponse } from "next/server";
 import {
   createApiSuccess,
   createApiError,
-  getSessionPath,
-  sessionExists,
 } from "@/lib/fs-utils";
-import { touchSessionActivity } from "@/lib/session-manager";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
-import fs from "fs";
-import path from "path";
-
-const MESSAGES_FILE = ".messages.json";
+import { getConversationService } from "@/lib/conversation";
+import { ConversationDomainError } from "@/lib/conversation/domain";
 
 export async function GET(
   _request: Request,
@@ -33,22 +28,15 @@ export async function GET(
 
     const { sessionId } = await params;
 
-    if (!sessionExists(sessionId)) {
-      return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
-        status: 404,
-      });
-    }
-
-    const sessionPath = getSessionPath(sessionId);
-    const messagesPath = path.join(sessionPath, MESSAGES_FILE);
-
-    if (!fs.existsSync(messagesPath)) {
-      return NextResponse.json(createApiSuccess([]));
-    }
-
-    const messages = JSON.parse(fs.readFileSync(messagesPath, "utf-8"));
+    const messages = getConversationService()
+      .get(payload.userId, sessionId)
+      .messages;
     return NextResponse.json(createApiSuccess(messages));
   } catch (error) {
+    if (error instanceof ConversationDomainError) {
+      const status = error.code === "CONVERSATION_FORBIDDEN" ? 403 : 404;
+      return NextResponse.json(createApiError(status === 403 ? "FORBIDDEN" : "SESSION_NOT_FOUND", error.message), { status });
+    }
     console.error("Error reading session messages:", error);
     return NextResponse.json(
       createApiError("FILE_READ_ERROR", "读取消息历史失败"),
@@ -58,7 +46,7 @@ export async function GET(
 }
 
 export async function POST(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ sessionId: string }> },
 ) {
   try {
@@ -78,27 +66,19 @@ export async function POST(
 
     const { sessionId } = await params;
 
-    if (!sessionExists(sessionId)) {
-      return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
-        status: 404,
-      });
+    try {
+      getConversationService().get(payload.userId, sessionId);
+    } catch (error) {
+      if (error instanceof ConversationDomainError) {
+        const status = error.code === "CONVERSATION_FORBIDDEN" ? 403 : 404;
+        return NextResponse.json(createApiError(status === 403 ? "FORBIDDEN" : "SESSION_NOT_FOUND", error.message), { status });
+      }
+      throw error;
     }
-
-    const { messages } = await request.json();
-
-    if (!Array.isArray(messages)) {
-      return NextResponse.json(
-        createApiError("INVALID_REQUEST", "messages 必须为数组"),
-        { status: 400 },
-      );
-    }
-
-    const sessionPath = getSessionPath(sessionId);
-    const messagesPath = path.join(sessionPath, MESSAGES_FILE);
-
-    fs.writeFileSync(messagesPath, JSON.stringify(messages, null, 2), "utf-8");
-    touchSessionActivity(sessionId);
-    return NextResponse.json(createApiSuccess(null));
+    return NextResponse.json(
+      createApiError("INVALID_REQUEST", "整份消息快照写入已停用，请使用 Conversation Command API"),
+      { status: 410 },
+    );
   } catch (error) {
     console.error("Error saving session messages:", error);
     return NextResponse.json(

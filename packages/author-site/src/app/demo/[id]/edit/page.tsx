@@ -2383,6 +2383,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     content: "",
     parts: [],
   });
+  const conversationLoadGenerationRef = useRef(0);
 
   const [errorBannerVisible, setErrorBannerVisible] = useState(false);
   const [tabValue, setTabValue] = useState("ai");
@@ -4460,6 +4461,59 @@ ${context.details}
         if (!sessionData.success) {
           throw new Error(sessionData.error?.message || "创建 Session 失败");
         }
+
+        // The agent session is also the stable conversation id for this editor.
+        // Establish/load the canonical ledger before rendering the chat so a
+        // reused editor never starts from an empty browser-only message array.
+        const canonicalConversationId = sessionData.data.sessionId as string;
+        const conversationEnsureRes = await fetch("/api/conversations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversationId: canonicalConversationId,
+            projectId: demoId,
+            workspaceId: sessionData.data.workspaceId || null,
+          }),
+        });
+        if (!conversationEnsureRes.ok) {
+          throw new Error("初始化对话账本失败");
+        }
+        const conversationEnsureData = await conversationEnsureRes.json();
+        if (!conversationEnsureData.success) {
+          throw new Error(
+            conversationEnsureData.error?.message || "初始化对话账本失败",
+          );
+        }
+        const conversationLedgerRes = await fetch(
+          `/api/conversations/${encodeURIComponent(canonicalConversationId)}`,
+        );
+        if (!conversationLedgerRes.ok) {
+          throw new Error("加载对话历史失败");
+        }
+        const conversationLedgerData = await conversationLedgerRes.json();
+        if (!conversationLedgerData.success) {
+          throw new Error(
+            conversationLedgerData.error?.message || "加载对话历史失败",
+          );
+        }
+        const hydratedLedgerMessages = sanitizeHydratedMessages(
+          (conversationLedgerData.data?.messages || []).map(
+            (message: {
+              id?: string;
+              role?: string;
+              content?: string;
+              displayParts?: unknown[];
+              metadata?: Record<string, unknown>;
+              status?: string;
+              sequence?: number;
+              createdAt?: number;
+            }) => ({
+              ...message,
+              parts: message.displayParts || [],
+            }),
+          ),
+        );
+        setAiMessages(hydratedLedgerMessages);
 
         setSessionId(sessionData.data.sessionId);
         setWorkspaceId(sessionData.data.workspaceId || "");
@@ -9157,6 +9211,42 @@ ${context.details}
                             });
                             return;
                           }
+                          const nextConversationId = data.data.sessionId as string;
+                          const loadGeneration =
+                            ++conversationLoadGenerationRef.current;
+                          const ensureConversationRes = await fetch(
+                            "/api/conversations",
+                            {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                conversationId: nextConversationId,
+                                projectId: demoId,
+                                workspaceId: data.data.workspaceId || null,
+                              }),
+                            },
+                          );
+                          if (!ensureConversationRes.ok) {
+                            throw new Error("初始化对话账本失败");
+                          }
+                          const ledgerRes = await fetch(
+                            `/api/conversations/${encodeURIComponent(nextConversationId)}`,
+                          );
+                          if (!ledgerRes.ok) {
+                            throw new Error("加载对话历史失败");
+                          }
+                          const ledgerData = await ledgerRes.json();
+                          if (!ledgerData.success) {
+                            throw new Error(
+                              ledgerData.error?.message || "加载对话历史失败",
+                            );
+                          }
+                          if (
+                            loadGeneration !==
+                            conversationLoadGenerationRef.current
+                          ) {
+                            return;
+                          }
                           setSessionId(data.data.sessionId);
                           setWorkspaceId(data.data.workspaceId || "");
                           setWorkspacePath(
@@ -9165,7 +9255,25 @@ ${context.details}
                               "",
                           );
                           setAgentSessionId(data.data.sessionId);
-                          setAiMessages([]);
+                          setAiMessages(
+                            sanitizeHydratedMessages(
+                              (ledgerData.data?.messages || []).map(
+                                (message: {
+                                  id?: string;
+                                  role?: string;
+                                  content?: string;
+                                  displayParts?: unknown[];
+                                  metadata?: Record<string, unknown>;
+                                  status?: string;
+                                  sequence?: number;
+                                  createdAt?: number;
+                                }) => ({
+                                  ...message,
+                                  parts: message.displayParts || [],
+                                }),
+                              ),
+                            ),
+                          );
                           setAiCurrentMessage({
                             role: "assistant",
                             content: "",
@@ -9229,20 +9337,20 @@ ${context.details}
                             return;
                           }
 
-                          const messagesRes = await fetch(
-                            `/api/sessions/${newSessionId}/messages`,
+                          const conversationRes = await fetch(
+                            `/api/conversations/${encodeURIComponent(newSessionId)}`,
                           );
-                          if (!messagesRes.ok) {
+                          if (!conversationRes.ok) {
                             toast({
                               title: "会话暂时无法恢复",
                               variant: "destructive",
                             });
                             return;
                           }
-                          const messagesData = await messagesRes.json();
+                          const conversationData = await conversationRes.json();
                           if (
-                            !messagesData.success ||
-                            !Array.isArray(messagesData.data)
+                            !conversationData.success ||
+                            !Array.isArray(conversationData.data?.messages)
                           ) {
                             toast({
                               title: "会话暂时无法恢复",
@@ -9275,7 +9383,16 @@ ${context.details}
                           }
 
                           setAiMessages(
-                            sanitizeHydratedMessages(messagesData.data),
+                            sanitizeHydratedMessages(
+                              conversationData.data.messages.map(
+                                (message: {
+                                  displayParts?: unknown[];
+                                }) => ({
+                                  ...message,
+                                  parts: message.displayParts || [],
+                                }),
+                              ),
+                            ),
                           );
                           setAiCurrentMessage({
                             role: "assistant",

@@ -65,7 +65,14 @@ function createLiveWorkspaceSessionError() {
 
 function createMutationErrorResponse(error: WorkspaceAuthorityClientError) {
   return NextResponse.json(
-    { success: false, error: { code: error.code, message: error.message } },
+    {
+      success: false,
+      error: {
+        code: error.code,
+        message: error.message,
+        ...(error.details === undefined ? {} : { details: error.details }),
+      },
+    },
     { status: error.status },
   );
 }

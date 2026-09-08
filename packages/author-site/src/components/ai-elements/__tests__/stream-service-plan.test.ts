@@ -111,7 +111,7 @@ describe("StreamService plan event", () => {
     expect(onFinish).toHaveBeenCalledTimes(1);
   });
 
-  it("ready 状态会在 finish 丢失时兜底触发完成回调", () => {
+  it("ready 状态不能在 finish 丢失时推测完成", () => {
     jest.useFakeTimers();
     const service = new StreamService() as any;
     const handlers = new Map<string, (event: any) => void>();
@@ -134,15 +134,12 @@ describe("StreamService plan event", () => {
       status: "ready",
     });
 
-    jest.advanceTimersByTime(999);
+    jest.advanceTimersByTime(10_000);
     expect(onFinish).not.toHaveBeenCalled();
-
-    jest.advanceTimersByTime(1);
-    expect(onFinish).toHaveBeenCalledWith({ content: "" });
-    expect(close).toHaveBeenCalledTimes(1);
+    expect(close).not.toHaveBeenCalled();
   });
 
-  it("finish 正常到达时会取消 ready 兜底完成", () => {
+  it("finish 正常到达时作为唯一完成信号", () => {
     jest.useFakeTimers();
     const service = new StreamService() as any;
     const handlers = new Map<string, (event: any) => void>();

@@ -27,6 +27,20 @@ export function extractBearerToken(
 /** token 有效期，createToken、cookie maxAge 与 CLI 返回的 expiresAt 共用同一来源 */
 export const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+function getAuthCookieOptions() {
+  const isProduction = process.env.NODE_ENV === "production";
+  const useSecureCookie =
+    isProduction && process.env.USE_SECURE_COOKIE !== "false";
+
+  return {
+    httpOnly: true,
+    secure: useSecureCookie,
+    sameSite: "lax" as const,
+    maxAge: TOKEN_TTL_MS / 1000,
+    path: "/",
+  };
+}
+
 export interface UserPayload {
   userId: string;
   username: string;
@@ -65,18 +79,16 @@ export async function verifyToken(token: string): Promise<UserPayload | null> {
  * - 示例：USE_SECURE_COOKIE=false docker-compose up -d
  */
 export async function setAuthCookie(token: string): Promise<void> {
-  const isProduction = process.env.NODE_ENV === "production";
-  const useSecureCookie =
-    isProduction && process.env.USE_SECURE_COOKIE !== "false";
-
   const cookieStore = await cookies();
-  cookieStore.set(getAuthCookieName(), token, {
-    httpOnly: true,
-    secure: useSecureCookie,
-    sameSite: "lax",
-    maxAge: TOKEN_TTL_MS / 1000,
-    path: "/",
-  });
+  cookieStore.set(getAuthCookieName(), token, getAuthCookieOptions());
+}
+
+/** Attach the browser auth cookie to a response such as an OAuth redirect. */
+export function setAuthCookieOnResponse(
+  response: { cookies: { set: (name: string, value: string, options: ReturnType<typeof getAuthCookieOptions>) => void } },
+  token: string,
+): void {
+  response.cookies.set(getAuthCookieName(), token, getAuthCookieOptions());
 }
 
 /**

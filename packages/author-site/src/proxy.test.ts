@@ -107,6 +107,15 @@ describe("proxy authentication and CORS contract", () => {
     expect(response.headers.get("location")).toBe("http://localhost/workbench");
   });
 
+  it("does not treat the removed registration page as an auth route", async () => {
+    verifyToken.mockResolvedValue({ userId: "u1", username: "alice" });
+
+    const response = await proxy(request("/register", { cookie: "auth_token=valid" }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+  });
+
   it("redirects an unauthenticated workbench deep link with its query string", async () => {
     const response = await proxy(request("/workbench?tab=templates"));
 

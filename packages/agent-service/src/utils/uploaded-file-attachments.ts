@@ -26,6 +26,8 @@ const ALLOWED_EXTENSIONS = new Set([
 ]);
 
 export interface StoredUploadedFileAttachment extends FileAttachment {
+  ownerUserId: string;
+  conversationId: string;
   originalFilename?: string;
   storedFilename?: string;
   sha256?: string;
@@ -107,11 +109,15 @@ function resolveAttachmentDir(projectId: string, attachmentId: string): string {
 
 export async function saveUploadedFileAttachment(input: {
   projectId: string;
+  ownerUserId: string;
+  conversationId: string;
   filename: string;
   mimeType: string;
   buffer: Buffer;
 }): Promise<FileAttachment> {
   const projectId = validateProjectId(input.projectId);
+  const ownerUserId = sanitizePathSegment(input.ownerUserId, "ownerUserId");
+  const conversationId = sanitizePathSegment(input.conversationId, "conversationId");
   const extension = path.extname(input.filename).toLowerCase();
   if (!ALLOWED_EXTENSIONS.has(extension)) {
     throw new AttachmentUploadError(
@@ -135,8 +141,13 @@ export async function saveUploadedFileAttachment(input: {
   const text = rawText.slice(0, MAX_EXTRACTED_TEXT_CHARS);
   const sha256 = crypto.createHash("sha256").update(input.buffer).digest("hex");
 
-  // 按内容去重：同一项目内已存在相同内容附件时，复用既有 attachmentId，不新建副本
-  const existing = await findAttachmentBySha256(projectId, sha256);
+  // 按内容去重：仅在同一用户和对话内复用，避免跨对话共享物理附件扩大访问面。
+  const existing = await findAttachmentBySha256(
+    projectId,
+    ownerUserId,
+    conversationId,
+    sha256,
+  );
   if (existing) {
     return existing;
   }
@@ -165,6 +176,8 @@ export async function saveUploadedFileAttachment(input: {
     JSON.stringify(
       {
         ...metadata,
+        ownerUserId,
+        conversationId,
         originalFilename: input.filename,
         storedFilename: safeFilename,
         sha256,
@@ -180,6 +193,8 @@ export async function saveUploadedFileAttachment(input: {
 
 async function findAttachmentBySha256(
   projectId: string,
+  ownerUserId: string,
+  conversationId: string,
   sha256: string,
 ): Promise<StoredUploadedFileAttachment | null> {
   const projectDir = resolveProjectAttachmentsDir(projectId);
@@ -202,7 +217,11 @@ async function findAttachmentBySha256(
     try {
       const manifestRaw = await fs.promises.readFile(manifestPath, "utf-8");
       const metadata = JSON.parse(manifestRaw) as StoredUploadedFileAttachment;
-      if (metadata.sha256 === sha256) return metadata;
+      if (
+        metadata.ownerUserId === ownerUserId &&
+        metadata.conversationId === conversationId &&
+        metadata.sha256 === sha256
+      ) return metadata;
     } catch {
       continue;
     }

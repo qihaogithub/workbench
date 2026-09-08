@@ -1,18 +1,7 @@
-import { persistMessages } from "@workbench/ai-chat-shared/chat/services/message-service";
-import type { ChatMessage } from "@workbench/ai-chat-shared/message";
+import { updateSessionTitle } from "@workbench/ai-chat-shared/chat/services/message-service";
 
-// 会话持久化以 authorContext 配置为开关（viewer 宿主未配置时跳过），测试中模拟创作端已配置
 jest.mock("@workbench/ai-chat-shared/config", () => ({
-  configureAiChatShared: jest.fn(),
-  getConfiguredAgentClient: jest.fn(),
-  getAuthorContextIntegration: () => ({
-    buildStaticSystemPrompt: () => "",
-    fetchContextPrefix: async () => ({
-      l3: "",
-      memoryPrefix: null,
-      knowledgePrefix: null,
-    }),
-  }),
+  getAuthorContextIntegration: () => ({}),
 }));
 
 describe("message-service", () => {
@@ -23,39 +12,30 @@ describe("message-service", () => {
     jest.restoreAllMocks();
   });
 
-  it("保存消息时保留文件附件 part", async () => {
+  it("通过 Conversation Command API 更新标题", async () => {
     const fetchMock = jest.fn().mockResolvedValue({ ok: true });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const messages: ChatMessage[] = [
-      {
-        id: "user-1",
-        role: "user",
-        content: "读取附件",
-        parts: [
-          {
-            type: "file",
-            name: "demo.html",
-            url: "",
-            size: 123,
-            attachmentId: "att-1",
-            mimeType: "text/html",
-            textExtracted: true,
-          },
-        ],
-      },
-    ];
-
-    await persistMessages("session-1", messages);
+    await updateSessionTitle("conversation-1", "  新标题  ");
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/sessions/session-1/messages",
+      "/api/conversations/conversation-1/title",
       expect.objectContaining({
-        method: "POST",
-        body: expect.any(String),
+        method: "PATCH",
+        body: JSON.stringify({ title: "新标题" }),
       }),
     );
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
-    expect(body.messages[0].parts).toEqual(messages[0].parts);
+  });
+
+  it("标题更新非 2xx 时不会伪装成功", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500 }) as unknown as typeof fetch;
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    await updateSessionTitle("conversation-1", "标题");
+
+    expect(warn).toHaveBeenCalledWith(
+      "[MessageService] Failed to update session title:",
+      expect.objectContaining({ message: "Conversation title update failed (500)" }),
+    );
   });
 });

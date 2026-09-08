@@ -105,9 +105,11 @@ export {
   getConfigFieldCategory,
   getSchemaConfigCategories,
   getSchemaFieldCountByCategory,
+  getSchemaFieldCountByType,
   getSchemaFieldCountByBindings,
   orderConfigCategories,
   getConfigFieldType,
+  configFieldMatchesTypeFilter,
   filterConfigValuesByType,
   stripConfigSchemaByType,
 } from "./config-categories";

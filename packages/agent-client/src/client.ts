@@ -10,11 +10,16 @@ import type {
   SendMessageOptions,
   ApiResponse,
   RunSummary,
+  ConversationProjection,
+  ConversationRecord,
+  MessageAcceptedAck,
 } from "./types";
 
 export interface AgentClientConfig {
   baseUrl: string;
   apiKey?: string;
+  /** Host serving the public conversation ledger (defaults to the current browser origin). */
+  conversationBaseUrl?: string;
   /** 行为模式，默认 "workbench"；viewer-readonly 会随请求/连接透传给 agent-service */
   mode?: AgentMode;
 }
@@ -43,11 +48,16 @@ export class AgentClient {
   private baseUrl: string;
   private apiKey?: string;
   private mode: AgentMode;
+  private conversationBaseUrl: string;
 
   constructor(config: AgentClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.apiKey = config.apiKey;
     this.mode = config.mode ?? "workbench";
+    this.conversationBaseUrl = (
+      config.conversationBaseUrl ??
+      (typeof window !== "undefined" ? window.location.origin : this.baseUrl)
+    ).replace(/\/+$/, "");
   }
 
   getMode(): AgentMode {
@@ -77,6 +87,146 @@ export class AgentClient {
     });
 
     return response.json() as Promise<ApiResponse<T>>;
+  }
+
+  private async requestConversation<T>(
+    path: string,
+    options?: RequestInit,
+  ): Promise<T> {
+    let response: Response;
+    try {
+      response = await fetch(`${this.conversationBaseUrl}${path}`, {
+        ...options,
+        headers: {
+          ...this.getHeaders(),
+          ...options?.headers,
+        },
+      });
+    } catch (error) {
+      throw new ConversationHttpError(
+        0,
+        "NETWORK_ERROR",
+        error instanceof Error ? error.message : "Conversation request failed",
+        true,
+      );
+    }
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = undefined;
+    }
+    if (!response.ok) {
+      const body = payload as { error?: { code?: string; message?: string } } | undefined;
+      throw new ConversationHttpError(
+        response.status,
+        body?.error?.code || `HTTP_${response.status}`,
+        body?.error?.message || `Conversation request failed (${response.status})`,
+      );
+    }
+    if (!payload || typeof payload !== "object") {
+      throw new ConversationHttpError(response.status, "INVALID_RESPONSE", "Invalid conversation response");
+    }
+    const envelope = payload as { success?: boolean; data?: T; error?: { code?: string; message?: string } };
+    if (envelope.success === false || !("data" in envelope)) {
+      throw new ConversationHttpError(
+        response.status,
+        envelope.error?.code || "INVALID_RESPONSE",
+        envelope.error?.message || "Invalid conversation response",
+      );
+    }
+    return envelope.data as T;
+  }
+
+  async listConversations(projectId: string): Promise<ConversationRecord[]> {
+    const data = await this.requestConversation<ConversationRecord[]>(
+      `/api/conversations?projectId=${encodeURIComponent(projectId)}`,
+    );
+    return Array.isArray(data) ? data : [];
+  }
+
+  async loadConversation(conversationId: string, afterSequence = 0): Promise<ConversationProjection> {
+    const query = afterSequence > 0 ? `?afterSequence=${encodeURIComponent(String(afterSequence))}` : "";
+    return this.requestConversation<ConversationProjection>(
+      `/api/conversations/${encodeURIComponent(conversationId)}${query}`,
+    );
+  }
+
+  async loadMessages(conversationId: string, afterSequence = 0): Promise<ConversationProjection> {
+    const query = afterSequence > 0 ? `?afterSequence=${encodeURIComponent(String(afterSequence))}` : "";
+    return this.requestConversation<ConversationProjection>(
+      `/api/conversations/${encodeURIComponent(conversationId)}/messages${query}`,
+    );
+  }
+
+  async submitMessageCommand(input: {
+    conversationId: string;
+    clientMessageId: string;
+    content: string;
+    displayParts?: unknown[];
+    attachmentIds?: string[];
+    expectedRevision?: number;
+    kind?: string;
+  }): Promise<MessageAcceptedAck> {
+    return this.requestConversation<MessageAcceptedAck>(
+      `/api/conversations/${encodeURIComponent(input.conversationId)}/messages`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          clientMessageId: input.clientMessageId,
+          content: input.content,
+          displayParts: input.displayParts,
+          attachmentIds: input.attachmentIds,
+          expectedRevision: input.expectedRevision,
+          kind: input.kind,
+        }),
+      },
+    );
+  }
+
+  async cancelRun(conversationId: string, runId: string): Promise<unknown> {
+    return this.requestConversation(
+      `/api/conversations/${encodeURIComponent(conversationId)}/runs/${encodeURIComponent(runId)}/cancel`,
+      { method: "POST" },
+    );
+  }
+
+  async retryRun(conversationId: string, userMessageId: string): Promise<MessageAcceptedAck> {
+    return this.requestConversation<MessageAcceptedAck>(
+      `/api/conversations/${encodeURIComponent(conversationId)}/retry`,
+      { method: "POST", body: JSON.stringify({ userMessageId }) },
+    );
+  }
+
+  async supersede(input: {
+    conversationId: string;
+    afterMessageId: string | null;
+    expectedRevision: number;
+  }): Promise<ConversationProjection> {
+    return this.requestConversation<ConversationProjection>(
+      `/api/conversations/${encodeURIComponent(input.conversationId)}/supersede`,
+      { method: "POST", body: JSON.stringify(input) },
+    );
+  }
+
+  async updateConversationTitle(conversationId: string, title: string): Promise<ConversationRecord> {
+    return this.requestConversation<ConversationRecord>(
+      `/api/conversations/${encodeURIComponent(conversationId)}/title`,
+      { method: "PATCH", body: JSON.stringify({ title }) },
+    );
+  }
+
+  async exportConversation(conversationId: string): Promise<ConversationProjection & { exportedAt: string }> {
+    return this.requestConversation<ConversationProjection & { exportedAt: string }>(
+      `/api/conversations/${encodeURIComponent(conversationId)}/export`,
+    );
+  }
+
+  async deleteConversation(conversationId: string): Promise<void> {
+    await this.requestConversation<null>(
+      `/api/conversations/${encodeURIComponent(conversationId)}`,
+      { method: "DELETE" },
+    );
   }
 
   async sendMessage(
@@ -324,6 +474,21 @@ export class AgentClient {
   }
 }
 
+export class ConversationHttpError extends Error {
+  readonly retryable: boolean;
+
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+    retryable?: boolean,
+  ) {
+    super(message);
+    this.name = "ConversationHttpError";
+    this.retryable = retryable ?? (status === 408 || status === 429 || status >= 500);
+  }
+}
+
 export interface StreamEvent {
   type:
     | "stream"
@@ -400,6 +565,12 @@ export interface StreamEvent {
   };
   runSummary?: RunSummary;
   checkpointVersion?: number;
+  /** Canonical conversation identity echoed by agent-service events. */
+  conversationId?: string;
+  messageId?: string;
+  runId?: string;
+  assistantMessageId?: string;
+  conversationRevision?: number;
 }
 
 
@@ -496,7 +667,26 @@ export class AgentStream {
         images: options?.images,
         files: options?.files,
         projectRules: options?.projectRules,
-        options,
+        options: {
+          ...options,
+          conversation: {
+            ...options?.conversation,
+            conversationId: options?.conversationId || options?.conversation?.conversationId,
+            messageId: options?.messageId || id,
+            runId: options?.runId || undefined,
+            assistantMessageId:
+              options?.assistantMessageId || options?.conversation?.assistantMessageId,
+            conversationRevision:
+              options?.conversationRevision ?? options?.conversation?.conversationRevision,
+          },
+        },
+        conversationId: options?.conversationId,
+        messageId: options?.messageId || id,
+        runId: options?.runId,
+        assistantMessageId:
+          options?.assistantMessageId || options?.conversation?.assistantMessageId,
+        conversationRevision: options?.conversationRevision,
+        expectedRevision: options?.expectedRevision,
       }),
     );
   }
@@ -542,64 +732,6 @@ export class AgentStream {
         modelId,
       }),
     );
-  }
-
-  /**
-   * 重同步服务端会话历史。
-   * 先销毁服务端 agent，再以正确 role 逐条重播保留的历史消息。
-   * 返回 Promise，在服务端返回 status:ready 且 id 匹配时 resolve。
-   */
-  async resyncHistory(
-    sessionId: string,
-    messages: Array<{ id?: string; role: string; content: string }>,
-    options?: { checkpointVersion?: number; truncateAfterMessageId?: string },
-  ): Promise<number | undefined> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error("WebSocket is not connected");
-    }
-
-    return new Promise((resolve, reject) => {
-      const id = `resync-${Date.now()}`;
-      const timeout = setTimeout(() => {
-        this.off("status", onStatus);
-        this.off("error", onError);
-        reject(new Error("resync_history timeout"));
-      }, 10000);
-
-      const onStatus = (event: StreamEvent) => {
-        if ((event as any).id === id && event.status === "ready") {
-          clearTimeout(timeout);
-          this.off("status", onStatus);
-          this.off("error", onError);
-          resolve(event.checkpointVersion);
-        }
-      };
-
-      const onError = (event: StreamEvent) => {
-        clearTimeout(timeout);
-        this.off("status", onStatus);
-        this.off("error", onError);
-        reject(
-          new Error(
-            (event as any).error?.message || "resync_history failed",
-          ),
-        );
-      };
-
-      this.on("status", onStatus);
-      this.on("error", onError);
-
-      this.ws!.send(
-        JSON.stringify({
-          type: "resync_history",
-          id,
-          sessionId,
-          messages,
-          checkpointVersion: options?.checkpointVersion,
-          truncateAfterMessageId: options?.truncateAfterMessageId,
-        }),
-      );
-    });
   }
 
   cancel(messageId: string): void {

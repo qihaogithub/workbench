@@ -33,6 +33,102 @@ const compactSchema = JSON.stringify({
   },
 });
 
+const semanticFilterSchema = JSON.stringify({
+  type: "object",
+  properties: {
+    logo: {
+      type: "string",
+      title: "品牌 Logo",
+      "ui:options": { category: "设计" },
+    },
+    membershipEnabled: {
+      type: "boolean",
+      title: "启用会员",
+      "ui:options": { category: "设计", configType: "business" },
+    },
+  },
+});
+
+describe("ConfigForm 字段语义筛选", () => {
+  it("仅显示业务配置，并与分类筛选相交", () => {
+    render(
+      <ConfigForm
+        schema={semanticFilterSchema}
+        onChange={vi.fn()}
+        configTypeFilter="business"
+        configCategoryFilter="设计"
+      />,
+    );
+
+    expect(screen.getByText("启用会员")).toBeInTheDocument();
+    expect(screen.queryByText("品牌 Logo")).not.toBeInTheDocument();
+  });
+
+  it("仅显示资源配置，并将未标注字段归入资源配置", () => {
+    render(
+      <ConfigForm
+        schema={semanticFilterSchema}
+        onChange={vi.fn()}
+        configTypeFilter="resource"
+      />,
+    );
+
+    expect(screen.getByText("品牌 Logo")).toBeInTheDocument();
+    expect(screen.queryByText("启用会员")).not.toBeInTheDocument();
+  });
+});
+
+describe("ConfigForm 项目共享来源提示", () => {
+  it("仅在宿主明确启用时为顶层字段提供项目共享提示", () => {
+    const { rerender } = render(
+      <ConfigForm schema={schema} onChange={vi.fn()} />,
+    );
+
+    expect(screen.queryByLabelText("项目共享配置：页面标题")).not.toBeInTheDocument();
+
+    rerender(
+      <ConfigForm
+        schema={schema}
+        onChange={vi.fn()}
+        projectSharedSourceHint
+      />,
+    );
+
+    expect(screen.getByLabelText("项目共享配置：页面标题")).toBeInTheDocument();
+  });
+
+  it("不会将项目共享提示传入数组嵌套字段", () => {
+    const objectArraySchema = JSON.stringify({
+      type: "object",
+      properties: {
+        cards: {
+          type: "array",
+          title: "卡片",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string", title: "卡片标题" },
+            },
+          },
+        },
+      },
+    });
+
+    render(
+      <ConfigForm
+        schema={objectArraySchema}
+        initialData={{ cards: [{ title: "第一张" }] }}
+        onChange={vi.fn()}
+        projectSharedSourceHint
+      />,
+    );
+
+    expect(screen.getByLabelText("项目共享配置：卡片")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "项目 1" }));
+    expect(screen.queryByLabelText("项目共享配置：卡片标题")).not.toBeInTheDocument();
+  });
+});
+
 const optionGroupSchema = JSON.stringify({
   type: "object",
   properties: {
@@ -522,6 +618,13 @@ describe("ConfigForm configuration-definition entry", () => {
     const textInput = screen.getByPlaceholderText("请输入页面标题");
     expect(textInput).toBeVisible();
     expect(textInput.closest('[aria-hidden="true"]')).toBeNull();
+  });
+
+  it("宿主可隐藏分组标题以避免额外视觉层级", () => {
+    render(<ConfigForm schema={groupedSchema} onChange={vi.fn()} hideGroupTitles />);
+
+    expect(screen.queryByRole("heading", { name: "文本" })).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("请输入页面标题")).toBeVisible();
   });
 
   it("数字、开关和颜色保持紧凑的行内编辑布局", () => {

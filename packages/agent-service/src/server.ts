@@ -33,6 +33,7 @@ import {
   cleanupAgentRuntimeLogs,
   RUNTIME_LOG_RETENTION_INTERVAL_MS,
 } from "./session/runtime-log-retention";
+import { getConversationLedgerClient } from "./services/conversation-ledger-client";
 
 const config = loadConfig();
 const logger = getLogger();
@@ -41,6 +42,7 @@ const logger = getLogger();
 getBackendProvidersManager().initialize();
 
 async function start() {
+  const processStartedAt = Date.now();
   const workspaceAuthorityInstancePolicy = assertWorkspaceAuthorityInstancePolicy();
   logger.info({ workspaceAuthorityInstancePolicy }, "Workspace Authority instance policy accepted");
   const fastify = Fastify({
@@ -151,6 +153,9 @@ async function start() {
 
   await fastify.listen({ port: config.port, host: config.host });
   logger.info(`Agent service started on http://${config.host}:${config.port}`);
+  void getConversationLedgerClient().reconcileInterrupted(processStartedAt)
+    .then((result) => logger.info({ result }, "Conversation run startup recovery completed"))
+    .catch((error) => logger.warn({ error }, "Conversation run startup recovery deferred"));
 }
 
 start().catch((err) => {

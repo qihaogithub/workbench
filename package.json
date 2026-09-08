@@ -94,6 +94,10 @@
     "test:knowledge-validation": "node scripts/development/knowledge-validation-suite.mjs metrics",
     "test:knowledge-validation:run": "node scripts/development/knowledge-validation-suite.mjs run",
     "migrate:legacy-templates": "node scripts/migrate-legacy-template-projects.mjs",
+    "inventory:legacy-conversations": "node scripts/inventory-legacy-conversations.mjs",
+    "archive:legacy-conversations": "node scripts/archive-legacy-conversation-data.mjs",
+    "verify:legacy-conversation-archive": "node scripts/verify-legacy-conversation-archive.mjs",
+    "test:legacy-conversation-data": "node --test scripts/inventory-legacy-conversations.test.mjs scripts/archive-legacy-conversation-data.test.mjs",
     "test:legacy-template-migration": "node --test scripts/migrate-legacy-template-projects.test.mjs"
   },
   "devDependencies": {

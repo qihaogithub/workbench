@@ -47,7 +47,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { type ImageGenConfig } from "@/lib/agent-providers";
-import type { BackendProvider, BackendProvidersConfig } from "@workbench/shared";
+import type {
+  BackendProvider,
+  BackendProvidersConfig,
+} from "@workbench/shared";
 
 /* ============================================================
    类型定义
@@ -135,7 +138,10 @@ function matchesAutoRule(modelId: string, rule: AutoEnableRule): boolean {
   const idx = rule.value.indexOf(":");
   if (idx < 0) return false;
   const group = rule.value.slice(0, idx).trim();
-  const keyword = rule.value.slice(idx + 1).trim().toLowerCase();
+  const keyword = rule.value
+    .slice(idx + 1)
+    .trim()
+    .toLowerCase();
   if (!keyword) return false;
   const modelGroup = extractGroup(modelId);
   if (modelGroup !== group) return false;
@@ -162,7 +168,10 @@ function formToProvider(f: ProviderFormState): BackendProvider {
     name: f.name.trim() || f.id.trim(),
     baseURL: f.baseURL.trim(),
     apiKey: f.apiKey.trim(),
-    models: f.modelsText.split("\n").map((s) => s.trim()).filter(Boolean),
+    models: f.modelsText
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean),
     defaultModel: f.defaultModel.trim() || undefined,
     contextWindow: parseOptionalPositiveInteger(f.contextWindow),
     maxTokens: parseOptionalPositiveInteger(f.maxTokens),
@@ -202,7 +211,8 @@ const GROUP_COLOR_LIST = [
 function getGroupColor(group: string): string {
   if (!GROUP_COLORS[group]) {
     const keys = Object.keys(GROUP_COLORS);
-    GROUP_COLORS[group] = GROUP_COLOR_LIST[keys.length % GROUP_COLOR_LIST.length];
+    GROUP_COLORS[group] =
+      GROUP_COLOR_LIST[keys.length % GROUP_COLOR_LIST.length];
   }
   return GROUP_COLORS[group];
 }
@@ -218,7 +228,9 @@ function useAutoSave(
   debounceMs = 500,
   enabled = true,
 ) {
-  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
   const [message, setMessage] = useState<string | null>(null);
   const saveRef = useRef(save);
   const enabledRef = useRef(enabled);
@@ -257,7 +269,11 @@ function useAutoSave(
     setMessage(null);
   }, []);
 
-  return { autoSaveState: state, autoSaveMessage: message, resetAutoSave: reset };
+  return {
+    autoSaveState: state,
+    autoSaveMessage: message,
+    resetAutoSave: reset,
+  };
 }
 
 async function readApiErrorMessage(
@@ -279,7 +295,9 @@ async function readApiErrorMessage(
 export default function ModelsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "providers");
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get("tab") || "providers",
+  );
 
   const handleTabChange = useCallback(
     (value: string) => {
@@ -324,7 +342,7 @@ export default function ModelsPage() {
           )}
         >
           <Sparkles className="h-4 w-4" />
-           模型白名单
+          模型白名单
         </button>
         <button
           onClick={() => handleTabChange("image-gen")}
@@ -340,7 +358,13 @@ export default function ModelsPage() {
         </button>
       </div>
 
-      {activeTab === "providers" ? <SuppliersTab /> : activeTab === "image-gen" ? <ImageGenTab /> : <ModelConfigTab />}
+      {activeTab === "providers" ? (
+        <SuppliersTab />
+      ) : activeTab === "image-gen" ? (
+        <ImageGenTab />
+      ) : (
+        <ModelConfigTab />
+      )}
     </div>
   );
 }
@@ -358,7 +382,8 @@ function SuppliersTab() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<BackendProvidersSyncStatus | null>(null);
+  const [syncStatus, setSyncStatus] =
+    useState<BackendProvidersSyncStatus | null>(null);
   const [pushResult, setPushResult] = useState<{
     ok: boolean;
     message: string;
@@ -465,7 +490,10 @@ function SuppliersTab() {
         return { ok: true, message: "配置已保存并同步到 agent-service" };
       }
       loadSyncStatus();
-      return { ok: true, message: "配置已保存，运行时同步失败，系统会自动重试" };
+      return {
+        ok: true,
+        message: "配置已保存，运行时同步失败，系统会自动重试",
+      };
     }
 
     try {
@@ -473,13 +501,19 @@ function SuppliersTab() {
         method: "POST",
       });
       const j = await r.json();
-      setPushResult({ ok: j.success, message: j.message || (j.success ? "已推送" : "推送失败") });
+      setPushResult({
+        ok: j.success,
+        message: j.message || (j.success ? "已推送" : "推送失败"),
+      });
       if (j.success) {
         loadSyncStatus();
         return { ok: true, message: "配置已保存并同步到 agent-service" };
       }
     } catch {
-      setPushResult({ ok: false, message: "推送失败：无法连接到 agent-service" });
+      setPushResult({
+        ok: false,
+        message: "推送失败：无法连接到 agent-service",
+      });
     }
     loadSyncStatus();
     return { ok: true, message: "配置已保存" };
@@ -537,11 +571,17 @@ function SuppliersTab() {
       setError("默认模型必须在模型列表中");
       return;
     }
-    if (form.contextWindow.trim() && !parseOptionalPositiveInteger(form.contextWindow)) {
+    if (
+      form.contextWindow.trim() &&
+      !parseOptionalPositiveInteger(form.contextWindow)
+    ) {
       setError("上下文窗口必须是正整数");
       return;
     }
-    if (form.maxTokens.trim() && !parseOptionalPositiveInteger(form.maxTokens)) {
+    if (
+      form.maxTokens.trim() &&
+      !parseOptionalPositiveInteger(form.maxTokens)
+    ) {
       setError("最大输出 token 必须是正整数");
       return;
     }
@@ -591,7 +631,9 @@ function SuppliersTab() {
         <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="font-semibold text-neutral-50">配置保存与运行时同步</h3>
+              <h3 className="font-semibold text-neutral-50">
+                配置保存与运行时同步
+              </h3>
               <p className="text-sm text-neutral-400 mt-1">
                 数据库是配置源，agent-service 使用同步后的运行时配置。
               </p>
@@ -658,7 +700,8 @@ function SuppliersTab() {
               </div>
               <div className="text-xs text-neutral-500 mt-1 truncate">
                 {syncStatus.agentConfig.reachable
-                  ? syncStatus.agentConfig.activeProviderId || "未设置激活供应商"
+                  ? syncStatus.agentConfig.activeProviderId ||
+                    "未设置激活供应商"
                   : syncStatus.agentConfig.message}
               </div>
             </div>
@@ -790,7 +833,9 @@ function SuppliersTab() {
                   disabled={!isAdding}
                   className="bg-neutral-800 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
                 />
-                <p className="text-xs text-neutral-500 mt-1">用作模型 ID 前缀，不可修改</p>
+                <p className="text-xs text-neutral-500 mt-1">
+                  用作模型 ID 前缀，不可修改
+                </p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-neutral-400 mb-1">
@@ -809,7 +854,9 @@ function SuppliersTab() {
                 </label>
                 <Input
                   value={form.baseURL}
-                  onChange={(e) => setForm({ ...form, baseURL: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, baseURL: e.target.value })
+                  }
                   placeholder="如: https://token.xjjj.co/v1"
                   className="bg-neutral-800 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
                 />
@@ -832,7 +879,9 @@ function SuppliersTab() {
                 </label>
                 <Textarea
                   value={form.modelsText}
-                  onChange={(e) => setForm({ ...form, modelsText: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, modelsText: e.target.value })
+                  }
                   placeholder="deepseek-v4-flash\ngpt-4\nclaude-3-5-sonnet"
                   rows={5}
                   className="bg-neutral-800 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
@@ -844,7 +893,9 @@ function SuppliersTab() {
                 </label>
                 <Input
                   value={form.defaultModel}
-                  onChange={(e) => setForm({ ...form, defaultModel: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, defaultModel: e.target.value })
+                  }
                   placeholder="留空则取列表第一个"
                   className="bg-neutral-800 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
                 />
@@ -856,7 +907,9 @@ function SuppliersTab() {
                 <Input
                   inputMode="numeric"
                   value={form.contextWindow}
-                  onChange={(e) => setForm({ ...form, contextWindow: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, contextWindow: e.target.value })
+                  }
                   placeholder="128000"
                   className="bg-neutral-800 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
                 />
@@ -868,7 +921,9 @@ function SuppliersTab() {
                 <Input
                   inputMode="numeric"
                   value={form.maxTokens}
-                  onChange={(e) => setForm({ ...form, maxTokens: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, maxTokens: e.target.value })
+                  }
                   placeholder="4096"
                   className="bg-neutral-800 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
                 />
@@ -887,12 +942,19 @@ function SuppliersTab() {
               </div>
             </div>
             <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" size="sm" onClick={handleCancelForm}
-                className="bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancelForm}
+                className="bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700"
+              >
                 取消
               </Button>
-              <Button size="sm" onClick={handleSubmitForm}
-                className="bg-indigo-600 hover:bg-indigo-500">
+              <Button
+                size="sm"
+                onClick={handleSubmitForm}
+                className="bg-indigo-600 hover:bg-indigo-500"
+              >
                 {isAdding ? "添加到列表" : "保存修改"}
               </Button>
             </div>
@@ -1163,7 +1225,12 @@ function ModelConfigTab() {
 
   const { autoSaveState, autoSaveMessage } = useAutoSave(
     doSave,
-    [config.enabledModels, config.autoEnableRules, config.blacklist, configReady],
+    [
+      config.enabledModels,
+      config.autoEnableRules,
+      config.blacklist,
+      configReady,
+    ],
     500,
     configReady,
   );
@@ -1198,24 +1265,21 @@ function ModelConfigTab() {
       });
   }, [availableModels, enabledSet, search]);
 
-  const toggleModel = useCallback(
-    (id: string, enable: boolean) => {
-      setConfig((prev) => {
-        if (enable) {
-          if (prev.enabledModels.includes(id)) return prev;
-          return {
-            ...prev,
-            enabledModels: [...prev.enabledModels, id],
-          };
-        }
+  const toggleModel = useCallback((id: string, enable: boolean) => {
+    setConfig((prev) => {
+      if (enable) {
+        if (prev.enabledModels.includes(id)) return prev;
         return {
           ...prev,
-          enabledModels: prev.enabledModels.filter((m) => m !== id),
+          enabledModels: [...prev.enabledModels, id],
         };
-      });
-    },
-    [],
-  );
+      }
+      return {
+        ...prev,
+        enabledModels: prev.enabledModels.filter((m) => m !== id),
+      };
+    });
+  }, []);
 
   const addAutoRule = useCallback(
     (type: "prefix" | "nameFilter", value: string) => {
@@ -1350,7 +1414,9 @@ function ModelConfigTab() {
         <header className="mb-4 flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-amber-400" />
           <div>
-            <h3 className="text-lg font-semibold text-neutral-50">自动启用规则</h3>
+            <h3 className="text-lg font-semibold text-neutral-50">
+              自动启用规则
+            </h3>
             <p className="text-sm text-neutral-400 mt-1">
               匹配规则的模型会在后端新增时自动启用。
             </p>
@@ -1617,7 +1683,10 @@ function ModelRow({
             </Badge>
           )}
         </div>
-        <div className="text-xs text-neutral-500 truncate mt-0.5" title={model.id}>
+        <div
+          className="text-xs text-neutral-500 truncate mt-0.5"
+          title={model.id}
+        >
           {model.id}
         </div>
       </div>
@@ -1695,6 +1764,8 @@ function ImageGenTab() {
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("https://api.openai.com/v1");
   const [model, setModel] = useState("dall-e-3");
+  const [apiProfile, setApiProfile] =
+    useState<NonNullable<ImageGenConfig["apiProfile"]>>("auto");
   const [timeoutMs, setTimeoutMs] = useState(60000);
   const [maxPerSession, setMaxPerSession] = useState(30);
   const [maxRetries, setMaxRetries] = useState(3);
@@ -1714,6 +1785,7 @@ function ImageGenTab() {
         setApiKey(c.apiKey || "");
         setBaseUrl(c.baseUrl || "https://api.openai.com/v1");
         setModel(c.model || "dall-e-3");
+        setApiProfile(c.apiProfile || "auto");
         setTimeoutMs(c.timeoutMs || 60000);
         setMaxPerSession(c.maxPerSession ?? 30);
         setMaxRetries(c.maxRetries ?? 3);
@@ -1744,6 +1816,7 @@ function ImageGenTab() {
           apiKey,
           baseUrl,
           model,
+          apiProfile,
           timeoutMs,
           maxPerSession,
           maxRetries,
@@ -1761,11 +1834,32 @@ function ImageGenTab() {
       return { ok: true, message: "配置已保存" + genMsg };
     }
     return { ok: false, message: body?.error?.message || "保存失败" };
-  }, [enabled, apiKey, baseUrl, model, timeoutMs, maxPerSession, maxRetries, maxPromptLen]);
+  }, [
+    enabled,
+    apiKey,
+    baseUrl,
+    model,
+    apiProfile,
+    timeoutMs,
+    maxPerSession,
+    maxRetries,
+    maxPromptLen,
+  ]);
 
   const { autoSaveState, autoSaveMessage } = useAutoSave(
     doSave,
-    [enabled, apiKey, baseUrl, model, timeoutMs, maxPerSession, maxRetries, maxPromptLen, configReady],
+    [
+      enabled,
+      apiKey,
+      baseUrl,
+      model,
+      apiProfile,
+      timeoutMs,
+      maxPerSession,
+      maxRetries,
+      maxPromptLen,
+      configReady,
+    ],
     500,
     configReady,
   );
@@ -1797,9 +1891,12 @@ function ImageGenTab() {
       <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-6 space-y-5">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-neutral-50 mb-1">图像生成配置</h3>
+            <h3 className="text-lg font-semibold text-neutral-50 mb-1">
+              图像生成配置
+            </h3>
             <p className="text-sm text-neutral-400">
-              为 AI 提供文生图能力。启用后，主 Agent 可通过图片子 Agent 生成页面素材。
+              为 AI 提供文生图能力。启用后，主 Agent 可通过图片子 Agent
+              生成页面素材。
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -1821,13 +1918,17 @@ function ImageGenTab() {
         <div className="flex items-center justify-between py-2">
           <div>
             <p className="text-sm font-medium text-neutral-200">启用图像生成</p>
-            <p className="text-xs text-neutral-500">关闭后 AI 无法生成页面图片素材</p>
+            <p className="text-xs text-neutral-500">
+              关闭后 AI 无法生成页面图片素材
+            </p>
           </div>
           <Switch checked={enabled} onCheckedChange={setEnabled} />
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-neutral-300">API Key</label>
+          <label className="text-sm font-medium text-neutral-300">
+            API Key
+          </label>
           <Input
             type="password"
             value={apiKey}
@@ -1835,34 +1936,73 @@ function ImageGenTab() {
             placeholder="sk-..."
             className="bg-neutral-900 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
           />
-          <p className="text-xs text-neutral-500">图像生成接口的 API Key（OpenAI 兼容）</p>
+          <p className="text-xs text-neutral-500">
+            图像生成接口的 API Key（OpenAI 兼容）
+          </p>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-neutral-300">Base URL</label>
+          <label className="text-sm font-medium text-neutral-300">
+            Base URL
+          </label>
           <Input
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder="https://xxx/v1"
             className="bg-neutral-900 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
           />
-          <p className="text-xs text-neutral-500">OpenAI 兼容 baseURL，例如 https://api.openai.com/v1</p>
+          <p className="text-xs text-neutral-500">
+            OpenAI 兼容 baseURL，例如 https://api.openai.com/v1
+          </p>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-neutral-300">生成模型</label>
+          <label className="text-sm font-medium text-neutral-300">
+            生成模型
+          </label>
           <Input
             value={model}
             onChange={(e) => setModel(e.target.value)}
             placeholder="dall-e-3"
             className="bg-neutral-900 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
           />
-          <p className="text-xs text-neutral-500">用于文生图的模型 ID，如 dall-e-3、gpt-image-1</p>
+          <p className="text-xs text-neutral-500">
+            用于文生图的模型 ID，如 dall-e-3、gpt-image-1
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label
+            htmlFor="image-gen-api-profile"
+            className="text-sm font-medium text-neutral-300"
+          >
+            API Profile
+          </label>
+          <select
+            id="image-gen-api-profile"
+            value={apiProfile}
+            onChange={(event) =>
+              setApiProfile(
+                event.target.value as NonNullable<ImageGenConfig["apiProfile"]>,
+              )
+            }
+            className="w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
+          >
+            <option value="auto">自动识别</option>
+            <option value="gpt-image">GPT Image（支持参考图）</option>
+            <option value="dall-e-3">DALL·E 3</option>
+            <option value="generation-only">仅生成（保守能力）</option>
+          </select>
+          <p className="text-xs text-neutral-500">
+            决定图像接口能力与参考图支持；旧配置默认使用自动识别。
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-neutral-300">单次生成超时 (毫秒)</label>
+            <label className="text-sm font-medium text-neutral-300">
+              单次生成超时 (毫秒)
+            </label>
             <Input
               type="number"
               value={timeoutMs}
@@ -1871,7 +2011,9 @@ function ImageGenTab() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-neutral-300">每会话最大生成数</label>
+            <label className="text-sm font-medium text-neutral-300">
+              每会话最大生成数
+            </label>
             <Input
               type="number"
               value={maxPerSession}
@@ -1880,7 +2022,9 @@ function ImageGenTab() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-neutral-300">失败重试次数</label>
+            <label className="text-sm font-medium text-neutral-300">
+              失败重试次数
+            </label>
             <Input
               type="number"
               value={maxRetries}
@@ -1889,7 +2033,9 @@ function ImageGenTab() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-neutral-300">Prompt 最大字符数</label>
+            <label className="text-sm font-medium text-neutral-300">
+              Prompt 最大字符数
+            </label>
             <Input
               type="number"
               value={maxPromptLen}

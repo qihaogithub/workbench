@@ -30,7 +30,7 @@ export async function POST(
         status: 404,
       });
     }
-    if (session.userId && session.userId !== payload.userId) {
+    if (!session.userId || session.userId !== payload.userId) {
       return NextResponse.json(
         createApiError("FORBIDDEN", "无权操作其他用户的 Session"),
         { status: 403 },

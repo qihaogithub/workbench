@@ -30,6 +30,7 @@ import {
 interface UserInfo {
   id: string;
   username: string;
+  displayName?: string;
 }
 
 type View =
@@ -494,7 +495,9 @@ export function SettingsButton() {
                     <User className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{user?.username}</p>
+                    <p className="text-sm font-medium">
+                      {user?.displayName || user?.username}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       当前登录账号
                     </p>

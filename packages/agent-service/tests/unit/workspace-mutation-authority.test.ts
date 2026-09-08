@@ -692,6 +692,34 @@ describe("WorkspaceMutationAuthority", () => {
     expect(authority.getHealth("project-1", "workspace-1").missingBackupCount).toBe(1);
   });
 
+  it("显式 reconcile adopt 可为缺失备份且已漂移的工作区重建新基线", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const state = await authority.bootstrap("project-1", "workspace-1");
+    const dataDir = path.join(path.dirname(workspacePath), "data");
+    fs.rmSync(path.join(dataDir, "workspace-authority", "workspace-1", "backups", `${state.resourceHashes["demos/home/index.tsx"]}.bin`));
+    fs.writeFileSync(path.join(workspacePath, "demos/home/index.tsx"), "external", "utf-8");
+
+    await expect(authority.mutate({
+      mutationId: "blocked-by-missing-backup",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      baseRevision: state.revision,
+      actor: "author-site",
+      reason: "test",
+      operations: [{ type: "put_text", path: "demos/home/index.tsx", content: "next", expectedHash: hash("external") }],
+    })).rejects.toMatchObject({ code: "WORKSPACE_AUTHORITY_BACKUP_MISSING" });
+
+    const adopted = await authority.reconcileAdopt("project-1", "workspace-1");
+
+    expect(adopted.revision).toBe(state.revision + 1);
+    expect(authority.getHealth("project-1", "workspace-1")).toMatchObject({
+      ready: true,
+      externalDrift: false,
+      missingBackupCount: 0,
+    });
+    expect((await authority.getSnapshot("project-1", "workspace-1")).resources["demos/home/index.tsx"]).toBe("external");
+  });
+
   it("committed backup 缺失但磁盘内容仍可信时自动重建并记录诊断", async () => {
     const { authority, workspacePath } = createAuthority();
     const state = await authority.bootstrap("project-1", "workspace-1");

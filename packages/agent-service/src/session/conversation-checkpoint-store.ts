@@ -8,13 +8,15 @@ export interface CheckpointMessage {
 
 export interface ConversationCheckpoint {
   version: number;
+  conversationId: string;
+  conversationRevision: number;
   messages: CheckpointMessage[];
   updatedAt: number;
 }
 
 export type CheckpointResyncResult =
-  | { ok: true; checkpoint: ConversationCheckpoint; source: "checkpoint" | "fallback" }
-  | { ok: false; code: "CHECKPOINT_VERSION_CONFLICT" | "CHECKPOINT_ANCHOR_REQUIRED" | "CHECKPOINT_ANCHOR_NOT_FOUND" | "CHECKPOINT_FALLBACK_INVALID" };
+  | { ok: true; checkpoint: ConversationCheckpoint; source: "checkpoint" }
+  | { ok: false; code: "CHECKPOINT_VERSION_CONFLICT" | "CHECKPOINT_ANCHOR_REQUIRED" | "CHECKPOINT_ANCHOR_NOT_FOUND" | "CHECKPOINT_FALLBACK_DISABLED" };
 
 const MAX_MESSAGES = 24;
 const MAX_MESSAGE_CHARS = 4_000;
@@ -68,15 +70,36 @@ export class ConversationCheckpointStore {
       : undefined;
   }
 
+  getForRevision(
+    sessionId: string,
+    conversationId: string,
+    conversationRevision: number,
+  ): ConversationCheckpoint | undefined {
+    const checkpoint = this.checkpoints.get(sessionId);
+    if (
+      !checkpoint ||
+      checkpoint.conversationId !== conversationId ||
+      checkpoint.conversationRevision !== conversationRevision
+    ) {
+      if (checkpoint) this.checkpoints.delete(sessionId);
+      return undefined;
+    }
+    return this.get(sessionId);
+  }
+
   recordTurn(
     sessionId: string,
     user: CheckpointMessage,
     assistant: CheckpointMessage,
+    authority?: { conversationId: string; conversationRevision: number },
   ): ConversationCheckpoint {
     const current = this.checkpoints.get(sessionId);
     const messages = limitMessages([...(current?.messages ?? []), user, assistant]);
     const checkpoint: ConversationCheckpoint = {
       version: (current?.version ?? 0) + 1,
+      conversationId: authority?.conversationId ?? current?.conversationId ?? sessionId,
+      conversationRevision:
+        authority?.conversationRevision ?? current?.conversationRevision ?? (current?.version ?? 0) + 1,
       messages,
       updatedAt: Date.now(),
     };
@@ -111,6 +134,8 @@ export class ConversationCheckpointStore {
         ok: true,
         checkpoint: {
           version: current.version + 1,
+          conversationId: current.conversationId,
+          conversationRevision: current.conversationRevision,
           messages: current.messages.slice(0, anchorIndex + 1),
           updatedAt: Date.now(),
         },
@@ -118,20 +143,7 @@ export class ConversationCheckpointStore {
       };
     }
 
-    if (!Array.isArray(input.fallbackMessages)) {
-      return { ok: false, code: "CHECKPOINT_FALLBACK_INVALID" };
-    }
-    const messages = input.fallbackMessages
-      .map((message, index) => normalizeMessage(message, index))
-      .filter((message): message is CheckpointMessage => Boolean(message));
-    if (messages.length !== input.fallbackMessages.length) {
-      return { ok: false, code: "CHECKPOINT_FALLBACK_INVALID" };
-    }
-    return {
-      ok: true,
-      checkpoint: { version: 1, messages: limitMessages(messages), updatedAt: Date.now() },
-      source: "fallback",
-    };
+    return { ok: false, code: "CHECKPOINT_FALLBACK_DISABLED" };
   }
 
   commit(sessionId: string, checkpoint: ConversationCheckpoint): ConversationCheckpoint {

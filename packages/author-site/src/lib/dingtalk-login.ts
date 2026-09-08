@@ -4,14 +4,20 @@ export interface DingtalkLoginConfig {
   appKey?: string;
   appSecret?: string;
   authUrl?: string;
+  redirectUri?: string;
+  oauthBaseUrl: string;
+  oauthScope: string;
+  oauthPrompt: string;
   oapiBaseUrl: string;
   apiBaseUrl: string;
 }
 
 export interface SafeDingtalkLoginConfig {
   enabled: boolean;
+  browserOAuthEnabled: boolean;
   corpId?: string;
   authUrl?: string;
+  redirectUri?: string;
   message?: string;
 }
 
@@ -41,6 +47,7 @@ export function readDingtalkLoginConfig(): DingtalkLoginConfig {
   const appKey = readEnv("DINGTALK_APP_KEY");
   const appSecret = readEnv("DINGTALK_APP_SECRET");
   const authUrl = readEnv("DINGTALK_LOGIN_AUTH_URL");
+  const redirectUri = readEnv("DINGTALK_LOGIN_REDIRECT_URI");
   const enabled =
     readEnv("DINGTALK_LOGIN_ENABLED") === "true" ||
     Boolean(corpId && appKey && appSecret);
@@ -51,6 +58,12 @@ export function readDingtalkLoginConfig(): DingtalkLoginConfig {
     appKey,
     appSecret,
     authUrl,
+    redirectUri,
+    oauthBaseUrl:
+      readEnv("DINGTALK_LOGIN_OAUTH_BASE_URL") ||
+      "https://login.dingtalk.com/oauth2/auth",
+    oauthScope: readEnv("DINGTALK_LOGIN_SCOPE") || "openid",
+    oauthPrompt: readEnv("DINGTALK_LOGIN_PROMPT") || "consent",
     oapiBaseUrl: readEnv("DINGTALK_OAPI_BASE_URL") || "https://oapi.dingtalk.com",
     apiBaseUrl: readEnv("DINGTALK_API_BASE_URL") || "https://api.dingtalk.com",
   };
@@ -58,9 +71,16 @@ export function readDingtalkLoginConfig(): DingtalkLoginConfig {
 
 export function readSafeDingtalkLoginConfig(): SafeDingtalkLoginConfig {
   const config = readDingtalkLoginConfig();
+  const browserOAuthEnabled = Boolean(
+    config.enabled &&
+      config.appKey &&
+      config.appSecret &&
+      config.redirectUri,
+  );
   if (!config.enabled) {
     return {
       enabled: false,
+      browserOAuthEnabled: false,
       message: "DingTalk enterprise login is not configured",
     };
   }
@@ -68,17 +88,44 @@ export function readSafeDingtalkLoginConfig(): SafeDingtalkLoginConfig {
   if (!config.corpId || !config.appKey || !config.appSecret) {
     return {
       enabled: false,
+      browserOAuthEnabled: false,
       corpId: config.corpId,
       authUrl: config.authUrl,
+      redirectUri: config.redirectUri,
       message: "DingTalk enterprise login is missing corpId, appKey, or appSecret",
     };
   }
 
   return {
     enabled: true,
+    browserOAuthEnabled,
     corpId: config.corpId,
     authUrl: config.authUrl,
+    redirectUri: config.redirectUri,
   };
+}
+
+/**
+ * Build the authorization URL used by ordinary browsers. The client id is
+ * the enterprise app's Client ID (the value historically called AppKey), not
+ * the developer-platform App ID or AgentId.
+ */
+export function createDingtalkOAuthAuthorizationUrl(
+  config: DingtalkLoginConfig,
+  state: string,
+): string {
+  if (!config.appKey || !config.redirectUri) {
+    throw new Error("DingTalk browser OAuth is not configured");
+  }
+
+  const url = new URL(config.oauthBaseUrl);
+  url.searchParams.set("redirect_uri", config.redirectUri);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", config.appKey);
+  url.searchParams.set("scope", config.oauthScope);
+  url.searchParams.set("state", state);
+  url.searchParams.set("prompt", config.oauthPrompt);
+  return url.toString();
 }
 
 function readString(value: unknown, keys: string[]): string | undefined {
@@ -241,6 +288,90 @@ export async function exchangeDingtalkAuthCode(
     name: readString(detail, ["name"]) || readString(baseInfo, ["name"]),
     avatar: readString(detail, ["avatar"]) || readString(baseInfo, ["avatar"]),
     raw: { baseInfo, detail },
+  };
+}
+
+async function requestDingtalkUserAccessToken(
+  config: DingtalkLoginConfig,
+  authCode: string,
+): Promise<string> {
+  if (!config.appKey || !config.appSecret) {
+    throw new Error("DingTalk enterprise login is not configured");
+  }
+
+  const response = await fetch(`${config.apiBaseUrl}/v1.0/oauth2/userAccessToken`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      clientId: config.appKey,
+      clientSecret: config.appSecret,
+      code: authCode,
+      grantType: "authorization_code",
+    }),
+  });
+  const body = (await response.json()) as Record<string, unknown>;
+  const token = readString(body, ["accessToken", "access_token"]);
+  if (!response.ok || !token) {
+    throw new Error(
+      readString(body, ["message", "errmsg"]) ||
+        "Failed to exchange DingTalk browser authorization code",
+    );
+  }
+  return token;
+}
+
+async function fetchDingtalkAuthorizedUser(
+  config: DingtalkLoginConfig,
+  accessToken: string,
+): Promise<Record<string, unknown>> {
+  const response = await fetch(`${config.apiBaseUrl}/v1.0/contact/users/me`, {
+    headers: { "x-acs-dingtalk-access-token": accessToken },
+  });
+  const body = (await response.json()) as Record<string, unknown>;
+  if (!response.ok) {
+    throw new Error(
+      readString(body, ["message", "errmsg"]) ||
+        "Failed to fetch DingTalk user profile",
+    );
+  }
+  return body;
+}
+
+/**
+ * Exchange the authCode returned by the browser OAuth page. This is separate
+ * from exchangeDingtalkAuthCode, which handles the internal H5免登 code via
+ * the app access token API.
+ */
+export async function exchangeDingtalkBrowserAuthCode(
+  authCode: string,
+): Promise<DingtalkLoginProfile> {
+  const config = readDingtalkLoginConfig();
+  if (
+    !config.enabled ||
+    !config.corpId ||
+    !config.appKey ||
+    !config.appSecret ||
+    !config.redirectUri
+  ) {
+    throw new Error("DingTalk browser OAuth is not configured");
+  }
+
+  const userAccessToken = await requestDingtalkUserAccessToken(config, authCode);
+  const body = await fetchDingtalkAuthorizedUser(config, userAccessToken);
+  const unionId = readString(body, ["unionId", "unionid"]);
+  const dingtalkUserId =
+    readString(body, ["userid", "userId", "openId", "openid"]) || unionId;
+  if (!dingtalkUserId) {
+    throw new Error("DingTalk user profile is missing a stable user id");
+  }
+
+  return {
+    corpId: readString(body, ["corpId", "corp_id"]) || config.corpId,
+    dingtalkUserId,
+    unionId,
+    name: readString(body, ["name", "nick"]),
+    avatar: readString(body, ["avatar", "avatarUrl"]),
+    raw: body,
   };
 }
 

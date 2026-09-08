@@ -137,6 +137,31 @@ describe("workspace authority client", () => {
     } satisfies Partial<WorkspaceAuthorityClientError>);
   });
 
+  it("保留 Authority 备份缺失错误的资源诊断详情", async () => {
+    global.fetch = jest.fn(async () => ({
+      ok: false,
+      status: 503,
+      json: async () => ({
+        success: false,
+        error: {
+          code: "WORKSPACE_AUTHORITY_BACKUP_MISSING",
+          message: "Committed Workspace backup is missing or untrusted",
+          details: { path: "knowledge/Rules.md", hash: "missing-hash" },
+        },
+      }),
+    })) as unknown as typeof fetch;
+    const request = createTextWorkspaceMutation({
+      projectId: "project-1", workspaceId: "workspace-1", sessionId: "session-1",
+      path: "knowledge/Rules.md", content: "after", previousContent: "before", reason: "test",
+    });
+
+    await expect(commitWorkspaceMutation(request)).rejects.toMatchObject({
+      code: "WORKSPACE_AUTHORITY_BACKUP_MISSING",
+      status: 503,
+      details: { path: "knowledge/Rules.md", hash: "missing-hash" },
+    } satisfies Partial<WorkspaceAuthorityClientError>);
+  });
+
   it("Authority 网络不可达时返回可操作提示，不暴露底层 fetch 错误", async () => {
     global.fetch = jest.fn().mockRejectedValue(new Error("fetch failed")) as unknown as typeof fetch;
     const request = createTextWorkspaceMutation({

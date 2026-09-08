@@ -100,6 +100,24 @@ describe("Message 用户消息展示", () => {
 
     expect(onCancelQueuedMessage).toHaveBeenCalledWith("queued-1");
   });
+
+  it.each([
+    ["pending", "正在同步"],
+    ["failed", "同步失败，请编辑后重试"],
+  ] as const)("展示 %s 账本同步状态", (syncStatus, label) => {
+    render(
+      <Message
+        message={{
+          id: `user-${syncStatus}`,
+          role: "user",
+          content: "需要可靠保存的消息",
+          syncStatus,
+        }}
+      />,
+    );
+
+    expect(screen.getByText(label)).toBeInTheDocument();
+  });
 });
 
 describe("Message 自动修复系统任务", () => {

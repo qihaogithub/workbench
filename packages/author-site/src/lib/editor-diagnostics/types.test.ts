@@ -182,6 +182,45 @@ describe("editor diagnostic sanitizers", () => {
     });
   });
 
+  it("保留对话命令持久化指标但不记录消息正文", () => {
+    const event = normalizeEditorDiagnosticEvent({
+      id: "evt-conversation-persist",
+      schemaVersion: 1,
+      ts: "2026-09-07T00:00:00.000Z",
+      source: "author-api",
+      level: "info",
+      eventGroup: "ai",
+      eventType: "ai.message_persist_succeeded",
+      sessionId: "conversation-1",
+      operationId: "request-1",
+      payload: {
+        requestId: "request-1",
+        messageId: "message-1",
+        runId: "run-1",
+        clientRevision: 4,
+        revision: 5,
+        httpStatus: 201,
+        payloadBytes: 123,
+        durationMs: 8,
+        status: "accepted",
+        content: "不应进入诊断库",
+      },
+    });
+
+    expect(event.payload).toEqual({
+      requestId: "request-1",
+      messageId: "message-1",
+      runId: "run-1",
+      clientRevision: 4,
+      revision: 5,
+      httpStatus: 201,
+      payloadBytes: 123,
+      durationMs: 8,
+      status: "accepted",
+      content: { length: 7, redacted: true },
+    });
+  });
+
   it("保留自动保存 flush 失败的阶段化字段", () => {
     const event = normalizeEditorDiagnosticEvent({
       id: "evt-autosave-flush",

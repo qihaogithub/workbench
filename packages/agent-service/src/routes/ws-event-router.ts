@@ -12,6 +12,7 @@ import {
   createAgentRunLog,
 } from "../session/run-log-store";
 import { logger } from "../utils/logger";
+import type { LedgerTerminalInput } from "../services/conversation-ledger-client";
 
 const AGENT_EVENT_TYPES = [
   "stream",
@@ -46,6 +47,9 @@ export interface ServerMessage {
     | "models";
   id?: string;
   sessionId?: string;
+  conversationId?: string;
+  runId?: string;
+  assistantMessageId?: string;
   content?: string;
   done?: boolean;
   status?: AgentStatus;
@@ -127,6 +131,9 @@ export type SendMessageFn = (message: ServerMessage) => void;
 
 interface ActiveMessage {
   id: string;
+  conversationId: string;
+  runId: string;
+  assistantMessageId: string;
   isCancelled: boolean;
 }
 
@@ -138,6 +145,8 @@ export class WebSocketEventRouter {
   private agent: BaseAgent | null = null;
   private boundHandler: (event: AgentEvent) => void;
   private onActivity?: (event: AgentEvent) => void;
+  private ledgerDisplayParts: Array<Record<string, unknown>> = [];
+  private latestContextSummary: NonNullable<LedgerTerminalInput["contextSummary"]> | null = null;
 
   constructor(sessionId: string, sendMessage: SendMessageFn, onActivity?: (event: AgentEvent) => void) {
     this.sessionId = sessionId;
@@ -170,7 +179,15 @@ export class WebSocketEventRouter {
     messageId: string,
     logOptions?: Omit<AgentRunLogStartOptions, "sessionId" | "messageId">,
   ): void {
-    this.activeMessage = { id: messageId, isCancelled: false };
+    this.ledgerDisplayParts = [];
+    this.latestContextSummary = null;
+    this.activeMessage = {
+      id: messageId,
+      conversationId: logOptions?.conversationId || this.sessionId,
+      runId: logOptions?.runId || messageId,
+      assistantMessageId: logOptions?.assistantMessageId || messageId,
+      isCancelled: false,
+    };
     this.runLog = logOptions
       ? createAgentRunLog({
           sessionId: this.sessionId,
@@ -209,6 +226,34 @@ export class WebSocketEventRouter {
     return this.activeMessage?.isCancelled ?? false;
   }
 
+  getActiveRunIds(): Pick<ActiveMessage, "conversationId" | "runId" | "assistantMessageId"> | null {
+    if (!this.activeMessage) return null;
+    const { conversationId, runId, assistantMessageId } = this.activeMessage;
+    return { conversationId, runId, assistantMessageId };
+  }
+
+  getLedgerDisplayParts(): Array<Record<string, unknown>> {
+    return this.ledgerDisplayParts.map((part) => ({ ...part }));
+  }
+
+  getContextSummary(): NonNullable<LedgerTerminalInput["contextSummary"]> | undefined {
+    return this.latestContextSummary
+      ? {
+          ...this.latestContextSummary,
+          tailMessages: this.latestContextSummary.tailMessages.map((message) => ({ ...message })),
+        }
+      : undefined;
+  }
+
+  recordContextRestore(input: {
+    success: boolean;
+    restoredMessageCount: number;
+    durationMs: number;
+    errorCode?: string;
+  }): void {
+    this.runLog?.recordContextRestore(input);
+  }
+
   async destroy(): Promise<void> {
     await this.runLog?.drain();
     this.unbindAgent();
@@ -219,6 +264,19 @@ export class WebSocketEventRouter {
   private handleEvent(event: AgentEvent): void {
     if (event.sessionId !== this.sessionId) return;
 
+    if (event.type === "context_compacted" && event.contextSummary) {
+      // The websocket route fills in the ledger revision/sequence boundary.
+      // Keep only the bounded private payload here; never forward its body.
+      this.latestContextSummary = {
+        schemaVersion: 1,
+        reason: event.reason,
+        summaryText: event.contextSummary.summaryText,
+        tailMessages: event.contextSummary.tailMessages.map((message) => ({ ...message })),
+        sourceRevision: 0,
+        coveredThroughSequence: 0,
+      };
+    }
+
     if (this.activeMessage?.isCancelled) {
       logger.debug(
         { sessionId: this.sessionId, eventType: event.type },
@@ -228,8 +286,12 @@ export class WebSocketEventRouter {
     }
 
     const messageId = this.activeMessage?.id;
-    this.onActivity?.(event);
-    this.runLog?.recordAgentEvent(event);
+    const runIds = this.getActiveRunIds();
+    const observedEvent: AgentEvent = event.type === "context_compacted"
+      ? { ...event, contextSummary: undefined }
+      : event;
+    this.onActivity?.(observedEvent);
+    this.runLog?.recordAgentEvent(observedEvent);
 
     switch (event.type) {
       case "stream":
@@ -237,6 +299,7 @@ export class WebSocketEventRouter {
           type: "stream",
           id: messageId,
           sessionId: this.sessionId,
+          ...runIds,
           content: event.content,
           done: event.done,
         });
@@ -247,16 +310,25 @@ export class WebSocketEventRouter {
           type: "thought",
           id: messageId,
           sessionId: this.sessionId,
+          ...runIds,
           content: event.content,
           done: event.done,
         });
         break;
 
       case "tool_call":
+        this.ledgerDisplayParts.push({
+          type: "tool",
+          toolCallId: event.toolCallId,
+          title: event.title,
+          kind: event.kind,
+          status: event.status,
+        });
         this.sendMessage({
           type: "tool_call",
           id: messageId,
           sessionId: this.sessionId,
+          ...runIds,
           toolCallId: event.toolCallId,
           title: event.title,
           kind: event.kind,
@@ -266,10 +338,21 @@ export class WebSocketEventRouter {
         break;
 
       case "tool_call_update":
+        this.ledgerDisplayParts = this.ledgerDisplayParts.map((part) =>
+          part.toolCallId === event.toolCallId
+            ? {
+                ...part,
+                status: event.status,
+                durationMs: event.durationMs,
+                errorMessage: event.error?.message,
+              }
+            : part,
+        );
         this.sendMessage({
           type: "tool_call_update",
           id: messageId,
           sessionId: this.sessionId,
+          ...runIds,
           toolCallId: event.toolCallId,
           toolCallStatus: event.status,
           content: event.content,
@@ -281,10 +364,12 @@ export class WebSocketEventRouter {
         break;
 
       case "plan":
+        this.ledgerDisplayParts.push({ type: "plan", content: event.content.slice(0, 8_000) });
         this.sendMessage({
           type: "plan",
           id: messageId,
           sessionId: this.sessionId,
+          ...runIds,
           content: event.content,
         });
         break;
@@ -294,6 +379,7 @@ export class WebSocketEventRouter {
           type: "error",
           id: messageId,
           sessionId: this.sessionId,
+          ...runIds,
           error: event.error,
         });
         break;
@@ -303,6 +389,7 @@ export class WebSocketEventRouter {
           type: "status",
           id: messageId,
           sessionId: this.sessionId,
+          ...runIds,
           status: event.status,
         });
         break;
@@ -312,6 +399,7 @@ export class WebSocketEventRouter {
           type: "context_compacted",
           id: messageId,
           sessionId: this.sessionId,
+          ...runIds,
           contextCompaction: {
             reason: event.reason,
             tokensBefore: event.tokensBefore,
@@ -326,6 +414,7 @@ export class WebSocketEventRouter {
           type: "run_summary",
           id: messageId,
           sessionId: this.sessionId,
+          ...runIds,
           runSummary: event.runSummary,
         });
         break;
@@ -342,6 +431,7 @@ export class WebSocketEventRouter {
           type: "permission_request",
           id: messageId,
           sessionId: this.sessionId,
+          ...runIds,
           permissionRequest: event.permissionRequest,
         });
         break;
@@ -358,6 +448,7 @@ export class WebSocketEventRouter {
           type: "user_choice_request",
           id: messageId,
           sessionId: this.sessionId,
+          ...runIds,
           userChoiceRequest: event.userChoiceRequest,
         });
         break;

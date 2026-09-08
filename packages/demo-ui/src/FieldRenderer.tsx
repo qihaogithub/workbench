@@ -22,7 +22,7 @@ import { CascadeSelect } from "./CascadeSelect";
 import { OptionGroup } from "./OptionGroup";
 import type { FieldConfig } from "./schema-parser";
 import { createContext, useContext } from "react";
-import { Check, Edit3, FileText, MessageSquare, Pencil } from "lucide-react";
+import { Check, Edit3, FileText, Globe2, MessageSquare, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,7 +39,17 @@ import {
 import type { ConfigBreadcrumb, ConfigChangeMeta, ConfigCommentTarget, ConfigItemCapabilities, ConfigItemDetailHandler, DesignSpecEntryLink, ImageConfigScope, WhiteboardLauncher } from "./types";
 import { ImageInputActions } from "./ImageInputActions";
 import { localizeRemoteImageForSession } from "./markdown/remote-image-localizer";
-import { ColorPicker, type ColorPickerFormat, type ColorPreset } from "@workbench/color-picker";
+import {
+  ColorPicker,
+  type ColorPickerFormat,
+  type ColorPreset,
+} from "@workbench/color-picker";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export interface PositionFieldEntry {
   instanceId: string;
@@ -128,6 +138,7 @@ export function FieldRenderer({
   onItemDetailInvalidated,
   breadcrumb,
   arrayDepth,
+  projectSharedSourceHint = false,
 }: {
   field: FieldConfig;
   value: unknown;
@@ -163,9 +174,11 @@ export function FieldRenderer({
   onItemDetailInvalidated?: (itemId: string) => void;
   breadcrumb?: ConfigBreadcrumb[];
   arrayDepth?: number;
+  /** 仅顶层项目配置字段使用；数组子字段不继承该提示。 */
+  projectSharedSourceHint?: boolean;
 }) {
   const canEditValue = !readonly && (configItemCapabilities?.canEditValue ?? true);
-  const canEditDefinition = !readonly && !field.isConst
+  const canEditDefinition = !readonly && !field.isConst && (!schemaFieldPath || schemaFieldPath === field.key)
     && (configItemCapabilities?.canEditDefinition ?? Boolean(onEditConfigDefinition));
   // A read-only host still needs the entry point to inspect existing threads;
   // the popover controller owns whether write controls are available.
@@ -754,6 +767,25 @@ export function FieldRenderer({
               >
                 <FileText className="h-3 w-3" />规范
               </button>
+            )}
+            {projectSharedSourceHint && !embedded && (
+              <TooltipProvider delayDuration={250}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      tabIndex={0}
+                      role="img"
+                      aria-label={`项目共享配置：${field.title}`}
+                      className="inline-flex shrink-0 items-center text-foreground/25 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
+                    >
+                      <Globe2 aria-hidden="true" className="h-3 w-3" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={6}>
+                    项目共享配置
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
             {shouldRenderCommentTag && onAddConfigComment && (
               <div className={cn("flex shrink-0 items-center transition-opacity", commentTagVisibilityClassName)}>

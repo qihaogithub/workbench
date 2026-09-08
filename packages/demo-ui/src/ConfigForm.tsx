@@ -13,7 +13,10 @@ import {
 } from "./schema-parser";
 import { getPageTypeLimits } from "./type-limits-store";
 import { FieldRenderer, PositionConfigContext, type PositionConfigContextValue, type PositionFieldEntry } from "./FieldRenderer";
-import { configFieldMatchesCategoryFilter } from "./config-categories";
+import {
+  configFieldMatchesCategoryFilter,
+  configFieldMatchesTypeFilter,
+} from "./config-categories";
 import { getPreviewSize } from "./validator";
 import { isAtomicConfigField } from "@workbench/shared";
 
@@ -133,6 +136,8 @@ function FieldGroupSection({
   onItemDetailInvalidated,
   breadcrumb,
   arrayDepth,
+  projectSharedSourceHint,
+  hideGroupTitles,
 }: {
   group: FieldGroup;
   formData: Record<string, unknown>;
@@ -161,8 +166,10 @@ function FieldGroupSection({
   onItemDetailInvalidated?: (itemId: string) => void;
   breadcrumb?: ConfigBreadcrumb[];
   arrayDepth?: number;
+  projectSharedSourceHint?: boolean;
+  hideGroupTitles?: boolean;
 }) {
-  if (group.title === "") {
+  if (group.title === "" || hideGroupTitles) {
     return (
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-5">
@@ -197,6 +204,7 @@ function FieldGroupSection({
               onItemDetailInvalidated={onItemDetailInvalidated}
               breadcrumb={breadcrumb}
               arrayDepth={arrayDepth}
+              projectSharedSourceHint={projectSharedSourceHint}
             />
           ))}
         </div>
@@ -241,6 +249,7 @@ function FieldGroupSection({
             onItemDetailInvalidated={onItemDetailInvalidated}
             breadcrumb={breadcrumb}
             arrayDepth={arrayDepth}
+            projectSharedSourceHint={projectSharedSourceHint}
           />
         ))}
       </div>
@@ -256,6 +265,9 @@ export function ConfigForm({
   readonly,
   sessionId,
   configCategoryFilter,
+  configTypeFilter,
+  hideGroupTitles,
+  projectSharedSourceHint,
   typeLimits,
   className,
   onEnterPositionEdit,
@@ -318,11 +330,12 @@ export function ConfigForm({
           ...group,
           fields: group.fields.filter((field) =>
             isFieldVisible(field, effectiveFormData) &&
-            configFieldMatchesCategoryFilter(field, configCategoryFilter),
+            configFieldMatchesCategoryFilter(field, configCategoryFilter) &&
+            configFieldMatchesTypeFilter(field, configTypeFilter),
           ),
         }))
         .filter((group) => group.fields.length > 0),
-    [fieldGroups, effectiveFormData, configCategoryFilter],
+    [fieldGroups, effectiveFormData, configCategoryFilter, configTypeFilter],
   );
 
   const previewSize = useMemo(() => {
@@ -458,9 +471,9 @@ export function ConfigForm({
         </div>
         <p className="text-sm text-muted-foreground">暂无配置项</p>
         <p className="text-xs text-muted-foreground/70 mt-1">
-          {!configCategoryFilter
+          {!configCategoryFilter && !configTypeFilter
             ? "请检查 Schema 格式是否正确"
-            : "当前分类下没有可配置字段"}
+            : "当前筛选条件下没有可配置字段"}
         </p>
       </div>
     );
@@ -498,6 +511,8 @@ export function ConfigForm({
                 activeItemDetailId={activeItemDetailId}
                 activeItemDetailFieldPath={activeItemDetailFieldPath}
                 onItemDetailInvalidated={onItemDetailInvalidated}
+                projectSharedSourceHint={projectSharedSourceHint}
+                hideGroupTitles={hideGroupTitles}
               />
             </div>
           ))}

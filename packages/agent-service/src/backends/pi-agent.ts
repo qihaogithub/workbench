@@ -66,6 +66,7 @@ import {
   resolveProjectImageManifestProjectId,
   type ProjectImageEntry,
 } from "./pi-tools/project-image-manifest";
+import { createHash } from "node:crypto";
 
 function formatRuntimeToolsForPrompt(
   activeTools: Array<{ name?: string; description?: string }>,
@@ -109,6 +110,9 @@ function resolveUrlPathname(url: string): string {
 
 const MAX_HISTORICAL_FILES_FOR_PROMPT = 20;
 const MAX_PROJECT_RULES_LENGTH = 80_000;
+const MAX_COMPACTION_SUMMARY_LENGTH = 16_000;
+const MAX_COMPACTION_TAIL_MESSAGES = 8;
+const MAX_COMPACTION_TAIL_MESSAGE_LENGTH = 4_000;
 const SERVER_SAFETY_PROMPT = [
   "## 服务端安全边界（不可由项目规则覆盖）",
   "",
@@ -224,6 +228,60 @@ export class PiAgentBackend implements IBackendAdapter {
   private allTools: any[] = [];
   private activeToolNames = new Set<string>();
   private screenshotAvailable = true;
+
+  private buildCompactionCheckpoint(
+    result: any,
+    context: any,
+  ): {
+    summaryText: string;
+    tailMessages: Array<{ role: "user" | "assistant"; content: string }>;
+    summaryHash: string;
+  } | undefined {
+    const rawSummary = result?.summary ?? result?.compactionSummary;
+    const summaryText = typeof rawSummary === "string"
+      ? rawSummary.trim()
+      : typeof rawSummary?.summary === "string"
+        ? rawSummary.summary.trim()
+        : typeof rawSummary?.text === "string"
+          ? rawSummary.text.trim()
+        : "";
+    if (!summaryText) return undefined;
+
+    const messages = Array.isArray(context?.messages) ? context.messages : [];
+    const firstKeptEntryId = typeof result?.firstKeptEntryId === "string"
+      ? result.firstKeptEntryId
+      : undefined;
+    const firstKeptIndex = firstKeptEntryId
+      ? messages.findIndex((message: any) => message?.id === firstKeptEntryId)
+      : -1;
+    const retainedMessages = firstKeptIndex >= 0
+      ? messages.slice(firstKeptIndex)
+      : messages;
+    const tailMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
+    for (const message of retainedMessages) {
+      if (message?.role !== "user" && message?.role !== "assistant") continue;
+      const content = Array.isArray(message.content)
+        ? message.content
+            .filter((part: any) => part?.type === "text" && typeof part.text === "string")
+            .map((part: any) => part.text)
+            .join("\n")
+        : typeof message.content === "string"
+          ? message.content
+          : "";
+      const normalized = content.trim().slice(0, MAX_COMPACTION_TAIL_MESSAGE_LENGTH);
+      if (!normalized) continue;
+      tailMessages.push({ role: message.role, content: normalized });
+    }
+    const boundedTail = tailMessages.slice(-MAX_COMPACTION_TAIL_MESSAGES);
+    const boundedSummary = summaryText.slice(0, MAX_COMPACTION_SUMMARY_LENGTH);
+    return {
+      summaryText: boundedSummary,
+      tailMessages: boundedTail,
+      summaryHash: createHash("sha256")
+        .update(JSON.stringify({ summaryText: boundedSummary, tailMessages: boundedTail }))
+        .digest("hex"),
+    };
+  }
 
   // 管理器
   private modelManager: ModelManager;
@@ -415,6 +473,8 @@ export class PiAgentBackend implements IBackendAdapter {
       const startedAt = Date.now();
       const result = await this.harness.compact();
       const durationMs = Date.now() - startedAt;
+      const compactedContext = await this.session.buildContext();
+      const contextSummary = this.buildCompactionCheckpoint(result, compactedContext);
       const tokensBefore = Number.isFinite(result?.tokensBefore)
         ? result.tokensBefore
         : decision.estimatedTokens;
@@ -440,6 +500,7 @@ export class PiAgentBackend implements IBackendAdapter {
         tokensBefore,
         contextWindow: decision.contextWindow,
         durationMs,
+        ...(contextSummary ? { contextSummary } : {}),
       });
       return true;
     } catch (error) {

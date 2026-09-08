@@ -3,6 +3,7 @@ import {
   createApiSuccess,
   createApiError,
   getSessionPath,
+  getSessionMeta,
   sessionExists,
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
@@ -35,6 +36,10 @@ export async function PATCH(
       return NextResponse.json(createApiError("SESSION_NOT_FOUND"), {
         status: 404,
       });
+    }
+    const ownerMeta = getSessionMeta(sessionId);
+    if (!ownerMeta?.userId || ownerMeta.userId !== payload.userId) {
+      return NextResponse.json(createApiError("FORBIDDEN", "无权修改该 Session"), { status: 403 });
     }
 
     const updates = await request.json();

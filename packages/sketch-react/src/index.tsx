@@ -51,6 +51,10 @@ import {
   Square,
   StickyNote,
   SlidersHorizontal,
+  Sparkles,
+  Upload,
+  Settings2,
+  X,
   Trash2,
   Type,
   Ungroup,
@@ -108,6 +112,11 @@ import type {
   SketchEditorToolbarProps,
   SketchLayerPanelProps,
   InlineTextSelectionState,
+  SketchImageGenerationAdapter,
+  SketchImageGenerationCapabilities,
+  SketchImageGenerationOption,
+  SketchImageReferenceInput,
+  SketchGeneratedImage,
 } from "./types";
 import { resolveSketchEditorProfile } from "./types";
 import {
@@ -4723,7 +4732,7 @@ function SketchBrushToolbarGroup({
   );
 }
 
-export function SketchEditorToolbar({ scene: _scene, controller, configData: _configData = {}, className, allowedTools, brushToolbarMode = "individual", onImageUpload }: SketchEditorToolbarProps) {
+export function SketchEditorToolbar({ scene: _scene, controller, configData: _configData = {}, className, allowedTools, brushToolbarMode = "individual", onImageUpload, onImageMenu }: SketchEditorToolbarProps) {
   const toolButtonClass =
     "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-35";
   const actionButtonClass =
@@ -4759,7 +4768,8 @@ export function SketchEditorToolbar({ scene: _scene, controller, configData: _co
               )}
               onClick={() => {
                 if (item.tool === "image") {
-                  onImageUpload();
+                  if (onImageMenu) onImageMenu();
+                  else onImageUpload();
                   return;
                 }
                 controller.setTool(item.tool);
@@ -6960,6 +6970,619 @@ function BadgeLike({ children }: { children: React.ReactNode }) {
   );
 }
 
+interface SketchImageGenerationFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const UNAVAILABLE_IMAGE_CAPABILITIES: SketchImageGenerationCapabilities = {
+  enabled: false,
+  unavailableReason: "正在读取 AI 绘图能力…",
+  qualities: [],
+  sizes: [],
+  maxImages: 1,
+  maxReferences: 0,
+  supportsReferences: false,
+};
+
+function getImageGenerationFrames(
+  count: number,
+  center: { x: number; y: number },
+  sourceWidth: number,
+  sourceHeight: number,
+): SketchImageGenerationFrame[] {
+  const scale = Math.min(1, 480 / Math.max(1, sourceWidth, sourceHeight));
+  const width = Math.round(Math.max(1, sourceWidth) * scale);
+  const height = Math.round(Math.max(1, sourceHeight) * scale);
+  const columns = count <= 2 ? count : 2;
+  const rows = Math.ceil(count / columns);
+  const gap = 24;
+  const totalWidth = columns * width + (columns - 1) * gap;
+  const totalHeight = rows * height + (rows - 1) * gap;
+  const startX = Math.max(0, center.x - totalWidth / 2);
+  const startY = Math.max(0, center.y - totalHeight / 2);
+  return Array.from({ length: count }, (_, index) => ({
+    x: Math.round(startX + (index % columns) * (width + gap)),
+    y: Math.round(startY + Math.floor(index / columns) * (height + gap)),
+    width,
+    height,
+  }));
+}
+
+function SketchImageGenerationPanel({
+  scene,
+  configData,
+  controller,
+  adapter,
+  getViewportCenter,
+  onTransientNodesChange,
+  onClose,
+}: {
+  scene: SketchSceneDocument;
+  configData: Record<string, unknown>;
+  controller: SketchEditorController;
+  adapter: SketchImageGenerationAdapter;
+  getViewportCenter: () => { x: number; y: number };
+  onTransientNodesChange: (nodes: readonly SketchSceneNode[]) => void;
+  onClose: () => void;
+}) {
+  const [prompt, setPrompt] = React.useState("");
+  const [count, setCount] = React.useState(1);
+  const [qualityId, setQualityId] = React.useState("");
+  const [sizeId, setSizeId] = React.useState("");
+  const [imageWidth, setImageWidth] = React.useState(1024);
+  const [imageHeight, setImageHeight] = React.useState(1024);
+  const [locked, setLocked] = React.useState(true);
+  const [references, setReferences] = React.useState<SketchImageReferenceInput[]>([]);
+  const [caps, setCaps] = React.useState<SketchImageGenerationCapabilities>(UNAVAILABLE_IMAGE_CAPABILITIES);
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [picking, setPicking] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const abortRef = React.useRef<AbortController | null>(null);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    void Promise.resolve(adapter.getCapabilities?.(controller.signal))
+      .then((next) => {
+        if (!next || controller.signal.aborted) return;
+        setCaps(next);
+        const quality = next.qualities.find((option) => option.enabled !== false);
+        const size = next.sizes.find((option) => option.enabled !== false);
+        if (quality) setQualityId(quality.id);
+        if (size) {
+          setSizeId(size.id);
+          if (size.width && size.height) {
+            setImageWidth(size.width);
+            setImageHeight(size.height);
+          }
+        }
+        setCount((current) => Math.min(current, Math.max(1, next.maxImages)));
+      })
+      .catch((cause) => {
+        if (controller.signal.aborted) return;
+        setCaps({
+          ...UNAVAILABLE_IMAGE_CAPABILITIES,
+          unavailableReason: cause instanceof Error ? cause.message : "AI 绘图能力读取失败",
+        });
+      });
+    return () => controller.abort();
+  }, [adapter]);
+
+  React.useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      onTransientNodesChange([]);
+    },
+    [onTransientNodesChange],
+  );
+
+  React.useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      if (settingsOpen) setSettingsOpen(false);
+      else if (picking) setPicking(false);
+      else if (busy) abortRef.current?.abort();
+      else onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [busy, onClose, picking, settingsOpen]);
+
+  const selectedSize = caps.sizes.find((option) => option.id === sizeId);
+  const selectedQuality = caps.qualities.find((option) => option.id === qualityId);
+  const maxReferences = Math.min(4, Math.max(0, caps.maxReferences));
+  const canAddReference = caps.supportsReferences && references.length < maxReferences && !busy;
+  const canvasImages = scene.nodes.flatMap((node) => {
+    if (node.type !== "image" || !isNodeVisibleForConfig(node, configData)) return [];
+    const src = resolveSketchSceneBindingValue(node, "src", node.src ?? "", configData);
+    return typeof src === "string" && src.trim() ? [{ node, src }] : [];
+  });
+
+  React.useEffect(() => {
+    if (!picking) return;
+    const selectedId = controller.selection.nodeIds.at(-1);
+    const selected = canvasImages.find(({ node }) => node.id === selectedId);
+    if (!selected) return;
+    setReferences((current) => current.some((reference) => reference.id === selected.node.id)
+      ? current
+      : [...current, { id: selected.node.id, src: selected.src, name: selected.node.name }].slice(0, maxReferences));
+    setPicking(false);
+  }, [canvasImages, controller.selection.nodeIds, maxReferences, picking]);
+
+  const chooseSize = (option: SketchImageGenerationOption) => {
+    if (option.enabled === false) return;
+    setSizeId(option.id);
+    if (option.width && option.height) {
+      setImageWidth(option.width);
+      setImageHeight(option.height);
+    }
+  };
+
+  const addReferenceFile = (file: File) => {
+    if (!canAddReference || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") return;
+      setReferences((current) =>
+        [
+          ...current,
+          {
+            id: "upload-" + Date.now() + "-" + Math.random().toString(36).slice(2),
+            src: reader.result as string,
+            name: file.name,
+            file,
+          },
+        ].slice(0, maxReferences),
+      );
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const moveReference = (index: number, direction: -1 | 1) => {
+    setReferences((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const createPlaceholders = (frames: readonly SketchImageGenerationFrame[]): SketchSceneNode[] => {
+    const topZIndex =
+      scene.nodes.reduce(
+        (highest, node) => Math.max(highest, Number.isFinite(node.zIndex) ? (node.zIndex ?? 0) : 0),
+        0,
+      ) + 1;
+    return frames.map((frame, index) => {
+      const node = createNodeAtPoint("rect", {
+        x: frame.x + frame.width / 2,
+        y: frame.y + frame.height / 2,
+      });
+      return {
+        ...node,
+        id: "ai-image-placeholder-" + index,
+        name: "AI 图片生成中",
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height,
+        zIndex: topZIndex + index,
+        locked: true,
+        style: {
+          ...node.style,
+          fill: "#F5F3FF",
+          stroke: "#A78BFA",
+          strokeWidth: 2,
+          radius: 16,
+        },
+      };
+    });
+  };
+
+  const insertResults = (items: readonly SketchGeneratedImage[], frames: readonly SketchImageGenerationFrame[]) => {
+    const nodes = items.map((item, index) => {
+      const frame = frames[index];
+      const node = createNodeAtPoint("image", {
+        x: frame.x + frame.width / 2,
+        y: frame.y + frame.height / 2,
+      });
+      return {
+        ...node,
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height,
+        src: item.src,
+        alt: (item.alt ?? prompt.slice(0, 120)) || "AI 生成图片",
+        name: "AI 生成图片",
+        ...(item.width && item.height ? { intrinsicWidth: item.width, intrinsicHeight: item.height } : {}),
+        style: { ...node.style, imageFit: "contain" as const },
+      };
+    });
+    controller.applyOperations(nodes.map((node) => ({ op: "add" as const, node })));
+    controller.setNodeIds(nodes.map((node) => node.id));
+  };
+
+  const generate = async () => {
+    const cleanPrompt = prompt.trim();
+    if (!cleanPrompt || busy || !caps.enabled) return;
+    if (!qualityId || !sizeId) {
+      setError("当前模型没有可用的质量或尺寸选项");
+      return;
+    }
+    if (references.length && !caps.supportsReferences) {
+      setError("当前模型不支持参考图，请移除参考图后重试");
+      return;
+    }
+    const requestedCount = Math.min(count, caps.maxImages);
+    const width = caps.allowCustomSize ? imageWidth : (selectedSize?.width ?? imageWidth);
+    const height = caps.allowCustomSize ? imageHeight : (selectedSize?.height ?? imageHeight);
+    const frames = getImageGenerationFrames(requestedCount, getViewportCenter(), width, height);
+    onTransientNodesChange(createPlaceholders(frames));
+    setBusy(true);
+    setError(null);
+    const abort = new AbortController();
+    abortRef.current = abort;
+    try {
+      const preparedReferences = adapter.prepareReference
+        ? await Promise.all(references.map((reference) => adapter.prepareReference!(reference, abort.signal)))
+        : references;
+      if (abort.signal.aborted) return;
+      const result = await adapter.generate(
+        {
+          prompt: cleanPrompt,
+          count: requestedCount,
+          qualityId,
+          sizeId,
+          ...(caps.allowCustomSize ? { width, height } : {}),
+          references: preparedReferences,
+        },
+        abort.signal,
+      );
+      if (abort.signal.aborted) return;
+      if (result.length !== requestedCount) {
+        throw new Error("生成结果数量不完整，请重试");
+      }
+      insertResults(result, frames);
+      onClose();
+    } catch (cause) {
+      if (!abort.signal.aborted) {
+        setError(cause instanceof Error ? cause.message : "生成失败，请稍后重试");
+      }
+    } finally {
+      onTransientNodesChange([]);
+      setBusy(false);
+      abortRef.current = null;
+    }
+  };
+
+  const closeOrCancel = () => {
+    if (busy) abortRef.current?.abort();
+    else onClose();
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="AI 绘图"
+      data-testid="sketch-ai-image-panel"
+      className="pointer-events-auto absolute bottom-20 left-1/2 z-40 max-h-[calc(100vh-104px)] w-[min(460px,calc(100vw-24px))] -translate-x-1/2 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 text-slate-900 shadow-2xl"
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold">AI 绘图</h2>
+          <p className="text-xs text-slate-500">描述画面，可添加最多 {maxReferences} 张参考图</p>
+        </div>
+        <button
+          type="button"
+          aria-label={busy ? "取消并保留设置" : "关闭 AI 绘图"}
+          className="cursor-pointer rounded-lg p-2 text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+          onClick={closeOrCancel}
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+
+      {!caps.enabled ? (
+        <p role="status" className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {caps.unavailableReason || "当前 AI 绘图服务不可用"}
+        </p>
+      ) : null}
+
+      {references.length ? (
+        <div className="mb-3 flex gap-2 overflow-x-auto" aria-label="参考图列表">
+          {references.map((reference, index) => {
+            const label = reference.name || "参考图 " + (index + 1);
+            return (
+              <div
+                key={reference.id}
+                className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200"
+              >
+                <img src={reference.src} alt={label} className="h-full w-full object-cover" />
+                <div className="absolute inset-x-0 bottom-0 flex justify-center gap-0.5 bg-black/55 p-0.5 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                  <button
+                    type="button"
+                    aria-label={"前移" + label}
+                    disabled={index === 0 || busy}
+                    className="rounded px-1 text-xs text-white disabled:opacity-30"
+                    onClick={() => moveReference(index, -1)}
+                  >
+                    ←
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={"后移" + label}
+                    disabled={index === references.length - 1 || busy}
+                    className="rounded px-1 text-xs text-white disabled:opacity-30"
+                    onClick={() => moveReference(index, 1)}
+                  >
+                    →
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={"移除" + label}
+                    disabled={busy}
+                    className="rounded px-1 text-xs text-white"
+                    onClick={() => setReferences((current) => current.filter((item) => item.id !== reference.id))}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <textarea
+        autoFocus
+        value={prompt}
+        maxLength={caps.maxPromptLength ?? 10_000}
+        disabled={busy}
+        onChange={(event) => setPrompt(event.target.value)}
+        placeholder="描述你想生成的图片…"
+        className="min-h-28 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-200 disabled:opacity-60"
+      />
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={!canAddReference}
+          title={!caps.supportsReferences ? "当前模型不支持参考图" : undefined}
+          className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
+          onClick={() => fileRef.current?.click()}
+        >
+          <Upload className="h-3.5 w-3.5" />
+          添加参考图
+        </button>
+        <button
+          type="button"
+          disabled={!canAddReference || !canvasImages.length}
+          className={cn(
+            "cursor-pointer rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-40",
+            picking && "border-violet-400 bg-violet-50",
+          )}
+          onClick={() => {
+            if (picking) setPicking(false);
+            else {
+              controller.clearSelection();
+              setPicking(true);
+            }
+          }}
+        >
+          从画布选取
+        </button>
+        <button
+          type="button"
+          className={cn(
+            "ml-auto inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500",
+            settingsOpen && "bg-slate-100",
+          )}
+          onClick={() => setSettingsOpen((value) => !value)}
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+          图像设置
+        </button>
+      </div>
+
+      {!caps.supportsReferences && caps.enabled ? (
+        <p className="mt-2 text-xs text-slate-500">当前模型仅支持文生图，参考图入口已停用。</p>
+      ) : null}
+
+      {picking ? (
+        <div className="mt-2 rounded-lg bg-slate-50 p-2">
+          <p className="mb-2 text-xs text-slate-500">在画布或下方缩略图中选择一张可见图片，选择后自动返回；按 Esc 取消。</p>
+          <div className="flex max-h-24 gap-2 overflow-auto">
+            {canvasImages.map(({ node, src }) => (
+              <button
+                type="button"
+                key={node.id}
+                className="h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded border-2 border-transparent hover:border-violet-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                onClick={() => {
+                  if (!references.some((reference) => reference.id === node.id)) {
+                    setReferences((current) =>
+                      [
+                        ...current,
+                        {
+                          id: node.id,
+                          src,
+                          name: node.name,
+                        },
+                      ].slice(0, maxReferences),
+                    );
+                  }
+                  setPicking(false);
+                }}
+              >
+                <img src={src} alt={node.name ?? "画布图片"} className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {settingsOpen ? (
+        <div
+          role="dialog"
+          aria-label="图像设置"
+          className="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-lg"
+        >
+          <div className="mb-2 text-xs font-semibold">质量</div>
+          <div className="flex flex-wrap gap-1">
+            {caps.qualities.map((option) => (
+              <button
+                type="button"
+                key={option.id}
+                disabled={option.enabled === false || busy}
+                title={option.unavailableReason}
+                className={cn(
+                  "min-w-16 flex-1 cursor-pointer rounded-lg border px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40",
+                  qualityId === option.id ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:bg-slate-50",
+                )}
+                onClick={() => setQualityId(option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="mb-2 mt-3 text-xs font-semibold">尺寸 / 比例</div>
+          <div className="mb-2 flex items-center gap-1">
+            <input
+              aria-label="宽度"
+              type="number"
+              min="64"
+              max="4096"
+              value={imageWidth}
+              disabled={!caps.allowCustomSize || busy}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                const ratio = imageWidth > 0 ? imageHeight / imageWidth : 1;
+                setImageWidth(value);
+                if (locked) {
+                  setImageHeight(Math.max(64, Math.round(value * ratio)));
+                }
+              }}
+              className="min-w-0 flex-1 rounded border bg-slate-50 px-2 py-1.5 text-xs disabled:text-slate-500"
+            />
+            <button
+              type="button"
+              aria-label="锁定宽高比例"
+              disabled={!caps.allowCustomSize || busy}
+              className={cn("rounded p-1.5 disabled:opacity-40", locked ? "text-violet-600" : "text-slate-400")}
+              onClick={() => setLocked((value) => !value)}
+            >
+              <Link2 className="h-3.5 w-3.5" />
+            </button>
+            <input
+              aria-label="高度"
+              type="number"
+              min="64"
+              max="4096"
+              value={imageHeight}
+              disabled={!caps.allowCustomSize || busy}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                const ratio = imageHeight > 0 ? imageWidth / imageHeight : 1;
+                setImageHeight(value);
+                if (locked) {
+                  setImageWidth(Math.max(64, Math.round(value * ratio)));
+                }
+              }}
+              className="min-w-0 flex-1 rounded border bg-slate-50 px-2 py-1.5 text-xs disabled:text-slate-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+            {caps.sizes.map((option) => (
+              <button
+                type="button"
+                key={option.id}
+                disabled={option.enabled === false || busy}
+                title={option.unavailableReason}
+                className={cn(
+                  "cursor-pointer rounded-lg border px-1 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-40",
+                  sizeId === option.id ? "border-slate-900 bg-slate-50" : "border-slate-200 hover:bg-slate-50",
+                )}
+                onClick={() => chooseSize(option)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-slate-500">
+            仅提供当前模型原生支持的尺寸；不通过裁切或拉伸伪造 2K / 4K。
+          </p>
+        </div>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <label className="text-xs text-slate-500" htmlFor="sketch-image-count">
+          数量
+        </label>
+        <select
+          id="sketch-image-count"
+          value={count}
+          disabled={busy}
+          onChange={(event) => setCount(Number(event.target.value))}
+          className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+          aria-label="生成数量"
+        >
+          {[1, 2, 3, 4]
+            .filter((value) => value <= Math.max(1, caps.maxImages))
+            .map((value) => (
+              <option key={value} value={value}>
+                {value} 张
+              </option>
+            ))}
+        </select>
+        <span className="text-xs text-slate-400">
+          {(selectedQuality?.label || "—") + " · " + (selectedSize?.label || "—")}
+        </span>
+        <button
+          type="button"
+          disabled={!busy && (!caps.enabled || !prompt.trim() || !qualityId || !sizeId)}
+          onClick={busy ? () => abortRef.current?.abort() : generate}
+          className={cn(
+            "ml-auto cursor-pointer rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:cursor-not-allowed disabled:opacity-40",
+            busy && "animate-pulse motion-reduce:animate-none",
+          )}
+        >
+          {busy ? "取消生成" : "开始生成"}
+        </button>
+      </div>
+      <span className="sr-only" aria-live="polite">
+        {busy ? "正在生成图片，临时占位已显示在白板视口中心" : ""}
+      </span>
+      {error ? (
+        <p role="alert" className="mt-2 text-xs text-red-600">
+          {error}
+        </p>
+      ) : null}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const available = maxReferences - references.length;
+          Array.from(event.target.files ?? [])
+            .slice(0, available)
+            .forEach(addReferenceFile);
+          event.currentTarget.value = "";
+        }}
+      />
+    </div>
+  );
+}
+
+
 export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, SketchEditorCanvasProps>(function SketchEditorCanvas({
   scene,
   controller,
@@ -6969,6 +7592,7 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
   autoFitToContent = false,
   fillContainer = false,
   mode = "edit",
+  transientNodes = [],
   className,
   onViewportChange,
 }: SketchEditorCanvasProps, ref) {
@@ -7157,9 +7781,12 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
         ) + 1,
       }
     : null;
-  const previewScene = previewDrawingNode
+  const draftPreviewScene = previewDrawingNode
     ? { ...inlineTextPreviewScene, nodes: [...inlineTextPreviewScene.nodes, previewDrawingNode] }
     : inlineTextPreviewScene;
+  const previewScene = transientNodes.length
+    ? { ...draftPreviewScene, nodes: [...draftPreviewScene.nodes, ...transientNodes] }
+    : draftPreviewScene;
   const connectorCandidatePoints = getConnectorCandidatePoints(scene, dragStart, configData);
   const snapGuides = getSketchSnapGuides(scene, dragStart, configData);
   const dragModifierHint = dragStart && dragStart.kind !== "rotate"
@@ -8107,8 +8734,8 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
     const container = containerRef.current;
     return clampScenePoint(
       {
-        x: ((container?.clientWidth ?? width) / 2 - viewport.offsetX) / viewport.scale,
-        y: ((container?.clientHeight ?? height) / 2 - viewport.offsetY) / viewport.scale,
+        x: (((container?.clientWidth || width) / 2) - viewport.offsetX) / viewport.scale,
+        y: (((container?.clientHeight || height) / 2) - viewport.offsetY) / viewport.scale,
       },
       scene,
     );
@@ -8147,7 +8774,11 @@ export const SketchEditorCanvas = React.forwardRef<SketchEditorCanvasHandle, Ske
   }, [getViewportCenterScenePoint, mode, requestImageFileImport]);
 
   imageUploadActionRef.current = openImageFilePicker;
-  React.useImperativeHandle(ref, () => ({ openImageFilePicker }), [openImageFilePicker]);
+  React.useImperativeHandle(
+    ref,
+    () => ({ openImageFilePicker, getViewportCenterScenePoint }),
+    [getViewportCenterScenePoint, openImageFilePicker],
+  );
 
   const getImageReplaceTargetId = React.useCallback(
     (target: Element | null, point?: { x: number; y: number }): string | null => {
@@ -10586,6 +11217,7 @@ export function SketchEditorSurface({
   className,
   onSceneChange,
   onSelectionChange,
+  imageGeneration,
   onViewportChange,
 }: SketchEditorSurfaceProps) {
   const profileConfig = resolveSketchEditorProfile(profile);
@@ -10596,9 +11228,33 @@ export function SketchEditorSurface({
   const parsedScene = parsedSceneState.scene;
   const controller = useSketchEditorState(parsedScene, onSceneChange, onSelectionChange, configData, resolvedCreationTools);
   const canvasRef = React.useRef<SketchEditorCanvasHandle>(null);
+  const [imageMenuOpen, setImageMenuOpen] = React.useState(false);
+  const [imagePanelOpen, setImagePanelOpen] = React.useState(false);
+  const [transientImageNodes, setTransientImageNodes] = React.useState<readonly SketchSceneNode[]>([]);
   const openImageFilePicker = React.useCallback(() => {
+    setImageMenuOpen(false);
     canvasRef.current?.openImageFilePicker();
   }, []);
+  const closeImagePanel = React.useCallback(() => {
+    setTransientImageNodes([]);
+    setImagePanelOpen(false);
+  }, []);
+  const getViewportCenter = React.useCallback(
+    () => canvasRef.current?.getViewportCenterScenePoint() ?? {
+      x: parsedScene.pageSize.width / 2,
+      y: parsedScene.pageSize.height / 2,
+    },
+    [parsedScene.pageSize.height, parsedScene.pageSize.width],
+  );
+
+  React.useEffect(() => {
+    if (!imageMenuOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setImageMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [imageMenuOpen]);
 
   if (parsedSceneState.error) {
     return (
@@ -10619,8 +11275,17 @@ export function SketchEditorSurface({
         autoFitToContent={autoFitToContent}
         fillContainer={fillContainer}
         className="h-full"
+        transientNodes={transientImageNodes}
         onViewportChange={onViewportChange}
       />
+      {imageMenuOpen ? (
+        <button
+          type="button"
+          aria-label="关闭图片工具菜单"
+          className="absolute inset-0 z-10 cursor-default"
+          onClick={() => setImageMenuOpen(false)}
+        />
+      ) : null}
       <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
         <SketchEditorToolbar
           scene={parsedScene}
@@ -10629,8 +11294,51 @@ export function SketchEditorSurface({
           allowedTools={resolvedVisibleTools}
           brushToolbarMode={resolvedBrushToolbarMode}
           onImageUpload={openImageFilePicker}
+          onImageMenu={() => setImageMenuOpen((value) => !value)}
           className="pointer-events-auto"
         />
+        {imageMenuOpen ? (
+          <div
+            role="menu"
+            aria-label="图片工具菜单"
+            className="pointer-events-auto absolute bottom-14 left-1/2 w-44 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+              onClick={openImageFilePicker}
+            >
+              <Upload className="h-4 w-4" />
+              上传图片
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={!imageGeneration}
+              title={!imageGeneration ? "宿主未提供 AI 绘图能力" : undefined}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-40"
+              onClick={() => {
+                setImageMenuOpen(false);
+                setImagePanelOpen(true);
+              }}
+            >
+              <Sparkles className="h-4 w-4" />
+              AI 绘图
+            </button>
+          </div>
+        ) : null}
+        {imagePanelOpen && imageGeneration ? (
+          <SketchImageGenerationPanel
+            scene={parsedScene}
+            configData={configData}
+            controller={controller}
+            adapter={imageGeneration}
+            getViewportCenter={getViewportCenter}
+            onTransientNodesChange={setTransientImageNodes}
+            onClose={closeImagePanel}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -10658,6 +11366,12 @@ export type {
   SketchEditorToolbarProps,
   SketchLayerPanelProps,
   InlineTextSelectionState,
+  SketchImageGenerationCapabilities,
+  SketchImageGenerationOption,
+  SketchImageGenerationRequest,
+  SketchImageReferenceInput,
+  SketchGeneratedImage,
+  SketchImageGenerationAdapter,
 } from "./types";
 
 export {

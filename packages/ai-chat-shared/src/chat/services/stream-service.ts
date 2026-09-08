@@ -157,13 +157,11 @@ export class StreamService {
   private connectionEstablished = false;
   private finishDelivered = false;
   private messageInFlight = false;
-  private readyFallbackTimer: NodeJS.Timeout | null = null;
   private keepaliveTimer: NodeJS.Timeout | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private hasInjectedMemory = false;
   private readonly mode: AgentMode;
   private static readonly KEEPALIVE_INTERVAL_MS = 25000;
-  private static readonly READY_FINISH_FALLBACK_DELAY_MS = 1000;
   private static readonly RECONNECT_GRACE_MS = 10000; // 断连后等待重连的最大时间
 
   constructor(options?: { mode?: AgentMode }) {
@@ -186,7 +184,6 @@ export class StreamService {
     this.connectionEstablished = false;
     this.finishDelivered = false;
     this.messageInFlight = false;
-    this.clearReadyFallbackTimer();
 
     const agentClient = getConfiguredAgentClient();
     const stream = agentClient.stream(agentSessionId);
@@ -238,7 +235,13 @@ export class StreamService {
     files?: FileAttachment[],
     viewerContext?: ViewerContext,
     referencedProjects?: Array<{ projectId: string; label?: string }>,
-    conversation?: { assistantMessageId?: string },
+    conversation?: {
+      conversationId: string;
+      messageId: string;
+      runId: string;
+      assistantMessageId: string;
+      conversationRevision: number;
+    },
   ): Promise<void> {
     if (!this.stream) {
       throw new Error("Stream not connected");
@@ -248,7 +251,7 @@ export class StreamService {
     // 客户端只透传原始问题与浏览端上下文
     if (this.mode === "viewer-readonly") {
       this.messageInFlight = true;
-      this.stream.send(message, `msg-${Date.now()}`, {
+      this.stream.send(message, conversation?.messageId ?? `msg-${Date.now()}`, {
         stream: true,
         projectId,
         demoId,
@@ -324,7 +327,7 @@ export class StreamService {
     }
 
     this.messageInFlight = true;
-    this.stream.send(finalContent, `msg-${Date.now()}`, {
+    this.stream.send(finalContent, conversation?.messageId ?? `msg-${Date.now()}`, {
       stream: true,
       workingDir,
       projectId,
@@ -335,6 +338,11 @@ export class StreamService {
       files,
       projectRules,
       conversation,
+      conversationId: conversation?.conversationId,
+      messageId: conversation?.messageId,
+      runId: conversation?.runId,
+      assistantMessageId: conversation?.assistantMessageId,
+      conversationRevision: conversation?.conversationRevision,
     });
   }
 
@@ -392,52 +400,6 @@ export class StreamService {
     }
   }
 
-  /**
-   * 重同步服务端会话历史（编辑重发时使用）。
-   * 创建临时 AgentStream 连接，发送保留的历史消息，
-   * 等待服务端返回 ready 后关闭连接。
-   */
-  async resyncHistory(
-    agentSessionId: string,
-    messages: Array<{ id?: string; role: string; content: string }>,
-    options?: { checkpointVersion?: number; truncateAfterMessageId?: string },
-  ): Promise<number | undefined> {
-    const agentClient = getConfiguredAgentClient();
-    const stream = agentClient.stream(agentSessionId);
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          stream.off("status", onStatus);
-          stream.off("error", onError);
-          reject(new Error("resync_history 连接超时"));
-        }, 10000);
-
-        const onStatus = (event: any) => {
-          if (event.status === "connected") {
-            clearTimeout(timeout);
-            stream.off("status", onStatus);
-            stream.off("error", onError);
-            resolve();
-          }
-        };
-
-        const onError = (event: any) => {
-          clearTimeout(timeout);
-          stream.off("status", onStatus);
-          stream.off("error", onError);
-          reject(new Error(event.error?.message || "resync_history 连接失败"));
-        };
-
-        stream.on("status", onStatus);
-        stream.on("error", onError);
-      });
-
-      return await stream.resyncHistory(agentSessionId, messages, options);
-    } finally {
-      stream.close();
-    }
-  }
-
   close(): void {
     this.stopKeepalive();
     this.clearReconnectTimer();
@@ -457,7 +419,6 @@ export class StreamService {
       this.connectionEstablished = false;
       this.finishDelivered = false;
       this.messageInFlight = false;
-      this.clearReadyFallbackTimer();
       this.hasInjectedMemory = false;
     }
   }
@@ -486,7 +447,6 @@ export class StreamService {
     if (this.finishDelivered) return;
     this.finishDelivered = true;
     this.messageInFlight = false;
-    this.clearReadyFallbackTimer();
     this.handlers.onFinish?.(result);
   }
 
@@ -494,34 +454,6 @@ export class StreamService {
     if (!this.reconnectTimer) return;
     clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
-  }
-
-  private clearReadyFallbackTimer(): void {
-    if (!this.readyFallbackTimer) return;
-    clearTimeout(this.readyFallbackTimer);
-    this.readyFallbackTimer = null;
-  }
-
-  private scheduleReadyFinishFallback(streamId: string): void {
-    if (
-      this.finishDelivered ||
-      !this.messageInFlight ||
-      this.readyFallbackTimer
-    ) {
-      return;
-    }
-    this.readyFallbackTimer = setTimeout(() => {
-      this.readyFallbackTimer = null;
-      if (
-        this.currentSessionId !== streamId ||
-        this.finishDelivered ||
-        !this.messageInFlight
-      ) {
-        return;
-      }
-      this.deliverFinish({ content: "" });
-      this.close();
-    }, StreamService.READY_FINISH_FALLBACK_DELAY_MS);
   }
 
   private setupEventHandlers(): void {
@@ -549,7 +481,6 @@ export class StreamService {
       if (event.status === "processing" || event.status === "awaiting_approval") {
         this.connectionEstablished = true;
         this.messageInFlight = true;
-        this.clearReadyFallbackTimer();
         this.clearReconnectTimer();
         return;
       }
@@ -559,7 +490,6 @@ export class StreamService {
         return;
       }
       if (event.status === "ready") {
-        this.scheduleReadyFinishFallback(streamId);
         return;
       }
       // AgentStream 内置自动重连：断连后 N 秒内重连成功则静默恢复，超时则报错
@@ -679,7 +609,6 @@ export class StreamService {
         event.error?.code === "SESSION_NOT_FOUND" ||
         event.error?.code === "GET_MODELS_ERROR";
       if (isModelError) {
-        this.clearReadyFallbackTimer();
         this.handlers.onError?.({
           message: event.error?.message || "Model error",
           code: event.error?.code,
@@ -710,7 +639,6 @@ export class StreamService {
         code: event.error?.code,
         files: event.files,
       });
-      this.clearReadyFallbackTimer();
       this.close();
     });
   }

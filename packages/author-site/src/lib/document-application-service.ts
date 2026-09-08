@@ -68,7 +68,7 @@ export function documentErrorResponse(error: unknown): { status: number; body: {
     const status = error.code === "DOCUMENT_NOT_FOUND" || error.code === "DOCUMENT_VERSION_NOT_FOUND" ? 404
       : error.code === "DOCUMENT_FORBIDDEN" || error.code === "DOCUMENT_READONLY" ? 403
         : error.code === "DOCUMENT_CONFLICT" || error.code === "DOCUMENT_AUTHORITY_CONFLICT" ? 409
-          : error.code === "DOCUMENT_AUTHORITY_NOT_READY" ? 503 : 400;
+          : error.code === "DOCUMENT_AUTHORITY_NOT_READY" || error.code === "DOCUMENT_AUTHORITY_BACKUP_MISSING" ? 503 : 400;
     return { status, body: { success: false, error: error.toJSON() } };
   }
   const message = error instanceof Error ? error.message : "文档操作失败";

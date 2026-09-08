@@ -161,6 +161,8 @@ export interface ChatMessage {
   kind?: "auto_repair";
   queueId?: string;
   queueStatus?: "queued" | "sending";
+  /** 用户消息写入权威账本的状态；历史恢复消息默认视为已同步。 */
+  syncStatus?: "pending" | "accepted" | "failed";
   /** @deprecated 使用 parts 数组替代 */
   content: string;
   /** 服务端 Authority mutation/projection 的本轮终态摘要。 */
@@ -468,6 +470,16 @@ export function Message({
                 )}
               </div>
             )}
+            {!message.queueStatus && message.syncStatus === "pending" && (
+              <div className="mt-2 border-t border-border/50 pt-2 text-right text-xs text-muted-foreground">
+                正在同步
+              </div>
+            )}
+            {!message.queueStatus && message.syncStatus === "failed" && (
+              <div className="mt-2 border-t border-destructive/30 pt-2 text-right text-xs text-destructive">
+                同步失败，请编辑后重试
+              </div>
+            )}
             {!message.queueStatus && !isStreaming && onEditResend && message.id && (
               <button
                 onClick={() => {
@@ -523,6 +535,16 @@ export function Message({
                     取消
                   </button>
                 )}
+              </div>
+            )}
+            {!message.queueStatus && message.syncStatus === "pending" && (
+              <div className="mt-2 border-t border-border/50 pt-2 text-right text-xs text-muted-foreground">
+                正在同步
+              </div>
+            )}
+            {!message.queueStatus && message.syncStatus === "failed" && (
+              <div className="mt-2 border-t border-destructive/30 pt-2 text-right text-xs text-destructive">
+                同步失败，请编辑后重试
               </div>
             )}
             {!message.queueStatus && !isStreaming && onEditResend && message.id && (

@@ -19,7 +19,7 @@ import {
 interface Envelope<T> {
   success?: boolean;
   data?: T;
-  error?: { code?: string; message?: string };
+  error?: { code?: string; message?: string; details?: unknown };
 }
 
 interface WorkspaceAuthorityIdentifiers {
@@ -71,6 +71,7 @@ async function request<T>(
         : fallback,
       body.error?.message ?? `Workspace Authority 响应 ${response.status}`,
       response.status,
+      body.error?.details,
     );
   }
   return body.data;

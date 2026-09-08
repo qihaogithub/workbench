@@ -18,7 +18,6 @@ import {
   archiveActiveSession,
   bindEditSessionRole,
   createEditSession,
-  enforceSessionLimit,
   ensureSessionUsesProjectActiveWorkspace,
   findActiveSession,
   touchSessionActivity,
@@ -34,6 +33,7 @@ import { getModelConfig } from "@/lib/model-config";
 import { readUserBackendProvidersConfig } from "@/lib/user-model-config";
 import { findUserById, type UserRole } from "@/lib/user";
 import { parseVisibilityRules } from "@workbench/shared";
+import { getConversationService } from "@/lib/conversation";
 
 function createSessionBootstrap(input: {
   sessionId: string;
@@ -72,6 +72,7 @@ function createSessionBootstrap(input: {
   }
 
   return {
+    conversationId: input.sessionId,
     sessionId: input.sessionId,
     workspaceId: input.workspaceId,
     workspaceScope: input.workspaceScope,
@@ -219,6 +220,12 @@ export async function POST(request: NextRequest) {
       const workspaceScope = workspaceId
         ? getWorkspaceMeta(workspaceId)?.scope || "legacy"
         : "legacy";
+      getConversationService().ensureConversation({
+        id: activeSessionId,
+        ownerUserId: userId,
+        projectId,
+        workspaceId,
+      });
 
       return NextResponse.json(
         createApiSuccess(createSessionBootstrap({
@@ -253,7 +260,12 @@ export async function POST(request: NextRequest) {
         expiresAt: authorization.expiresAt,
       }),
     ]);
-    enforceSessionLimit(userId, projectId, 5);
+    getConversationService().ensureConversation({
+      id: result.sessionId,
+      ownerUserId: userId,
+      projectId,
+      workspaceId: result.workspaceId,
+    });
     return NextResponse.json(
       createApiSuccess(createSessionBootstrap({
         sessionId: result.sessionId,

@@ -46,7 +46,7 @@ export async function GET(
       });
     }
 
-    if (meta.userId && meta.userId !== payload.userId) {
+    if (!meta.userId || meta.userId !== payload.userId) {
       return NextResponse.json(
         createApiError("FORBIDDEN", "无权访问其他用户的 Session"),
         { status: 403 },
@@ -100,7 +100,7 @@ export async function DELETE(
     const metaPath = path.join(sessionPath, ".session.json");
     if (fs.existsSync(metaPath)) {
       const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-      if (meta.userId && meta.userId !== userId) {
+      if (!meta.userId || meta.userId !== userId) {
         return NextResponse.json(
           createApiError("FORBIDDEN", "无权删除其他用户的 Session"),
           { status: 403 },

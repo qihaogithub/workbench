@@ -110,7 +110,7 @@ export async function GET(
       });
     }
 
-    if (meta.userId && meta.userId !== payload.userId) {
+    if (!meta.userId || meta.userId !== payload.userId) {
       return NextResponse.json(
         createApiError("FORBIDDEN", "无权访问其他用户的 Session"),
         { status: 403 },

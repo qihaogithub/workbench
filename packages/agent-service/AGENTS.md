@@ -109,7 +109,7 @@ tests/
 | `saveImage` | 保存图片到图床（SHA256 去重，返回绝对 URL `/api/images/{hash}-{filename}`） |
 | `listImages` | 查询当前项目已上传的图片清单 |
 | `readUserImage` | 按 imageId 从全局图床回读图片内容（仅在模型支持图片时使用，返回图片像素内容） |
-| `generateImage` | 文生图（仅图片子 Agent 工具集）：调 `IMAGE_GEN_*` API，b64_json/url → 全局图床，支持尺寸/多变体/配额/重试 |
+| `generateImage` | 文生图（仅图片子 Agent 工具集）：复用共享生成服务，校验模型能力并将 b64 图片写入全局图床，支持尺寸/多变体/配额/重试 |
 | `extractImageElement` | 语义抠图（仅图片子 Agent 工具集）：CLIPSeg 零样本文本-图像分割 + sharp 合成透明 PNG，支持 softEdge/invert/threshold |
 | `getConsoleLogs` | 获取页面控制台日志 |
 | `captureScreenshot` | 捕获页面截图 |
@@ -167,6 +167,7 @@ IMAGE_GEN_ENABLED=false               # 总开关（默认关闭）
 IMAGE_GEN_API_KEY=sk-...              # 图像生成 API key（OpenAI 兼容）
 IMAGE_GEN_BASE_URL=https://xxx/v1     # 图像生成 baseURL（OpenAI 兼容 /v1，默认 OpenAI）
 IMAGE_GEN_MODEL=dall-e-3             # 图像生成模型
+IMAGE_GEN_API_PROFILE=auto            # auto/gpt-image/dall-e-3/generation-only 能力档案
 IMAGE_GEN_TIMEOUT_MS=60000            # 单次生成超时
 IMAGE_GEN_MAX_PER_SESSION=30          # 每会话最大生成数
 IMAGE_GEN_MAX_RETRIES=3               # 失败重试次数
@@ -330,11 +331,12 @@ pnpm typecheck
   - `EventMapper`：AgentHarness 底层事件 → 应用层 AgentEvent 的映射
 - **文件操作**：`ToolHookManager` 在 `tool_result` hook 中捕获 `writeFile/editFile` 变更
 - **路径安全**：`PermissionManager.validateToolCall` 拦截 `readFile/writeFile/listFiles` 的越权访问
-- **编辑重发历史重同步**：WS 消息 `resync_history` 触发服务端销毁旧 agent → 重建 → 逐条 `appendHistoryMessage(role, content)` 写入 session。参见 `src/routes/websocket.ts` 的 `case "resync_history"`。`IBackendAdapter`、`BaseAgent`、`BackendAgent` 和 `PiAgentBackend` 均有 `appendHistoryMessage` 方法。
+- **编辑重发与重新生成**：浏览器不得回传历史数组，`resync_history` 协议已删除。author-site 通过 Conversation Ledger 的 `supersede/retry` 和 revision 提交结构变更，agent-service 在 run start 时从权威账本恢复上下文。
 - **上下文压缩**：`PiAgentBackend` 在 `harness.prompt()` 前按模型 `contextWindow`、`maxTokens`、16k 压缩预留和安全余量预检；达到阈值后调用 `harness.compact()`。供应商仍返回上下文超限时，最多压缩并重发同一请求一次。完成时通过 `context_compacted` 事件通知 UI，绝不将压缩摘要或原始消息写入事件日志。
 - **图片上下文策略**：用户上传的图片仅在发送当轮以原始像素进入当前 LLM 上下文；之后每轮通过 `context` hook（`stripExpiredImageParts`，`src/utils/image-context-strip.ts`）剥离所有历史消息（含 user、assistant、toolResult）中的 image part，仅保留入库 URL 引用文本。`readUserImage` 工具可让模型按需从全局图床重新加载历史图片。
 - **图片子 Agent**：`delegateTask` 支持 `subagentType: "image"` 启动定向图片子 Agent，工具集仅含 generateImage/extractImageElement/saveImage/listImages/readUserImage/readFile/writeFile（`createWorkbenchTools({ imageSubagent: true })`），继承当前多模态模型并通过专属 system prompt 自我评判（generateImage → readUserImage → 不满意重试 → 满意继续）。**两个图像工具仅注册给图片子 Agent，主 Agent 工具集中不包含。** **可见性门控**：`delegateTask` 的 `subagentType: "image"` 参数/描述仅在绘图配置启用时对主 Agent 暴露（`createDelegateTaskTool` 的 `imageSubagentEnabled` 来自 `getImageGenConfig().enabled`）；未启用时主 Agent 不知道图片子 Agent，模型强行传入会被工具层拒绝（`image_subagent_disabled`）。
-- **绘图配置来源**：图像生成配置（`src/services/image-gen-config.ts` 运行时单例）由管理后台「绘图配置」推送（`PUT /internal/image-gen`，`src/routes/internal-config.ts`）覆盖内存，环境变量仅作默认值。`generateImage`/`extractImageElement` 缺席配置时返回明确错误。
+- **绘图配置来源**：图像生成配置（`src/services/image-gen-config.ts` 运行时单例）由管理后台「绘图配置」推送（`PUT /internal/image-gen`，`src/routes/internal-config.ts`）覆盖内存，环境变量仅作默认值。`IMAGE_GEN_API_PROFILE` 用于选择 `auto`、`gpt-image`、`dall-e-3` 或保守的 `generation-only` 能力档案；未知模型不得自动获得参考图、多图或高分辨率能力。`generateImage`/`extractImageElement` 缺席配置时返回明确错误。
+- **共享图像生成服务**：`src/services/image-generation-service.ts` 统一处理能力、参数、配额、重试、超时、取消与响应解析；图片子 Agent 和受内部令牌保护的 `/internal/image-gen/capabilities`、`/internal/image-gen/generate` 必须复用它。无参考图走 `/images/generations` JSON，有参考图且档案允许时走 `/images/edits` multipart；供应商 URL 响应不得由该服务直接下载。
 
 ## 相关文档
 

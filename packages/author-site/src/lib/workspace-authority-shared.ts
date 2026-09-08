@@ -18,7 +18,7 @@ export const WORKSPACE_AUTHORITY_NOT_READY_MESSAGE =
 export interface AuthorityEnvelope<T> {
   success?: boolean;
   data?: T;
-  error?: { code?: string; message?: string };
+  error?: { code?: string; message?: string; details?: unknown };
 }
 
 export interface WorkspaceBinaryStagingReceipt {
@@ -44,6 +44,7 @@ export class WorkspaceAuthorityClientError extends Error {
     readonly code: WorkspaceAuthorityApiErrorCode,
     message: string,
     readonly status: number,
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = "WorkspaceAuthorityClientError";

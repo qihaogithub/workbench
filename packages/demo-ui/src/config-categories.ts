@@ -155,6 +155,18 @@ export function configFieldMatchesCategoryFilter(
   return getConfigFieldCategory(field) === normalizedFilter;
 }
 
+/**
+ * 判断解析后的表单字段是否匹配其业务语义筛选。
+ * 没有显式标注的旧字段视为 resource，以保持既有配置表单的展示行为。
+ */
+export function configFieldMatchesTypeFilter(
+  field: ConfigCategorySource,
+  typeFilter?: ConfigFieldType,
+): boolean {
+  if (!typeFilter) return true;
+  return getConfigFieldType({ "ui:options": field.uiOptions }) === typeFilter;
+}
+
 export function orderConfigCategories(categories: Iterable<string>): string[] {
   const seen = new Set<string>();
   const normalized = Array.from(categories)
@@ -208,6 +220,25 @@ export function getSchemaFieldCountByCategory(
 }
 
 /**
+ * 统计指定业务语义的顶级 Schema 字段，可额外按展示分类收窄范围。
+ */
+export function getSchemaFieldCountByType(
+  schema: string | undefined,
+  typeFilter: ConfigFieldType,
+  categoryFilter?: string,
+): number {
+  const properties = getSchemaProperties(schema);
+  return Object.values(properties).filter(
+    (property) =>
+      getConfigFieldType(property) === typeFilter &&
+      configFieldMatchesCategoryFilter(
+        { uiOptions: property["ui:options"] as Record<string, unknown> | undefined },
+        categoryFilter,
+      ),
+  ).length;
+}
+
+/**
  * 统计按页面绑定关系生效的项目级配置字段数量。
  * bindings 未提供时表示调用方尚未提供绑定信息，沿用展示全部字段的兼容语义；
  * 显式传入空数组表示该页面不消费项目级配置。
@@ -216,6 +247,7 @@ export function getSchemaFieldCountByBindings(
   schema: string | undefined,
   bindings: string[] | undefined,
   categoryFilter?: string,
+  typeFilter?: ConfigFieldType,
 ): number {
   const properties = getSchemaProperties(schema);
   const allowedKeys = bindings === undefined ? undefined : new Set(bindings);
@@ -224,6 +256,6 @@ export function getSchemaFieldCountByBindings(
     return configFieldMatchesCategoryFilter(
       { uiOptions: property["ui:options"] as Record<string, unknown> | undefined },
       categoryFilter,
-    );
+    ) && (!typeFilter || getConfigFieldType(property) === typeFilter);
   }).length;
 }

@@ -39,6 +39,9 @@ function healthWarnings(data: WorkspaceAuthorityHealthStatus): string[] {
   if (!data.workspaceExists) warnings.push("workspace missing");
   if (!data.stateExists) warnings.push("authority state missing");
   if (data.externalDrift) warnings.push("external drift detected");
+  if (data.externalDrift && data.missingBackupCount > 0) {
+    warnings.push("external drift with missing committed backups: restore is blocked; explicit reconcile-adopt is required to establish a new baseline");
+  }
   if (data.activeLease) warnings.push("active or stale write lease exists");
   if (data.preparedCount > 0) warnings.push("prepared transactions need recovery");
   if (data.missingBackupCount > 0) warnings.push("committed backups are incomplete");

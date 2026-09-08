@@ -4,8 +4,10 @@ import {
   AI_ATTACHMENT_MAX_FILE_SIZE,
   AttachmentUploadError,
   deleteUploadedFileAttachment,
+  readUploadedFileAttachment,
   saveUploadedFileAttachment,
 } from "../utils/uploaded-file-attachments";
+import { getSessionAuthorizations } from "../config/session-authorizations";
 import { sendApiError, sendApiSuccess } from "./api-response";
 
 export async function registerAttachmentRoutes(
@@ -22,6 +24,16 @@ export async function registerAttachmentRoutes(
             message: "缺少 projectId 参数",
           });
         }
+        const authorization = getSessionAuthorizations().get(
+          request.params.sessionId,
+          projectId,
+        );
+        if (!authorization) {
+          return sendApiError(reply, 403, {
+            code: "FORBIDDEN",
+            message: "Session 未获得当前项目的附件上传授权",
+          });
+        }
 
         const file = await request.file({
           limits: { files: 1, fileSize: AI_ATTACHMENT_MAX_FILE_SIZE },
@@ -34,6 +46,8 @@ export async function registerAttachmentRoutes(
         }
         const attachment = await saveUploadedFileAttachment({
           projectId,
+          ownerUserId: authorization.userId,
+          conversationId: request.params.sessionId,
           filename: file.filename,
           mimeType: file.mimetype,
           buffer: await file.toBuffer(),
@@ -62,10 +76,10 @@ export async function registerAttachmentRoutes(
   );
 
   fastify.delete<{
-    Params: { attachmentId: string };
+    Params: { sessionId: string; attachmentId: string };
     Querystring: { projectId?: string };
   }>(
-    "/api/agent/attachments/:attachmentId",
+    "/api/agent/:sessionId/attachments/:attachmentId",
     async (request, reply) => {
       try {
         const projectId = request.query.projectId;
@@ -73,6 +87,29 @@ export async function registerAttachmentRoutes(
           return sendApiError(reply, 400, {
             code: "INVALID_REQUEST",
             message: "缺少 projectId 参数",
+          });
+        }
+        const authorization = getSessionAuthorizations().get(
+          request.params.sessionId,
+          projectId,
+        );
+        if (!authorization) {
+          return sendApiError(reply, 403, {
+            code: "FORBIDDEN",
+            message: "Session 未获得当前项目的附件删除授权",
+          });
+        }
+        const stored = await readUploadedFileAttachment(
+          projectId,
+          request.params.attachmentId,
+        );
+        if (
+          stored.metadata.ownerUserId !== authorization.userId ||
+          stored.metadata.conversationId !== request.params.sessionId
+        ) {
+          return sendApiError(reply, 403, {
+            code: "FORBIDDEN",
+            message: "无权删除其他对话的附件",
           });
         }
         await deleteUploadedFileAttachment(projectId, request.params.attachmentId);

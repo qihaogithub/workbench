@@ -124,10 +124,73 @@ export interface SketchEditorSurfaceProps {
   className?: string;
   onSceneChange?: (scene: SketchSceneDocument) => void;
   onSelectionChange?: (selection: SketchEditorSelection) => void;
+  /** Optional host adapter for capability-aware AI image generation. */
+  imageGeneration?: SketchImageGenerationAdapter;
   onViewportChange?: (
     viewport: SketchEditorViewport,
     reason: SketchViewportChangeReason,
   ) => void;
+}
+
+export interface SketchImageGenerationOption {
+  id: string;
+  label: string;
+  width?: number;
+  height?: number;
+  enabled?: boolean;
+  unavailableReason?: string;
+}
+
+export interface SketchImageGenerationCapabilities {
+  enabled: boolean;
+  unavailableReason?: string;
+  modelId?: string;
+  qualities: readonly SketchImageGenerationOption[];
+  sizes: readonly SketchImageGenerationOption[];
+  maxImages: number;
+  maxReferences: number;
+  supportsReferences: boolean;
+  allowCustomSize?: boolean;
+  maxPromptLength?: number;
+}
+
+export interface SketchImageReferenceInput {
+  id: string;
+  src: string;
+  name?: string;
+  file?: File;
+}
+
+export interface SketchImageGenerationRequest {
+  prompt: string;
+  count: number;
+  qualityId: string;
+  sizeId: string;
+  width?: number;
+  height?: number;
+  references: readonly SketchImageReferenceInput[];
+}
+
+export interface SketchGeneratedImage {
+  id?: string;
+  src: string;
+  width?: number;
+  height?: number;
+  alt?: string;
+}
+
+export interface SketchImageGenerationAdapter {
+  getCapabilities?: (
+    signal?: AbortSignal,
+  ) => SketchImageGenerationCapabilities | Promise<SketchImageGenerationCapabilities>;
+  prepareReference?: (
+    reference: SketchImageReferenceInput,
+    signal: AbortSignal,
+  ) => Promise<SketchImageReferenceInput>;
+  generate: (
+    request: SketchImageGenerationRequest,
+    signal: AbortSignal,
+  ) => Promise<readonly SketchGeneratedImage[]>;
 }
 
 export interface InlineTextSelectionState {
@@ -170,6 +233,8 @@ export interface SketchEditorCanvasProps extends SketchEditorPartProps {
   autoFitToContent?: boolean;
   fillContainer?: boolean;
   mode?: SketchEditorMode;
+  /** Render-only nodes that follow the viewport but never enter scene/history. */
+  transientNodes?: readonly SketchSceneNode[];
   onViewportChange?: (
     viewport: SketchEditorViewport,
     reason: SketchViewportChangeReason,
@@ -178,6 +243,7 @@ export interface SketchEditorCanvasProps extends SketchEditorPartProps {
 
 export interface SketchEditorCanvasHandle {
   openImageFilePicker: () => void;
+  getViewportCenterScenePoint: () => { x: number; y: number };
 }
 
 export interface SketchPropertyPanelProps extends SketchEditorPartProps {
@@ -190,6 +256,8 @@ export interface SketchEditorToolbarProps extends SketchEditorPartProps {
   brushToolbarMode?: SketchBrushToolbarMode;
   /** Opens the canvas-owned image picker and inserts the selected file. */
   onImageUpload: () => void;
+  /** Opens a host-provided image action menu when present. */
+  onImageMenu?: () => void;
 }
 
 export interface SketchLayerPanelProps extends SketchEditorPartProps {

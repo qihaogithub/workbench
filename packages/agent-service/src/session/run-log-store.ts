@@ -12,6 +12,9 @@ export type RunLogSource = 'model' | 'tool' | 'subagent' | 'file' | 'system';
 export interface AgentRunLogStartOptions {
   sessionId: string;
   messageId: string;
+  conversationId?: string;
+  runId?: string;
+  assistantMessageId?: string;
   contentLength: number;
   workingDir?: string;
   demoId?: string;
@@ -50,6 +53,9 @@ interface RunLogEntry {
   summary?: string;
   sessionId: string;
   messageId: string;
+  conversationId: string;
+  runId: string;
+  assistantMessageId: string;
   toolCallId?: string;
   payload?: unknown;
 }
@@ -181,6 +187,9 @@ export class AgentRunLog {
 
   private readonly sessionId: string;
   private readonly messageId: string;
+  private readonly conversationId: string;
+  private readonly runId: string;
+  private readonly assistantMessageId: string;
   private streamLength = 0;
   private finishContentLength = 0;
   private toolResultCount = 0;
@@ -213,6 +222,9 @@ export class AgentRunLog {
   constructor(options: AgentRunLogStartOptions) {
     this.sessionId = options.sessionId;
     this.messageId = options.messageId;
+    this.conversationId = options.conversationId || options.sessionId;
+    this.runId = options.runId || options.messageId;
+    this.assistantMessageId = options.assistantMessageId || options.messageId;
     this.demoId = options.demoId;
     this.workingDir = options.workingDir;
     this.model = options.model;
@@ -235,7 +247,7 @@ export class AgentRunLog {
     });
 
     logger.info(
-      { sessionId: options.sessionId, messageId: options.messageId, logPath: this.filePath },
+      { sessionId: options.sessionId, messageId: options.messageId, runId: this.runId, conversationId: this.conversationId, logPath: this.filePath },
       'Agent run log created',
     );
   }
@@ -531,6 +543,26 @@ export class AgentRunLog {
     });
   }
 
+  recordContextRestore(input: {
+    success: boolean;
+    restoredMessageCount: number;
+    durationMs: number;
+    errorCode?: string;
+  }): void {
+    this.append({
+      level: input.success ? 'info' : 'error',
+      source: 'system',
+      eventType: input.success ? 'context_restore_succeeded' : 'context_restore_failed',
+      title: input.success ? 'Agent context restored' : 'Agent context restore failed',
+      payload: {
+        status: input.success ? 'succeeded' : 'failed',
+        restoredMessageCount: input.restoredMessageCount,
+        durationMs: input.durationMs,
+        errorCode: input.errorCode,
+      },
+    });
+  }
+
   /** Flush queued diagnostics before a run is discarded. */
   async drain(): Promise<void> {
     if (this.flushTimer) {
@@ -550,6 +582,8 @@ export class AgentRunLog {
       error: 'ai.run_failed',
       agent_error: 'ai.run_failed',
       cancel: 'ai.run_failed',
+      context_restore_succeeded: 'ai.context_restore_succeeded',
+      context_restore_failed: 'ai.context_restore_failed',
       capability_activation: 'ai.capability_activated',
     };
     const eventType = eventTypeByRunLog[line.eventType];
@@ -571,7 +605,9 @@ export class AgentRunLog {
           ? line.payload as Record<string, unknown>
           : {}),
         messageId: this.messageId,
-        runId: this.messageId,
+        runId: this.runId,
+        conversationId: this.conversationId,
+        assistantMessageId: this.assistantMessageId,
         toolCallId: line.toolCallId,
         demoId: this.demoId,
         workingDir: this.workingDir,
@@ -584,11 +620,14 @@ export class AgentRunLog {
     return diagnostic;
   }
 
-  private append(entry: Omit<RunLogEntry, 'timestamp' | 'sessionId' | 'messageId'>): void {
+  private append(entry: Omit<RunLogEntry, 'timestamp' | 'sessionId' | 'messageId' | 'conversationId' | 'runId' | 'assistantMessageId'>): void {
     const line: RunLogEntry = {
       timestamp: new Date().toISOString(),
       sessionId: this.sessionId,
       messageId: this.messageId,
+      conversationId: this.conversationId,
+      runId: this.runId,
+      assistantMessageId: this.assistantMessageId,
       ...entry,
       payload: sanitizePayload(entry.payload),
     };

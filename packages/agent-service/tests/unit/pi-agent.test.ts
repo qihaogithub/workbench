@@ -87,6 +87,7 @@ vi.mock('@earendil-works/pi-agent-core/node', () => ({
 }));
 
 vi.mock('@earendil-works/pi-ai', () => ({
+  complete: vi.fn(),
   getModel: (provider: string, modelId: string) => ({
     id: modelId,
     name: modelId,
@@ -195,6 +196,33 @@ describe('PiAgentBackend', () => {
   });
 
   describe('消息发送', () => {
+    it('压缩摘要只保留有界摘要与 user/assistant 尾部消息，并生成稳定哈希', () => {
+      const backend = new PiAgentBackend(mockConfig);
+      const checkpoint = (backend as any).buildCompactionCheckpoint(
+        {
+          summary: '官方压缩摘要',
+          firstKeptEntryId: 'kept-1',
+        },
+        {
+          messages: [
+            { id: 'old', role: 'user', content: '应被裁掉' },
+            { id: 'kept-1', role: 'user', content: [{ type: 'text', text: '保留的用户消息' }] },
+            { role: 'assistant', content: [{ type: 'text', text: '保留的助手消息' }] },
+            { role: 'tool', content: '不得进入尾部' },
+          ],
+        },
+      );
+
+      expect(checkpoint).toMatchObject({
+        summaryText: '官方压缩摘要',
+        tailMessages: [
+          { role: 'user', content: '保留的用户消息' },
+          { role: 'assistant', content: '保留的助手消息' },
+        ],
+      });
+      expect(checkpoint.summaryHash).toMatch(/^[a-f0-9]{64}$/);
+    });
+
     it('在发送前达到安全阈值时压缩历史上下文', async () => {
       const backend = new PiAgentBackend(mockConfig);
       await backend.start();

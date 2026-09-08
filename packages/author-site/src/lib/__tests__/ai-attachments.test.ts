@@ -89,6 +89,40 @@ describe("聊天附件读取（.ai-attachments）", () => {
     ]);
   });
 
+  it("仅列出并清理指定用户与对话的附件", () => {
+    writeAttachment("proj-1", "att-1", {
+      name: "a.md",
+      ownerUserId: "user-1",
+      conversationId: "conversation-1",
+    }, "a");
+    writeAttachment("proj-1", "att-2", {
+      name: "b.md",
+      ownerUserId: "user-1",
+      conversationId: "conversation-2",
+    }, "b");
+    writeAttachment("proj-1", "att-legacy", { name: "legacy.md" }, "legacy");
+
+    expect(mod.listConversationChatAttachments(
+      "proj-1",
+      "user-1",
+      "conversation-1",
+    ).map((attachment) => attachment.id)).toEqual(["att-1"]);
+    expect(mod.listUserChatAttachments(
+      "proj-1",
+      "user-1",
+      new Set(["conversation-1"]),
+    ).map((attachment) => attachment.id)).toEqual(["att-1"]);
+    expect(mod.deleteConversationChatAttachments(
+      "proj-1",
+      "user-1",
+      "conversation-1",
+    )).toBe(1);
+    expect(mod.listChatAttachments("proj-1").map((attachment) => attachment.id)).toEqual([
+      "att-2",
+      "att-legacy",
+    ]);
+  });
+
   it("读取图片附件原始文件", () => {
     writeAttachment(
       "proj-1",

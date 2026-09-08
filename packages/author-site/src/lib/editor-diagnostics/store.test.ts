@@ -142,6 +142,54 @@ describe("editor diagnostics store", () => {
     ]);
   });
 
+  it("隔离损坏的 SQLite 主库，重建后仍明确报告历史缺口", async () => {
+    const diagnosticsDir = path.join(mockDataDir, "diagnostics");
+    fs.mkdirSync(diagnosticsDir, { recursive: true });
+    fs.writeFileSync(path.join(diagnosticsDir, "editor-events.db"), "not-a-sqlite-database");
+
+    const result = await appendEditorDiagnosticEvents([
+      {
+        id: "evt-after-recovery",
+        editorSessionId: "editor-session-recovery",
+        projectId: "project-1",
+        timestamp: 1,
+        category: "system",
+        name: "diagnostic.after_recovery",
+      },
+    ]);
+
+    expect(result.sqliteWritten).toBe(1);
+    expect(result.diagnostics).toEqual(
+      expect.objectContaining({
+        sqliteUsed: true,
+        jsonlFallbackUsed: false,
+        dbUnavailable: false,
+        eventGapDetected: true,
+      }),
+    );
+    expect(result.diagnostics.warnings.join(" ")).toContain("已隔离原库");
+
+    const quarantineRoot = path.join(diagnosticsDir, "quarantine");
+    const quarantineEntries = fs.readdirSync(quarantineRoot);
+    expect(quarantineEntries).toHaveLength(1);
+    expect(
+      fs.readFileSync(
+        path.join(quarantineRoot, quarantineEntries[0], "editor-events.db"),
+        "utf8",
+      ),
+    ).toBe("not-a-sqlite-database");
+
+    const queried = await queryEditorDiagnosticEvents({
+      editorSessionId: "editor-session-recovery",
+    });
+    expect(queried.diagnostics.sqliteUsed).toBe(true);
+    expect(queried.diagnostics.eventGapDetected).toBe(true);
+    expect(queried.diagnostics.warnings.join(" ")).toContain("曾发生损坏");
+    expect(queried.events).toEqual([
+      expect.objectContaining({ eventType: "diagnostic.after_recovery" }),
+    ]);
+  });
+
   it("拒绝混合 editorSessionId 的批量写入", async () => {
     await expect(
       appendEditorDiagnosticEvents([

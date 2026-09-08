@@ -399,6 +399,8 @@ corepack pnpm workspace-authority:reconcile-restore -- "project-1" "live-1" --se
 
 `bootstrap` 默认返回 `would_bootstrap` 或 `already_bootstrapped`；`reconcile-adopt` 默认返回 `would_adopt` 或 `noop`；`reconcile-restore` 默认返回 `would_restore`、`restore_blocked` 或 `noop`。只有加 `--apply` 才会调用 agent-service 的修复入口。restore 依赖 Authority 内部按内容 hash 保存的 committed backup，备份缺失或损坏时返回阻断结果并保留当前外部内容，不会退化为静默 adopt。
 
+当 `status` / `preflight` 同时报告 `external drift` 和 `missingBackupCount > 0` 时，当前磁盘内容无法由缺失的 committed backup 证明，restore 必须保持阻断。若管理员确认磁盘内容才是要保留的版本，应先执行 reconcile-adopt dry-run，再加 `--apply` 显式建立新的审计 revision；该操作不改写业务文件，只重新记录当前受管内容并补齐 content-addressed backups。创作端文档视图遇到该状态会暂停自动保存，完成 adopt 后需刷新页面。
+
 **输出示例:**
 ```
 === 错误诊断 ===

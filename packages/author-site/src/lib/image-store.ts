@@ -373,6 +373,31 @@ export function releaseWhiteboardDraftImages(draftId: string): string[] {
   return removed;
 }
 
+/** Release one generated or localized asset lease without affecting the rest of a draft. */
+export function releaseWhiteboardDraftImage(imageId: string, draftId: string): boolean {
+  if (!WHITEBOARD_DRAFT_ID_PATTERN.test(imageId) || !WHITEBOARD_DRAFT_ID_PATTERN.test(draftId)) return false;
+  const manifest = readManifest();
+  const entry = manifest.images.find((candidate) => candidate.id === imageId);
+  if (!entry?.whiteboardDrafts?.[draftId]) return false;
+  const drafts = { ...entry.whiteboardDrafts };
+  delete drafts[draftId];
+  entry.whiteboardDrafts = Object.keys(drafts).length ? drafts : undefined;
+  if (canCollectWhiteboardEntry(entry)) removeImageEntry(manifest, imageId);
+  writeManifest(manifest);
+  return true;
+}
+
+/** Discard a just-created image when leasing it to a draft failed. */
+export function discardUnclaimedImage(imageId: string): boolean {
+  if (!WHITEBOARD_DRAFT_ID_PATTERN.test(imageId)) return false;
+  const manifest = readManifest();
+  const entry = manifest.images.find((candidate) => candidate.id === imageId);
+  if (!entry || entry.sourceType !== "ai_generated" || entry.projectRefs.length || entry.whiteboardRefs?.length || entry.whiteboardDrafts) return false;
+  const removed = removeImageEntry(manifest, imageId);
+  if (removed) writeManifest(manifest);
+  return removed;
+}
+
 /** Remove expired private draft assets; durable references are never collected. */
 export function collectExpiredWhiteboardImages(now = Date.now()): string[] {
   const manifest = readManifest();

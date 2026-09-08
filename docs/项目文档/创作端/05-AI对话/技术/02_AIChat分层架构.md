@@ -1,37 +1,26 @@
+---
+covers:
+  - packages/ai-chat-shared/src/ai-chat.tsx
+  - packages/ai-chat-shared/src/chat/hooks/use-chat-messages.ts
+  - packages/ai-chat-shared/src/chat/hooks/use-chat-stream.ts
+  - packages/ai-chat-shared/src/chat/hooks/use-chat-models.ts
+  - packages/ai-chat-shared/src/chat/services/stream-service.ts
+  - packages/ai-chat-shared/src/chat/services/message-service.ts
+  - packages/ai-chat-shared/src/chat/services/conversation-outbox.ts
+  - packages/ai-chat-shared/src/chat/utils/chat-file-utils.ts
+  - packages/ai-chat-shared/src/chat/utils/chat-stream-utils.ts
+  - packages/agent-client/src/client.ts
+  - packages/agent-client/src/types.ts
+---
+
 # AIChat 分层架构 - 技术文档
 
-> 版本：v1.3
+> 版本：v1.4
 > 创建日期：2026-05-11
-> 更新日期：2026-09-01
-> 更新说明：补充首轮即时标题与模型后台标题生成、固定标题策略，以及历史 Popover 仅展示标题的约束
+> 更新日期：2026-09-07
+> 更新说明：消息持久化切换为权威账本命令，删除全量快照和浏览器历史重同步协议
 > 关联需求：[AI对话\_需求文档.md](../AI对话_需求文档.md)
 > 上层文档：[INDEX.md](../INDEX.md)
-
----
-
-covers:
-
-- packages/author-site/src/components/ai-elements/ai-chat.tsx
-- packages/author-site/src/components/ai-elements/chat/hooks/use-chat-messages.ts
-- packages/author-site/src/components/ai-elements/chat/hooks/use-chat-stream.ts
-- packages/author-site/src/components/ai-elements/chat/hooks/use-chat-models.ts
-- packages/author-site/src/components/ai-elements/chat/services/stream-service.ts
-- packages/author-site/src/components/ai-elements/chat/services/message-service.ts
-- packages/author-site/src/components/ai-elements/chat/utils/chat-file-utils.ts
-- packages/author-site/src/components/ai-elements/chat/utils/chat-stream-utils.ts
-- packages/author-site/src/components/ai-elements/chat/chat-messages.tsx
-- packages/author-site/src/components/ai-elements/chat/chat-plan.tsx
-- packages/author-site/src/components/ai-elements/chat/chat-input.tsx
-- packages/author-site/src/components/ai-elements/chat/model-select-with-guard.tsx
-- packages/author-site/src/components/ai-elements/chat/types.ts
-- packages/agent-client/src/client.ts
-- packages/agent-client/src/types.ts
-- packages/agent-service/src/routes/agent.ts
-- packages/agent-service/src/services/conversation-title-service.ts
-- packages/ai-chat-shared/src/history-dialog.tsx
-- packages/ai-chat-shared/src/chat/services/title-service.ts
-
----
 
 ## 一、重构背景
 
@@ -80,12 +69,12 @@ Hooks 层负责管理组件状态和业务逻辑，是 AIChat 与 UI 子组件�
 
 #### useChatStream
 
-核心流式通信 Hook，协调 StreamService、MessageService 和文件操作：
+核心流式通信 Hook，协调权威账本命令、StreamService 和文件操作：
 
 - 创建和管理 StreamService 实例
 - 处理所有 SSE 事件（`message.part.delta`、`message.part.updated`、`session.diff`、`session.idle`、`session.status`、`session.step-start`、`session.step-finish`）
 - 实现文件操作的 300ms 防抖机制
-- WebSocket 失败时自动降级到 HTTP 非流式模式
+- 创作端 WebSocket 失败时明确结束本轮，不回退到绕过账本终态的 HTTP 写路径；只读使用端仍可使用其独立降级策略
 - 管理权限请求状态
 - **finish 快照处理**：`onFinish` 回调中优先使用 `result.files`，兜底调用 `fetchSessionFiles()`，统一应用代码和 schema 更新
 - **onSnapshotReady 回调**：finish 快照应用完成后触发，通知编辑页"本次 AI 编辑事务完成"
@@ -124,11 +113,12 @@ WebSocket 通信的核心封装，职责包括：
 
 #### MessageService
 
-消息持久化和会话元数据管理，提供三个纯异步函数：
+会话元数据和文件兜底管理，提供两个纯异步函数：
 
-- `persistMessages`：将消息列表持久化到服务端。调用时机：①用户发送消息后立即持久化（fire-and-forget）、②流式回复过程中节流持久化（每 5 秒最多一次）、③`onFinish` 时最终持久化、④页面 visibilitychange 到 hidden 时兜底持久化
 - `updateSessionTitle`：保存首轮即时标题或模型优化后的固定标题
 - `fetchSessionFiles`：从 HTTP API 获取代码/schema 文件内容（作为 WebSocket 事件的兜底）
+
+消息持久化不再属于 MessageService。`conversation-outbox.ts` 负责未 ACK 单条命令的 IndexedDB 事务与有界重试，服务端账本负责 user/assistant/run 的最终状态；详细契约见[对话账本与恢复](./11_对话账本与恢复.md)。
 
 #### TitleService
 
@@ -179,7 +169,9 @@ UI 子组件只负责渲染，不包含业务逻辑。
 ```
 用户输入 → ChatInput.onSubmit
   → useChatStream.handleSend
-    → setMessages（添加用户消息）
+    → IndexedDB outbox（事务提交未 ACK 命令）
+    → Conversation Command API（幂等提交并取得服务端 message/run/revision ACK）
+    → setMessages（临时 ID 对齐服务端 message ID）
     → 读取 AIChat 传入的当前完整模型 ID
     → StreamService.connect（建立 WebSocket）
     → StreamService.waitForConnection（等待连接，3s 超时）
@@ -198,16 +190,10 @@ UI 子组件只负责渲染，不包含业务逻辑。
         → 统一调用 onCodeUpdate / onSchemaUpdate
         → 触发 onSnapshotReady 回调（通知编辑页快照已就绪）
         → setMessages（保存助手消息）
-        → MessageService.persistMessages（最终持久化）
         → MessageService.updateSessionTitle
-    → 流式回复过程中：
-        → 节流调用 persistMessages（每 5 秒最多一次，fire-and-forget）
-    → 用户发送消息时：
-        → 立即调用 persistMessages（fire-and-forget，确保用户消息不丢失）
-    → 页面 visibilitychange 到 hidden：
-        → 立即调用 persistMessages（兜底，比 beforeunload 更可靠）
     → error 事件：
-        → 降级到 HTTP 非流式模式
+        → Agent Service 先向账本提交 failed/cancelled/interrupted 终态
+        → UI 只在收到终态 ACK 后结束本轮
 ```
 
 ### 4.2 模型切换
@@ -229,27 +215,18 @@ UI 子组件只负责渲染，不包含业务逻辑。
 
 ```
 用户编辑消息 → handleEditResend
-  → 截断消息列表（保留编辑消息之前的所有历史）
-  → 持久化截断后的消息列表
-  → StreamService.connect（建立临时 WebSocket）
-  → streamService.resyncHistory（发送保留的历史消息列表）
-    → agent-client AgentStream.resyncHistory（发送 { type: "resync_history", messages }）
-    → 服务端处理：
-        1. 获取当前 agent 配置
-        2. destroy 旧 agent
-        3. 重建 agent（getOrCreate + start）
-        4. 逐条 appendHistoryMessage（以正确 role 写入 session）
-        5. 回复 { type: "status", status: "ready" }
-  → 关闭临时 WebSocket
-  → handleSend(newContent, images, { skipHistoryPrefix: true })
-    → 正常消息发送流程（不注入历史文本前缀）
+  → GET conversation（读取当前服务端 revision）
+  → POST supersede（按锚点和 expectedRevision 作废旧分支）
+  → 收到服务端确认后截断 UI 列表
+  → handleSend(newContent, images)
+    → 按单条账本命令正常发送
 ```
 
 关键设计：
-- 编辑重发时，服务端 agent 被销毁重建，旧会话历史不残留
-- 保留的历史消息通过 `appendHistoryMessage` 以正确 role（user/assistant）写入新 session
-- 前端不注入 `buildConversationHistoryPrefix`，避免与重播的服务端历史重复
-- 重同步失败时回退到仅通过前端文本前缀提供上下文，不阻塞用户发送
+- 编辑重发、重新生成和回滚都先变更权威账本，失败时不提前截断 UI。
+- 重新生成在 supersede 后通过 retry 为原 user message 创建新 run，不重复写用户消息。
+- Agent 下一轮按更新后的 conversation revision 从账本恢复；浏览器不能提交消息数组或历史文本前缀覆盖它。
+- checkpoint 只按 revision 命中或失效，不是第二份可写历史。
 
 ## 五、关键设计决策
 

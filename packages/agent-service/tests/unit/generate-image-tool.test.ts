@@ -108,7 +108,10 @@ describe("createGenerateImageTool", () => {
   it("prompt 为空或超长应被拒绝", async () => {
     process.env.IMAGE_GEN_MAX_PROMPT_LEN = "10";
     const tool = createTool();
-    const empty = await tool.execute("id", { prompt: "  ", filename: "a.png" } as any);
+    const empty = await tool.execute("id", {
+      prompt: "  ",
+      filename: "a.png",
+    } as any);
     expect(empty.details.error).toBe("empty_prompt");
     const tooLong = await tool.execute("id", {
       prompt: "a".repeat(50),
@@ -148,25 +151,20 @@ describe("createGenerateImageTool", () => {
     const result = await tool.execute("id", {
       prompt: "a modern hero background",
       filename: "hero.png",
-      size: "1792x1024",
+      size: "1536x1024",
     } as any);
 
     expect(result.isError).toBeUndefined();
     expect(result.details.success).toBe(true);
     expect(result.details.results[0].imageId).toBe("img_generated123");
     expect(uploadToGlobalImageStore).toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://api.test/v1/images/generations",
-      expect.objectContaining({ method: "POST" }),
-    );
+    expect(fetchMock).toHaveBeenCalledWith("https://api.test/v1/images/generations", expect.objectContaining({ method: "POST" }));
     fetchMock.mockRestore();
   });
 
   it("API 返回错误时重试后返回失败", async () => {
     mockUpload();
-    vi.spyOn(globalThis, "fetch").mockRejectedValue(
-      new Error("network down"),
-    );
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network down"));
 
     const tool = createTool();
     const result = await tool.execute("id", {

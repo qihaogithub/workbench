@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Settings, Database, Users, Bot } from "lucide-react";
+import { Activity, Settings, Database, Users, Bot } from "lucide-react";
 
 export default function AdminLayout({
   children,
@@ -20,6 +20,7 @@ export default function AdminLayout({
     { href: "/admin", label: "概览", icon: Settings },
     { href: "/admin/models", label: "AI 模型管理", icon: Bot },
     { href: "/admin/users", label: "用户管理", icon: Users },
+    { href: "/admin/conversation-reliability", label: "AI 对话可靠性", icon: Activity },
   ];
   return (
     <div className="min-h-screen bg-neutral-950">

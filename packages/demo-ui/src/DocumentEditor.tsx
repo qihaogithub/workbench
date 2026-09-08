@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Crepe } from "@milkdown/crepe";
-import { editorViewCtx, parserCtx } from "@milkdown/kit/core";
+import { EditorStatus, editorViewCtx, parserCtx } from "@milkdown/kit/core";
 import type { CommentMention } from "@workbench/shared";
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { getMarkdown, insert, replaceAll } from "@milkdown/kit/utils";
@@ -131,8 +131,15 @@ function escapeMarkdownLabel(label: string): string {
 }
 
 function insertMarkdown(crepe: Crepe, markdown: string) {
+  const view = getEditorView(crepe);
+  if (!view) return;
   crepe.editor.action(insert(markdown));
-  crepe.editor.action((ctx) => ctx.get(editorViewCtx).focus());
+  view.focus();
+}
+
+function getEditorView(crepe: Crepe): EditorView | null {
+  if (crepe.editor.status !== EditorStatus.Created) return null;
+  return crepe.editor.action((ctx) => ctx.get(editorViewCtx)) ?? null;
 }
 
 export function DocumentEditor(props: DocumentEditorProps) {
@@ -186,6 +193,8 @@ function DocumentEditorInstance({
   const externalSyncRef = useRef(false);
   const externalSyncTargetRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
+  const editorReadyRef = useRef(false);
+  const [editorReady, setEditorReady] = useState(false);
   const readOnlyRef = useRef(readOnly);
   const onCommentSelectionRef = useRef(onCommentSelection);
   const referenceContextRef = useRef(referenceContext);
@@ -270,6 +279,8 @@ function DocumentEditorInstance({
 
   useEffect(() => {
     mountedRef.current = true;
+    editorReadyRef.current = false;
+    setEditorReady(false);
     const root = rootRef.current;
     const overlayRoot = overlayRootRef.current;
     if (!root || !overlayRoot) return;
@@ -362,10 +373,11 @@ function DocumentEditorInstance({
           return;
         }
         if (externalSyncTargetRef.current !== null) {
-          const currentMarkdown =
-            crepeRef.current === crepe
-              ? crepe.editor.action(getMarkdown())
-              : null;
+          const currentView =
+            crepeRef.current === crepe ? getEditorView(crepe) : null;
+          const currentMarkdown = currentView
+            ? crepe.editor.action(getMarkdown())
+            : null;
           if (currentMarkdown === markdown) {
             externalSyncTargetRef.current = null;
             lastEmittedRef.current = markdown;
@@ -438,6 +450,8 @@ function DocumentEditorInstance({
         )
           .then((localized) => {
             if (!mountedRef.current || crepeRef.current !== crepe) return;
+            const view = getEditorView(crepe);
+            if (!view) return;
             const replacements = new Map(localized);
             const currentMarkdown = crepe.editor.action(getMarkdown());
             const markdown = replaceMarkdownImageUrls(
@@ -487,10 +501,11 @@ function DocumentEditorInstance({
 
     const updateMentionMenu = () => {
       const candidates = mentionCandidatesRef.current;
-      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      const view = getEditorView(crepe);
       if (
         !candidates?.length ||
         readOnlyRef.current ||
+        !view ||
         !view.state.selection.empty
       ) {
         closeMentionMenu();
@@ -539,7 +554,8 @@ function DocumentEditorInstance({
     const insertMentionCandidate = (candidate: MarkdownMentionCandidate) => {
       const trigger = mentionTriggerRef.current;
       if (trigger === null) return;
-      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      const view = getEditorView(crepe);
+      if (!view) return;
       view.dispatch(view.state.tr.delete(trigger, view.state.selection.from));
       insertMarkdown(crepe, `@${escapeMarkdownLabel(candidate.name)} `);
       const current = mentionsRef.current;
@@ -564,11 +580,12 @@ function DocumentEditorInstance({
     const updateReferenceMenu = () => {
       const provider = referenceProviderRef.current;
       const context = referenceContextRef.current;
-      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      const view = getEditorView(crepe);
       if (
         !provider ||
         !context ||
         readOnlyRef.current ||
+        !view ||
         !view.state.selection.empty
       ) {
         closeReferenceMenu();
@@ -614,13 +631,13 @@ function DocumentEditorInstance({
               return false;
             return true;
           });
+          const currentView = getEditorView(crepe);
+          if (!currentView) return;
           setReferenceMenu({
             query,
             candidates: visibleCandidates.slice(0, 30),
             selectedIndex: 0,
-            anchor: getMenuAnchor(
-              crepe.editor.action((ctx) => ctx.get(editorViewCtx)),
-            ),
+            anchor: getMenuAnchor(currentView),
           });
         })
         .catch(() => {
@@ -631,7 +648,8 @@ function DocumentEditorInstance({
       const provider = referenceProviderRef.current;
       const context = referenceContextRef.current;
       if (!provider || !context || readOnlyRef.current) return;
-      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      const view = getEditorView(crepe);
+      if (!view) return;
       if (!view.state.selection.empty) return;
       referenceTriggerRef.current = view.state.selection.from;
       forceReferenceMenuRef.current = true;
@@ -643,7 +661,8 @@ function DocumentEditorInstance({
     ) => {
       const trigger = referenceTriggerRef.current;
       if (trigger === null) return;
-      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      const view = getEditorView(crepe);
+      if (!view) return;
       const markdown = serializeMarkdownReference(
         candidate.target,
         candidate.displayPath.split(" / ").pop() || candidate.displayPath,
@@ -664,9 +683,7 @@ function DocumentEditorInstance({
         return;
       }
       const mentionEnabled = Boolean(mentionCandidatesRef.current?.length);
-      const mentionView = mentionEnabled
-        ? crepe.editor.action((ctx) => ctx.get(editorViewCtx))
-        : null;
+      const mentionView = mentionEnabled ? getEditorView(crepe) : null;
       if (mentionView && !readOnlyRef.current) {
         if (event.key === "@" && mentionView.state.selection.empty) {
           mentionTriggerRef.current = mentionView.state.selection.from;
@@ -708,7 +725,8 @@ function DocumentEditorInstance({
       const provider = referenceProviderRef.current;
       const context = referenceContextRef.current;
       if (!provider || !context || readOnlyRef.current) return;
-      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      const view = getEditorView(crepe);
+      if (!view) return;
       if (event.key === "@" && view.state.selection.empty) {
         referenceTriggerRef.current = view.state.selection.from;
         window.queueMicrotask(updateReferenceMenu);
@@ -823,17 +841,31 @@ function DocumentEditorInstance({
     root.addEventListener("input", handleReferenceInput, true);
     root.addEventListener("click", handleReferenceClick, true);
 
-    void crepe.create().then(() => {
-      if (!mountedRef.current || crepeRef.current !== crepe) return;
-      if (autoFocus) {
-        queueMicrotask(() => {
-          // StrictMode can leave a previous instance in this host while its
-          // async destroy finishes. Focus this instance, not the first DOM match.
-          if (!mountedRef.current || crepeRef.current !== crepe) return;
-          crepe.editor.action((ctx) => ctx.get(editorViewCtx).focus());
-        });
-      }
-    });
+    void crepe
+      .create()
+      .then(() => {
+        if (!mountedRef.current || crepeRef.current !== crepe) return;
+        editorReadyRef.current = true;
+        setEditorReady(true);
+        if (autoFocus) {
+          queueMicrotask(() => {
+            // StrictMode can leave a previous instance in this host while its
+            // async destroy finishes. Focus this instance, not the first DOM match.
+            if (
+              !mountedRef.current ||
+              crepeRef.current !== crepe ||
+              !editorReadyRef.current
+            )
+              return;
+            getEditorView(crepe)?.focus();
+          });
+        }
+      })
+      .catch(() => {
+        if (crepeRef.current !== crepe) return;
+        editorReadyRef.current = false;
+        setEditorReady(false);
+      });
 
     return () => {
       mountedRef.current = false;
@@ -848,7 +880,10 @@ function DocumentEditorInstance({
       openReferenceMenuRef.current = null;
       insertReferenceCandidateRef.current = null;
       insertMentionCandidateRef.current = null;
-      if (crepeRef.current === crepe) crepeRef.current = null;
+      if (crepeRef.current === crepe) {
+        crepeRef.current = null;
+        editorReadyRef.current = false;
+      }
       void crepe.destroy();
     };
     // Crepe's feature graph is immutable after creation. Callback props use refs;
@@ -872,10 +907,17 @@ function DocumentEditorInstance({
 
   useEffect(() => {
     const crepe = crepeRef.current;
-    if (!crepe || value === lastEmittedRef.current) return;
+    if (!crepe || !editorReadyRef.current || value === lastEmittedRef.current)
+      return;
     queueMicrotask(() => {
-      if (!mountedRef.current || crepeRef.current !== crepe) return;
-      const view = crepe.editor.action((ctx) => ctx.get(editorViewCtx));
+      if (
+        !mountedRef.current ||
+        crepeRef.current !== crepe ||
+        !editorReadyRef.current
+      )
+        return;
+      const view = getEditorView(crepe);
+      if (!view) return;
       const currentMarkdown = crepe.editor.action(getMarkdown());
       if (currentMarkdown === value) {
         lastEmittedRef.current = value;
@@ -938,7 +980,7 @@ function DocumentEditorInstance({
         externalSyncRef.current = false;
       }
     });
-  }, [value]);
+  }, [value, editorReady]);
 
   return (
     <>
