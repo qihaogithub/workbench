@@ -117,6 +117,7 @@ describe("ConfigCommentPopover", () => {
       <ConfigCommentPopover
         target={target}
         threads={[currentThread]}
+        currentUser={{ id: "author-one", name: "当前用户", isAnonymous: false }}
         onUpdateComment={vi.fn()}
       />,
     );
@@ -134,6 +135,7 @@ describe("ConfigCommentPopover", () => {
       <ConfigCommentPopover
         target={target}
         threads={[thread("one", "原内容", 10)]}
+        currentUser={{ id: "author-one", name: "当前用户", isAnonymous: false }}
         onUpdateComment={onUpdateComment}
       />,
     );
@@ -161,6 +163,7 @@ describe("ConfigCommentPopover", () => {
       <ConfigCommentPopover
         target={target}
         threads={[thread("one", "原内容", 10)]}
+        currentUser={{ id: "author-one", name: "当前用户", isAnonymous: false }}
         onUpdateComment={onUpdateComment}
       />,
     );
@@ -185,6 +188,7 @@ describe("ConfigCommentPopover", () => {
       <ConfigCommentPopover
         target={target}
         threads={[thread("one", "原内容", 10)]}
+        currentUser={{ id: "author-one", name: "当前用户", isAnonymous: false }}
         onUpdateComment={onUpdateComment}
       />,
     );
@@ -249,6 +253,7 @@ describe("ConfigCommentPopover", () => {
       <ConfigCommentPopover
         target={target}
         threads={[thread("one", "主批注", 10, target, replies)]}
+        currentUser={{ id: "author-one", name: "当前用户", isAnonymous: false }}
         onAddReply={onAddReply}
       />,
     );
@@ -278,6 +283,7 @@ describe("ConfigCommentPopover", () => {
       <ConfigCommentPopover
         target={target}
         threads={[thread("one", "主批注", 10, target, replies)]}
+        currentUser={{ id: "author-one", name: "当前用户", isAnonymous: false }}
         onAddReply={vi.fn()}
         onUpdateComment={vi.fn()}
         onUpdateReply={vi.fn()}

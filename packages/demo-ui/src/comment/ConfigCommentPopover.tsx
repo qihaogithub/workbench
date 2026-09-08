@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Bot,
   Check,
   CheckCircle2,
   Circle,
@@ -21,6 +22,7 @@ import { cn } from "../utils";
 import { renderNoteMarkdown, stripMarkdown } from "../note-html";
 import { uploadNoteFile } from "../note-upload";
 import { CommentMarkdownEditor } from "./CommentMarkdownEditor";
+import { COMMENT_VISUAL_TOKENS, commentAvatarColor } from "./comment-theme";
 import type { ConfigCommentController, MentionCandidate } from "./types";
 
 export interface ConfigCommentPopoverProps extends ConfigCommentController {
@@ -61,15 +63,17 @@ function errorMessage(cause: unknown, fallback: string): string {
 
 function MarkdownContent({
   content,
+  mediaBaseUrl,
   className,
 }: {
   content: string;
+  mediaBaseUrl?: string;
   className?: string;
 }) {
   return (
     <div
       className={cn("markdown-editor-content min-w-0", className)}
-      dangerouslySetInnerHTML={{ __html: renderNoteMarkdown(content) }}
+      dangerouslySetInnerHTML={{ __html: renderNoteMarkdown(content, { mediaBaseUrl }) }}
     />
   );
 }
@@ -87,12 +91,23 @@ function IconButton({
       aria-label={label}
       title={label}
       className={cn(
-        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#bdbdbd] transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6fc2ff] disabled:pointer-events-none disabled:opacity-50",
         className,
       )}
     >
       {children}
     </button>
+  );
+}
+
+function ConfigAuthorBadge({ author }: { author: { id: string; name: string; isAgent?: boolean } }) {
+  return (
+    <span className="flex min-w-0 flex-1 items-center gap-2">
+      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: commentAvatarColor(author) }} aria-hidden="true">
+        {author.isAgent ? <Bot className="h-3.5 w-3.5" /> : author.name.slice(0, 1).toUpperCase() || "?"}
+      </span>
+      <span className="min-w-0 max-w-[45%] truncate text-xs font-semibold text-[#f3f3f3]">{author.name}</span>
+    </span>
   );
 }
 
@@ -108,6 +123,9 @@ function mentionCandidatesFor(
 export function ConfigCommentPopover({
   target,
   threads,
+  currentUser = null,
+  uploadCommentImage,
+  mediaBaseUrl,
   mentionCandidates = [],
   canMentionAgent = false,
   readOnly = false,
@@ -143,6 +161,47 @@ export function ConfigCommentPopover({
   >([]);
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    { kind: "thread"; threadId: string } | { kind: "reply"; threadId: string; replyId: string } | null
+  >(null);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const deleteReturnFocusRef = useRef<HTMLElement | null>(null);
+
+  const canEdit = useCallback(
+    (author: { id: string }) => Boolean(currentUser && currentUser.id === author.id),
+    [currentUser],
+  );
+
+  const requestDelete = useCallback((target: { kind: "thread"; threadId: string } | { kind: "reply"; threadId: string; replyId: string }) => {
+    const activeElement = document.activeElement;
+    deleteReturnFocusRef.current = activeElement instanceof HTMLElement && popoverRef.current?.contains(activeElement)
+      ? activeElement
+      : null;
+    setDeleteTarget(target);
+  }, []);
+
+  const closeDeleteDialog = useCallback(() => {
+    setDeleteTarget(null);
+    requestAnimationFrame(() => {
+      const previous = deleteReturnFocusRef.current;
+      if (previous?.isConnected) {
+        previous.focus();
+      } else {
+        popoverRef.current?.querySelector<HTMLElement>('[aria-label="编辑批注"], [aria-label="更多批注操作"]')?.focus();
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!deleteTarget) return;
+    deleteDialogRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeDeleteDialog();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [closeDeleteDialog, deleteTarget]);
 
   const mountedRef = useRef(true);
   const newDraftRef = useRef("");
@@ -484,7 +543,6 @@ export function ConfigCommentPopover({
   const handleDeleteThread = useCallback(
     async (threadId: string) => {
       if (readOnly || !onDeleteThread || submitting) return;
-      if (!window.confirm("确定删除这条批注及其所有回复吗？")) return;
       setSubmitting(true);
       setActionError(null);
       try {
@@ -501,7 +559,6 @@ export function ConfigCommentPopover({
   const handleDeleteReply = useCallback(
     async (threadId: string, replyId: string) => {
       if (readOnly || !onDeleteReply || submitting) return;
-      if (!window.confirm("确定删除这条回复吗？")) return;
       setSubmitting(true);
       setActionError(null);
       try {
@@ -514,6 +571,28 @@ export function ConfigCommentPopover({
     },
     [onDeleteReply, readOnly, submitting],
   );
+
+  const requestDeleteThread = useCallback(
+    (threadId: string) => {
+      if (!readOnly && onDeleteThread && !submitting) requestDelete({ kind: "thread", threadId });
+    },
+    [onDeleteThread, readOnly, requestDelete, submitting],
+  );
+
+  const requestDeleteReply = useCallback(
+    (threadId: string, replyId: string) => {
+      if (!readOnly && onDeleteReply && !submitting) requestDelete({ kind: "reply", threadId, replyId });
+    },
+    [onDeleteReply, readOnly, requestDelete, submitting],
+  );
+
+  const confirmDelete = useCallback(async () => {
+    const target = deleteTarget;
+    if (!target) return;
+    closeDeleteDialog();
+    if (target.kind === "thread") await handleDeleteThread(target.threadId);
+    else await handleDeleteReply(target.threadId, target.replyId);
+  }, [closeDeleteDialog, deleteTarget, handleDeleteReply, handleDeleteThread]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -584,10 +663,20 @@ export function ConfigCommentPopover({
   }, [clearEditingTimer, target.scope, target.pageId, target.fieldKey]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-card">
+    <>
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/65 p-4" onMouseDown={closeDeleteDialog}>
+          <div ref={deleteDialogRef} tabIndex={-1} role="alertdialog" aria-modal="true" aria-labelledby="config-comment-delete-title" aria-describedby="config-comment-delete-description" className="w-[min(320px,100%)] rounded-xl border border-[#505050] bg-[#2b2b2b] text-[#f4f4f4] shadow-[0_18px_45px_rgba(0,0,0,.6)]" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[#505050] px-4 py-3"><h2 id="config-comment-delete-title" className="text-sm font-semibold">删除批注</h2><button type="button" aria-label="关闭删除确认" onClick={closeDeleteDialog} className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[#d4d4d4] hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6fc2ff]"><X className="h-4 w-4" /></button></div>
+            <p id="config-comment-delete-description" className="px-4 py-4 text-xs leading-5 text-[#e1e1e1]">确定删除这条批注吗？删除批注线程时，其所有回复也会一并删除。</p>
+            <div className="flex justify-end gap-2 border-t border-[#505050] px-4 py-3"><button type="button" onClick={closeDeleteDialog} className="cursor-pointer rounded-md border border-[#777] px-3 py-1 text-xs hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6fc2ff]">取消</button><button type="button" onClick={() => void confirmDelete()} className="cursor-pointer rounded-md bg-[#ffc0c0] px-3 py-1 text-xs font-semibold text-[#3c1616] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fff]">删除</button></div>
+          </div>
+        </div>
+      )}
+    <div ref={popoverRef} className={cn("flex min-h-0 flex-1 flex-col", COMMENT_VISUAL_TOKENS.card)}>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
         {targetThreads.length === 0 ? (
-          <p className="py-5 text-center text-sm text-muted-foreground">
+          <p className="py-5 text-center text-sm text-[#bdbdbd]">
             暂无批注
           </p>
         ) : (
@@ -596,18 +685,16 @@ export function ConfigCommentPopover({
               <article
                 key={thread.id}
                 className={cn(
-                  "rounded-lg border border-border/70 bg-muted/20 p-3",
+                  "rounded-xl border border-[#4d4d4d] bg-[#303030] p-3",
                   thread.resolved && "opacity-80",
                 )}
               >
                 <div className="mb-2 flex min-w-0 items-center gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="min-w-0 max-w-[45%] truncate text-xs font-medium text-foreground sm:max-w-[12rem]">
-                      {thread.author.name}
-                    </span>
+                    <ConfigAuthorBadge author={thread.author} />
                     <time
                       dateTime={new Date(thread.createdAt).toISOString()}
-                      className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground"
+                      className="shrink-0 whitespace-nowrap text-[11px] text-[#b5b5b5]"
                     >
                       {formatTime(thread.createdAt)}
                     </time>
@@ -629,7 +716,7 @@ export function ConfigCommentPopover({
                           <MessageSquare className="h-4 w-4" />
                         </IconButton>
                       )}
-                      {onUpdateComment && (
+                      {onUpdateComment && canEdit(thread.author) && (
                         <IconButton
                           label="编辑批注"
                           onPointerDown={(event) => event.preventDefault()}
@@ -665,12 +752,12 @@ export function ConfigCommentPopover({
                           )}
                         </IconButton>
                       )}
-                      {onDeleteThread && (
+                      {onDeleteThread && canEdit(thread.author) && (
                         <IconButton
                           label="删除批注"
-                          className="hover:bg-destructive/10 hover:text-destructive"
+                          className="hover:bg-[#ff4b3d]/15 hover:text-[#ffaaa0]"
                           disabled={submitting}
-                          onClick={() => void handleDeleteThread(thread.id)}
+                          onClick={() => requestDeleteThread(thread.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </IconButton>
@@ -683,7 +770,7 @@ export function ConfigCommentPopover({
                         "inline-flex items-center gap-1 text-[11px]",
                         thread.resolved
                           ? "text-emerald-600"
-                          : "text-muted-foreground",
+                          : "text-[#bdbdbd]",
                       )}
                     >
                       {thread.resolved ? (
@@ -693,7 +780,7 @@ export function ConfigCommentPopover({
                         />
                       ) : (
                         <Circle
-                          className="h-3.5 w-3.5 text-muted-foreground"
+                          className="h-3.5 w-3.5 text-[#bdbdbd]"
                           aria-hidden="true"
                         />
                       )}
@@ -715,11 +802,11 @@ export function ConfigCommentPopover({
                       autoFocus
                       onBlur={handleEditingBlur}
                       onCancel={cancelEditing}
-                      uploadHandler={uploadNoteFile}
+                      uploadHandler={uploadCommentImage ?? uploadNoteFile}
                     />
                     <div className="flex min-h-5 items-center justify-end gap-2 text-[11px]">
                       {editingState === "saving" && (
-                        <span className="text-muted-foreground">
+                        <span className="text-[#b5b5b5]">
                           自动保存中…
                         </span>
                       )}
@@ -728,7 +815,7 @@ export function ConfigCommentPopover({
                       )}
                       {editingError && (
                         <>
-                          <span className="text-destructive">
+                          <span className="text-[#ffaaa0]">
                             {editingError}
                           </span>
                           <IconButton
@@ -736,7 +823,7 @@ export function ConfigCommentPopover({
                             onPointerDown={(event) => event.preventDefault()}
                             onClick={() => void saveEditing()}
                             disabled={editingState === "saving"}
-                            className="h-6 w-6 text-destructive"
+                            className="h-6 w-6 text-[#ffaaa0]"
                           >
                             <RotateCcw className="h-3.5 w-3.5" />
                           </IconButton>
@@ -754,32 +841,31 @@ export function ConfigCommentPopover({
                 ) : (
                   <MarkdownContent
                     content={thread.content}
+                    mediaBaseUrl={mediaBaseUrl}
                     className="text-sm text-foreground"
                   />
                 )}
 
                 {thread.replies.length > 0 && (
-                  <div className="mt-3 space-y-2 border-t border-border/60 pt-2">
+                  <div className="mt-3 space-y-2 border-t border-[#4d4d4d] pt-2">
                     {thread.replies.map((reply) => (
                       <div
                         key={reply.id}
-                        className="rounded-md bg-background/40 p-2"
+                        className="rounded-lg border border-[#454545] bg-[#343434] p-2"
                       >
                         <div className="mb-1 flex min-w-0 items-center gap-2">
                           <div className="flex min-w-0 flex-1 items-center gap-2">
-                            <span className="min-w-0 max-w-[45%] truncate text-xs font-medium text-foreground sm:max-w-[12rem]">
-                              {reply.author.name}
-                            </span>
+                            <ConfigAuthorBadge author={reply.author} />
                             <time
                               dateTime={new Date(reply.createdAt).toISOString()}
-                              className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground"
+                              className="shrink-0 whitespace-nowrap text-[11px] text-[#b5b5b5]"
                             >
                               {formatTime(reply.createdAt)}
                             </time>
                           </div>
                           {!readOnly && (
                             <div className="flex shrink-0 items-center gap-0.5">
-                              {onUpdateReply && (
+                              {onUpdateReply && canEdit(reply.author) && (
                                 <IconButton
                                   label="编辑回复"
                                   onClick={() => {
@@ -797,13 +883,13 @@ export function ConfigCommentPopover({
                                   <Pencil className="h-3.5 w-3.5" />
                                 </IconButton>
                               )}
-                              {onDeleteReply && (
+                              {onDeleteReply && canEdit(reply.author) && (
                                 <IconButton
                                   label="删除回复"
-                                  className="hover:bg-destructive/10 hover:text-destructive"
+                                  className="hover:bg-[#ff4b3d]/15 hover:text-[#ffaaa0]"
                                   disabled={submitting}
                                   onClick={() =>
-                                    void handleDeleteReply(thread.id, reply.id)
+                                    requestDeleteReply(thread.id, reply.id)
                                   }
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -824,7 +910,7 @@ export function ConfigCommentPopover({
                               canMentionAgent={canMentionAgent}
                               placeholder="修改回复…"
                               autoFocus
-                              uploadHandler={uploadNoteFile}
+                          uploadHandler={uploadCommentImage ?? uploadNoteFile}
                               onSubmit={() => void handleUpdateReply()}
                             />
                             <div className="flex justify-end gap-1">
@@ -842,7 +928,7 @@ export function ConfigCommentPopover({
                               </IconButton>
                               <IconButton
                                 label="提交回复修改"
-                                className="text-primary"
+                                className="text-[#70bfff]"
                                 disabled={
                                   !stripMarkdown(editingReplyText) || submitting
                                 }
@@ -855,6 +941,7 @@ export function ConfigCommentPopover({
                         ) : (
                           <MarkdownContent
                             content={reply.content}
+                            mediaBaseUrl={mediaBaseUrl}
                             className="text-xs text-foreground"
                           />
                         )}
@@ -864,8 +951,8 @@ export function ConfigCommentPopover({
                 )}
 
                 {replyThreadId === thread.id && !readOnly && onAddReply && (
-                  <div className="mt-3 flex items-end gap-2 border-t border-border/60 pt-2">
-                    <div className="min-w-0 flex-1 rounded-md border border-border/80 bg-background">
+                  <div className="mt-3 flex items-end gap-2 border-t border-[#4d4d4d] pt-2">
+                    <div className="min-w-0 flex-1 rounded-xl border border-[#4d4d4d] bg-[#3a3a3a]">
                       <CommentMarkdownEditor
                         value={replyText[thread.id] ?? ""}
                         onChange={(value) =>
@@ -886,12 +973,12 @@ export function ConfigCommentPopover({
                         placeholder="回复此批注…"
                         autoFocus
                         onSubmit={() => void handleReply(thread.id)}
-                        uploadHandler={uploadNoteFile}
+                        uploadHandler={uploadCommentImage ?? uploadNoteFile}
                       />
                     </div>
                     <IconButton
                       label="发送回复"
-                      className="mb-1 text-primary"
+                      className="mb-1 text-[#70bfff]"
                       disabled={
                         !stripMarkdown(replyText[thread.id] ?? "") || submitting
                       }
@@ -906,16 +993,16 @@ export function ConfigCommentPopover({
           </section>
         )}
         {actionError && (
-          <p className="mt-2 text-xs text-destructive">{actionError}</p>
+          <p className="mt-2 text-xs text-[#ffaaa0]">{actionError}</p>
         )}
       </div>
 
       {!readOnly && onCreateComment && (
         <section
-          className="shrink-0 border-t border-border/80 bg-muted/20 p-3 sm:p-4"
+          className="shrink-0 border-t border-[#4d4d4d] bg-[#242424] p-3 sm:p-4"
           aria-label="新增配置项批注"
         >
-          <div className="rounded-lg border border-border/80 bg-background shadow-inner">
+          <div className="rounded-xl border border-[#4d4d4d] bg-[#3a3a3a] shadow-inner">
             <CommentMarkdownEditor
               value={newDraft}
               onChange={(value) => {
@@ -930,21 +1017,21 @@ export function ConfigCommentPopover({
               placeholder="添加批注…"
               onSubmit={() => void handleCreate()}
               onBlur={() => void handleCreate()}
-              uploadHandler={uploadNoteFile}
+              uploadHandler={uploadCommentImage ?? uploadNoteFile}
             />
           </div>
           <div className="flex min-h-5 items-center justify-end gap-2 pt-1 text-[11px]">
             {newState === "saving" && (
-              <span className="text-muted-foreground">添加中…</span>
+              <span className="text-[#b5b5b5]">添加中…</span>
             )}
             {newState === "saved" && (
               <span className="text-emerald-600">已添加</span>
             )}
-            {newError && <span className="text-destructive">{newError}</span>}
+            {newError && <span className="text-[#ffaaa0]">{newError}</span>}
             {newError && (
               <IconButton
                 label="重试添加批注"
-                className="h-6 w-6 text-destructive"
+                className="h-6 w-6 text-[#ffaaa0]"
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={() => void handleCreate()}
                 disabled={newState === "saving"}
@@ -956,5 +1043,6 @@ export function ConfigCommentPopover({
         </section>
       )}
     </div>
+    </>
   );
 }

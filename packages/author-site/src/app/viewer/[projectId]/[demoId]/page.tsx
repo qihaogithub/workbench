@@ -7,7 +7,6 @@ import {
   ConfigForm,
   ConfigScopeWrapper,
   isSchemaEmpty,
-  stripConfigSchemaByType,
   filterConfigValuesByType,
 } from "../../../../../components/demo";
 import type {
@@ -155,7 +154,7 @@ export default function ViewerDemoPage() {
     );
   }, [data, visibilityResolution]);
   const visibleProjectConfigSchema = useMemo(
-    () => stripConfigSchemaByType(data?.projectConfigSchema, "business"),
+    () => data?.projectConfigSchema,
     [data?.projectConfigSchema],
   );
 
@@ -248,30 +247,25 @@ export default function ViewerDemoPage() {
             result.data.projectConfigValues,
           );
           const urlConfig = urlConfigDataRef.current;
-          const safeUrlConfig = urlConfig
-            ? filterConfigValuesByType(
-                result.data.projectConfigSchema,
-                filterConfigValuesByType(page.schema, urlConfig, "business"),
-                "business",
-              )
-            : undefined;
-          const merged = safeUrlConfig ? { ...defaults, ...safeUrlConfig } : defaults;
+          const sessionUrlConfig = urlConfig ? { ...urlConfig } : undefined;
+          const merged = sessionUrlConfig ? { ...defaults, ...sessionUrlConfig } : defaults;
           setConfigData(merged);
           setVisibilitySessionOverrides(
             filterConfigValuesByType(
               result.data.projectConfigSchema,
-              filterConfigValuesByType(page.schema, safeUrlConfig ?? {}, "business"),
+              filterConfigValuesByType(page.schema, sessionUrlConfig ?? {}, "business"),
               "business",
             ),
           );
         } else if (urlConfigDataRef.current) {
-          const safeConfig = filterConfigValuesByType(
-            result.data.projectConfigSchema,
-            urlConfigDataRef.current,
-            "business",
+          setConfigData({ ...urlConfigDataRef.current });
+          setVisibilitySessionOverrides(
+            filterConfigValuesByType(
+              result.data.projectConfigSchema,
+              urlConfigDataRef.current,
+              "business",
+            ),
           );
-          setConfigData(safeConfig);
-          setVisibilitySessionOverrides(safeConfig);
         }
 
         // 创建 session 以支持图片上传
@@ -313,13 +307,14 @@ export default function ViewerDemoPage() {
       if (msg.type === "VIEWER_SET_CONFIG") {
         if (msg.configData && typeof msg.configData === "object") {
           const pageSchema = data?.demoPages.find((page) => page.id === activeDemoId)?.schema;
-          const safeConfigData = filterConfigValuesByType(
+          const sessionConfigData = { ...msg.configData };
+          const visibilityValues = filterConfigValuesByType(
             data?.projectConfigSchema,
-            filterConfigValuesByType(pageSchema, msg.configData, "business"),
+            filterConfigValuesByType(pageSchema, sessionConfigData, "business"),
             "business",
           );
-          setConfigData((prev) => ({ ...prev, ...safeConfigData }));
-          setVisibilitySessionOverrides((prev) => ({ ...prev, ...safeConfigData }));
+          setConfigData((prev) => ({ ...prev, ...sessionConfigData }));
+          setVisibilitySessionOverrides((prev) => ({ ...prev, ...visibilityValues }));
         }
       } else if (msg.type === "VIEWER_SET_PAGE") {
         if (typeof msg.pageId === "string") {
@@ -333,17 +328,18 @@ export default function ViewerDemoPage() {
 
   const handleConfigChange = useCallback((newData: Record<string, unknown>) => {
     const pageSchema = data?.demoPages.find((page) => page.id === activeDemoId)?.schema;
-    const safeData = filterConfigValuesByType(
+    const sessionData = { ...newData };
+    const visibilityValues = filterConfigValuesByType(
       data?.projectConfigSchema,
-      filterConfigValuesByType(pageSchema, newData, "business"),
+      filterConfigValuesByType(pageSchema, sessionData, "business"),
       "business",
     );
     setConfigData((prev) => {
-      const merged = { ...prev, ...safeData };
+      const merged = { ...prev, ...sessionData };
       postOutgoing({ type: "VIEWER_CONFIG_CHANGE", configData: merged });
       return merged;
     });
-    setVisibilitySessionOverrides((prev) => ({ ...prev, ...safeData }));
+    setVisibilitySessionOverrides((prev) => ({ ...prev, ...visibilityValues }));
   }, [activeDemoId, data]);
 
   const syncBrowserUrl = useCallback((page: ViewerDemoPage) => {
@@ -450,7 +446,7 @@ export default function ViewerDemoPage() {
 
   const currentPage = availablePages.find((p) => p.id === activeDemoId) ?? availablePages[0];
   const currentPageSchema = currentPage?.schema
-    ? stripConfigSchemaByType(currentPage.schema, "business")
+    ? currentPage.schema
     : undefined;
   let previewStagePage: PreviewStagePage | undefined;
   if (currentPage) {
@@ -585,7 +581,6 @@ export default function ViewerDemoPage() {
                           onChange={handleConfigChange}
                           initialData={configData}
                           sessionId={sessionId}
-                          readonly
                         />
                       </ConfigScopeWrapper>
                     )}
@@ -602,7 +597,6 @@ export default function ViewerDemoPage() {
                           onChange={handleConfigChange}
                           initialData={configData}
                           sessionId={sessionId}
-                          readonly
                         />
                       </ConfigScopeWrapper>
                     )}

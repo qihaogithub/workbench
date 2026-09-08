@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createApiSuccess, createApiError } from "@/lib/fs-utils";
 import { getCommentThread, deleteReply, updateReply } from "@/lib/comment-store";
 import type { CommentMention } from "@workbench/shared";
-import { resolveCommentAuthor, canModify } from "@/lib/comment-auth";
+import { resolveCommentAuthor, canEditOrDeleteComment } from "@/lib/comment-auth";
 
 type RouteParams = {
   params: Promise<{ projectId: string; threadId: string; replyId: string }>;
@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (!reply) return NextResponse.json(createApiError("COMMENT_NOT_FOUND", "回复不存在"), { status: 404 });
     const authorResult = await resolveCommentAuthor(request, body);
     if (!authorResult) return NextResponse.json(createApiError("VALIDATION_ERROR", "未登录用户需提供 anonymousId"), { status: 400 });
-    if (!canModify(authorResult, reply.author.id)) return NextResponse.json(createApiError("FORBIDDEN", "无权修改此回复"), { status: 403 });
+    if (!canEditOrDeleteComment(authorResult, reply.author.id)) return NextResponse.json(createApiError("FORBIDDEN", "无权修改此回复"), { status: 403 });
     const mentions = Array.isArray(body.mentions) ? body.mentions : [];
     if (authorResult.author.isAnonymous && mentions.some((mention) => mention.type === "user")) {
       return NextResponse.json(createApiError("VALIDATION_ERROR", "匿名用户不能 @其他用户"), { status: 400 });
@@ -54,7 +54,7 @@ interface DeleteBody {
 
 /**
  * DELETE /api/projects/[projectId]/comments/[threadId]/replies/[replyId]
- * 删除回复（作者本人或管理员）
+ * 删除回复（仅回复发送者本人）
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const { projectId, threadId, replyId } = await params;
@@ -89,7 +89,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    if (!canModify(authorResult, reply.author.id)) {
+    if (!canEditOrDeleteComment(authorResult, reply.author.id)) {
       return NextResponse.json(createApiError("FORBIDDEN", "无权删除此回复"), {
         status: 403,
       });

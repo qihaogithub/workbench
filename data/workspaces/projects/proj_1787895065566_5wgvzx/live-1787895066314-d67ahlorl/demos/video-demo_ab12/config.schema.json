@@ -3,7 +3,10 @@
     "presentation": {
       "version": 1,
       "mode": "responsive-page",
-      "viewport": { "width": 390, "height": 844 },
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
       "heightBehavior": "content",
       "preset": "mobile",
       "source": "user"
@@ -16,11 +19,31 @@
       "title": "主视频",
       "format": "video",
       "properties": {
-        "url": { "type": "string", "title": "视频地址" },
-        "poster": { "type": "string", "title": "封面地址", "format": "image" }
+        "url": {
+          "type": "string",
+          "title": "视频地址"
+        },
+        "poster": {
+          "type": "string",
+          "title": "封面地址",
+          "format": "image"
+        }
       },
-      "required": ["url"],
-      "ui:options": { "accept": "video/mp4,video/webm", "videoPreviewStyle": "controls" }
+      "required": [
+        "url"
+      ],
+      "ui:options": {
+        "accept": "video/mp4,video/webm",
+        "videoPreviewStyle": "controls"
+      },
+      "default": null
+    },
+    "heroImage": {
+      "type": "string",
+      "title": "展示图片",
+      "format": "image",
+      "description": "图片为可选配置，建议 4:3 比例",
+      "default": ""
     }
   },
   "required": []

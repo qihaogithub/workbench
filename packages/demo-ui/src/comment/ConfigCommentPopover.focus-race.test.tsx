@@ -61,6 +61,7 @@ describe("ConfigCommentPopover 编辑焦点竞态", () => {
         <ConfigCommentPopover
           target={target}
           threads={[currentThread]}
+          currentUser={currentThread.author}
           onCreateComment={vi.fn().mockResolvedValue(undefined)}
           onUpdateComment={onUpdateComment}
         />

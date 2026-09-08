@@ -8,6 +8,8 @@ import {
   useMemo,
   useRef,
   useState,
+  forwardRef,
+  useImperativeHandle,
 } from "react";
 import { Bot, User } from "lucide-react";
 import type { CommentMention } from "@workbench/shared";
@@ -80,6 +82,12 @@ export interface MentionTextareaProps {
   onSubmit?: () => void;
   rows?: number;
   className?: string;
+  style?: React.CSSProperties;
+}
+
+export interface MentionTextareaHandle {
+  focus: () => void;
+  insertText: (text: string) => void;
 }
 
 interface ActiveMention { start: number; query: string }
@@ -97,9 +105,10 @@ export function detectActiveMention(text: string, cursor: number): ActiveMention
 
 function getCaretOffset(root: HTMLElement): number {
   const selection = window.getSelection();
-  if (!selection?.rangeCount) return root.innerText.length;
+  const text = () => root.innerText ?? root.textContent ?? "";
+  if (!selection?.rangeCount) return text().length;
   const range = selection.getRangeAt(0);
-  if (!root.contains(range.startContainer)) return root.innerText.length;
+  if (!root.contains(range.startContainer)) return text().length;
   const before = range.cloneRange();
   before.selectNodeContents(root);
   before.setEnd(range.startContainer, range.startOffset);
@@ -172,7 +181,7 @@ function renderEditor(root: HTMLElement, value: string, mentions: CommentMention
   if (lastIndex < value.length || root.childNodes.length === 0) root.append(document.createTextNode(value.slice(lastIndex)));
 }
 
-export function MentionTextarea({ value, onChange, mentions, onMentionsChange, candidates, placeholder, autoFocus, onSubmit, rows = 3, className }: MentionTextareaProps) {
+export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextareaProps>(function MentionTextarea({ value, onChange, mentions, onMentionsChange, candidates, placeholder, autoFocus, onSubmit, rows = 3, className, style }, ref) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState<ActiveMention | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -181,12 +190,12 @@ export function MentionTextarea({ value, onChange, mentions, onMentionsChange, c
   const updateActive = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) return;
-    setActive(detectActiveMention(editor.innerText, getCaretOffset(editor)));
+    setActive(detectActiveMention(editor.innerText ?? editor.textContent ?? "", getCaretOffset(editor)));
   }, []);
 
   useEffect(() => {
     const editor = editorRef.current;
-    if (!editor || editor.innerText === value) return;
+    if (!editor || (editor.innerText ?? editor.textContent ?? "") === value) return;
     renderEditor(editor, value, mentions);
   }, [value, mentions]);
 
@@ -195,7 +204,7 @@ export function MentionTextarea({ value, onChange, mentions, onMentionsChange, c
   const emitInput = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) return;
-    onChange(editor.innerText.replace(/\n$/, ""));
+    onChange((editor.innerText ?? editor.textContent ?? "").replace(/\n$/, ""));
     onMentionsChange(collectMentions(editor));
     requestAnimationFrame(updateActive);
   }, [onChange, onMentionsChange, updateActive]);
@@ -204,7 +213,7 @@ export function MentionTextarea({ value, onChange, mentions, onMentionsChange, c
     const editor = editorRef.current;
     if (!editor || !active) return;
     const cursor = getCaretOffset(editor);
-    const text = editor.innerText;
+    const text = editor.innerText ?? editor.textContent ?? "";
     const nextMention: CommentMention = { id: candidate.id, name: candidate.name, type: candidate.type };
     const nextMentions = mentions.some((mention) => mentionKey(mention) === mentionKey(nextMention)) ? mentions : [...mentions, nextMention];
     const insert = `@${candidate.name} `;
@@ -226,14 +235,29 @@ export function MentionTextarea({ value, onChange, mentions, onMentionsChange, c
     if (node.nodeType === Node.TEXT_NODE) node = backward ? node.previousSibling : node.nextSibling;
     else node = backward ? node.childNodes[range.startOffset - 1] : node.childNodes[range.startOffset];
     if (!(node instanceof HTMLElement) || !node.dataset.mentionId) return false;
-    const offset = getCaretOffset(editor) - (backward ? node.innerText.length : 0);
+    const offset = getCaretOffset(editor) - (backward ? (node.textContent ?? "").length : 0);
     const key = `${node.dataset.mentionType}:${node.dataset.mentionId}`;
     node.remove();
-    onChange(editor.innerText);
+    onChange(editor.innerText ?? editor.textContent ?? "");
     onMentionsChange(collectMentions(editor).filter((mention) => mentionKey(mention) !== key));
     requestAnimationFrame(() => setCaretOffset(editor, Math.max(0, offset)));
     return true;
   }, [onChange, onMentionsChange]);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => editorRef.current?.focus(),
+    insertText: (text: string) => {
+      const editor = editorRef.current;
+      if (!editor || !text) return;
+      const cursor = getCaretOffset(editor);
+      const editorText = editor.innerText ?? editor.textContent ?? "";
+      const next = editorText.slice(0, cursor) + text + editorText.slice(cursor);
+      renderEditor(editor, next, mentions);
+      onChange(next);
+      onMentionsChange(collectMentions(editor));
+      requestAnimationFrame(() => setCaretOffset(editor, cursor + text.length));
+    },
+  }), [mentions, onChange, onMentionsChange]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
@@ -277,6 +301,7 @@ export function MentionTextarea({ value, onChange, mentions, onMentionsChange, c
         onClick={updateActive}
         onBlur={() => setTimeout(() => setActive(null), 120)}
         onKeyDown={handleKeyDown}
+        style={style}
         className={cn("min-h-[2.5rem] w-full whitespace-pre-wrap break-words rounded-md border border-input bg-background px-2.5 py-2 text-xs text-foreground empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus:outline-none focus:ring-1 focus:ring-ring", rows === 2 ? "min-h-[4rem]" : "min-h-[5.5rem]", className)}
       />
       {active && candidates.length > 0 && (
@@ -286,7 +311,9 @@ export function MentionTextarea({ value, onChange, mentions, onMentionsChange, c
       )}
     </div>
   );
-}
+});
+
+MentionTextarea.displayName = "MentionTextarea";
 
 export interface MentionContentProps { content: string; mentions?: CommentMention[]; className?: string }
 

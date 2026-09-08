@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  computeCanvasPinPosition,
   computePrototypePinPosition,
   computePrototypePinRatio,
   computePrototypeScale,
@@ -108,5 +109,45 @@ describe("computePrototypePinRatio / computePrototypePinPosition", () => {
     });
     expect(ratio.xRatio).toBe(1);
     expect(ratio.yRatio).toBe(0);
+  });
+});
+
+describe("computeCanvasPinPosition", () => {
+  it("将页面归一化坐标映射到评论层容器坐标", () => {
+    const position = computeCanvasPinPosition({
+      containerRect: { left: 100, top: 50, width: 800, height: 600 },
+      pageRect: { left: 240, top: 170, width: 400, height: 200 },
+      pin: { xRatio: 0.25, yRatio: 0.75 },
+    });
+
+    expect(position).toEqual({ left: 240, top: 270 });
+  });
+
+  it("使用变换后的页面矩形，使 pin 随画布平移和缩放移动", () => {
+    const pin = { xRatio: 0.5, yRatio: 0.5 };
+    const before = computeCanvasPinPosition({
+      containerRect: { left: 0, top: 0, width: 800, height: 600 },
+      pageRect: { left: 100, top: 120, width: 200, height: 100 },
+      pin,
+    });
+    const after = computeCanvasPinPosition({
+      containerRect: { left: 0, top: 0, width: 800, height: 600 },
+      // translate(80px, 40px) scale(1.5) 的结果矩形
+      pageRect: { left: 180, top: 160, width: 300, height: 150 },
+      pin,
+    });
+
+    expect(before).toEqual({ left: 200, top: 170 });
+    expect(after).toEqual({ left: 330, top: 235 });
+  });
+
+  it("将异常归一化坐标钳制在页面边界内", () => {
+    expect(
+      computeCanvasPinPosition({
+        containerRect: { left: 0, top: 0, width: 100, height: 100 },
+        pageRect: { left: 10, top: 20, width: 80, height: 60 },
+        pin: { xRatio: 2, yRatio: -1 },
+      }),
+    ).toEqual({ left: 90, top: 20 });
   });
 });

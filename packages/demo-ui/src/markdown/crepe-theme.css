@@ -167,6 +167,35 @@
   padding: 12px 16px 24px;
 }
 
+/* 评论批注浮窗使用与 Figma 评论卡片一致的深色 token，不依赖宿主页面的
+ * light/dark CSS 变量；正文、placeholder 和浮动工具栏因此在 author/viewer
+ * 两端保持相同对比度。 */
+.document-editor-crepe.config-comment-editor {
+  --crepe-color-background: #3a3a3a;
+  --crepe-color-on-background: #f3f3f3;
+  --crepe-color-surface: #292929;
+  --crepe-color-surface-low: #505050;
+  --crepe-color-on-surface: #f3f3f3;
+  --crepe-color-on-surface-variant: #bdbdbd;
+  --crepe-color-outline: #666666;
+  --crepe-color-primary: #70bfff;
+  --crepe-color-secondary: #454545;
+  --crepe-color-hover: #474747;
+  --crepe-color-selected: #3e5578;
+  --crepe-color-inline-area: #343434;
+}
+
+.document-editor-crepe.config-comment-editor .milkdown .ProseMirror {
+  border: 1px solid #5b5b5b;
+  border-radius: 12px;
+  background: #3a3a3a;
+}
+
+.document-editor-crepe.config-comment-editor .milkdown .ProseMirror:focus {
+  border-color: #70bfff;
+  box-shadow: 0 0 0 1px rgb(112 191 255 / 70%);
+}
+
 /* 批注输入框默认一行，随内容增高；达到上限后只滚动正文，不撑破浮窗。 */
 .document-editor-crepe[data-auto-grow="true"] {
   height: auto !important;

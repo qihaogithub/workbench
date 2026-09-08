@@ -7,6 +7,8 @@ export { CommentThreadPopover } from "./CommentThreadPopover";
 export { ConfigCommentPopover } from "./ConfigCommentPopover";
 export { CommentMarkdownEditor } from "./CommentMarkdownEditor";
 export { CommentCreatePopover } from "./CommentCreatePopover";
+export { CommentComposer } from "./CommentComposer";
+export { COMMENT_VISUAL_TOKENS, COMMENT_AVATAR_COLORS, commentAvatarColor } from "./comment-theme";
 export {
   MentionPicker,
   MentionTextarea,
@@ -34,15 +36,19 @@ export type {
   UpdateCommentContentInput,
   IframeViewState,
   MentionCandidate,
+  CommentImageUploadResult,
+  CommentImageUploadHandler,
 } from "./types";
 export type { CommentPinProps } from "./CommentPin";
 export type { CommentThreadPopoverProps } from "./CommentThreadPopover";
 export type { ConfigCommentPopoverProps } from "./ConfigCommentPopover";
 export type { CommentMarkdownEditorProps } from "./CommentMarkdownEditor";
 export type { CommentCreatePopoverProps } from "./CommentCreatePopover";
+export type { CommentComposerProps } from "./CommentComposer";
 export type {
   MentionPickerProps,
   MentionTextareaProps,
+  MentionTextareaHandle,
   MentionContentProps,
 } from "./MentionPicker";
 export type { CommentPageMeta, CommentSidebarProps } from "./CommentSidebar";

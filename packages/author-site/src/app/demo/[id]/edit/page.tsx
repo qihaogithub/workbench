@@ -1938,6 +1938,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       values: Record<string, unknown>,
       delayMs = 500,
       shouldPersist = true,
+      markDirty = true,
     ) => {
       const nextValues = { ...values };
       configDataMapRef.current = {
@@ -1946,14 +1947,20 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       };
       setConfigDataMap((previous) => ({ ...previous, [pageId]: nextValues }));
       if (shouldPersist) persistPageConfigValues(pageId, nextValues, delayMs);
-      markScreenshotDirty(pageId);
-      markWorkspaceChanged();
+      if (markDirty) {
+        markScreenshotDirty(pageId);
+        markWorkspaceChanged();
+      }
     },
     [markScreenshotDirty, markWorkspaceChanged, persistPageConfigValues],
   );
 
   const replaceProjectConfigValues = useCallback(
-    (values: Record<string, unknown>, shouldPersist = true) => {
+    (
+      values: Record<string, unknown>,
+      shouldPersist = true,
+      markDirty = true,
+    ) => {
       const nextValues = { ...values };
       projectConfigValuesRef.current = nextValues;
       setProjectConfigValues(nextValues);
@@ -1971,8 +1978,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       };
       configDataMapRef.current = applyProjectValues(configDataMapRef.current);
       setConfigDataMap(applyProjectValues);
-      for (const page of demoPagesRef.current) markScreenshotDirty(page.id);
-      markWorkspaceChanged();
+      if (markDirty) {
+        for (const page of demoPagesRef.current) markScreenshotDirty(page.id);
+        markWorkspaceChanged();
+      }
     },
     [markScreenshotDirty, markWorkspaceChanged, persistProjectConfigValues],
   );
@@ -2496,6 +2505,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     () => ({
       threads: commentsData.threads,
       currentUser: commentUser,
+      uploadCommentImage: commentApi.uploadCommentImage,
       mentionCandidates: commentMentionCandidates,
       canMentionAgent: false,
       readOnly: false,
@@ -2509,6 +2519,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     }),
     [
       commentMentionCandidates,
+      commentApi,
       commentUser,
       commentsData.addReply,
       commentsData.createComment,
@@ -2528,27 +2539,27 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     (page: DemoPageMeta) => {
       const isReference = Boolean(page.reference);
       const isTemplate = Boolean(page.isTemplatePage);
-      const canEdit =
+      const canEditValue =
         canEditConfigRole &&
-        !isReference &&
         (!isTemplate || currentUserRole === "admin");
+      const canEditDefinition = canEditValue && !isReference;
       const reason = isReference
         ? "reference"
-        : isTemplate && !canEdit
+        : isTemplate && !canEditValue
           ? "template-page"
-          : !canEdit
+          : !canEditValue
             ? "readonly"
             : "none";
       return {
         project: {
-          canEditDefinition: canEdit,
-          canEditValue: canEdit,
+          canEditDefinition,
+          canEditValue,
           canAddComment: true,
           reason,
         },
         page: {
-          canEditDefinition: canEdit,
-          canEditValue: canEdit,
+          canEditDefinition,
+          canEditValue,
           canAddComment: true,
           reason,
         },
@@ -4830,6 +4841,8 @@ ${context.details}
 
   const handlePageConfigPanelChange = useCallback(
     (pageId: string, data: Record<string, unknown>, meta?: ConfigChangeMeta) => {
+      const pageMeta = demoPagesRef.current.find((page) => page.id === pageId);
+      const isReferencePage = Boolean(pageMeta?.reference);
       const schema = pageSchemaMapRef.current[pageId];
       const dataClean = schema ? flattenNestedDelta(data, schema) : data;
       const prevClean = schema
@@ -4842,19 +4855,25 @@ ${context.details}
         clearTimeout(pendingPersist.timer);
         delete pageConfigPersistTimersRef.current[pageId];
       }
+      const shouldPersist =
+        !isReferencePage &&
+        (!committed || Boolean(pendingPersist));
       replacePageConfigValues(
         pageId,
         nextPageConfig,
         committed ? 0 : 500,
-        !committed || Boolean(pendingPersist),
+        shouldPersist,
+        !isReferencePage,
       );
       if (!areConfigValuesEqual(prevClean, nextPageConfig)) {
         const before = { ...prevClean };
         const after = { ...nextPageConfig };
         recordCommand({
           label: "页面配置变更",
-          undo: () => replacePageConfigValues(pageId, before, 0),
-          redo: () => replacePageConfigValues(pageId, after, 0),
+          undo: () =>
+            replacePageConfigValues(pageId, before, 0, !isReferencePage, !isReferencePage),
+          redo: () =>
+            replacePageConfigValues(pageId, after, 0, !isReferencePage, !isReferencePage),
         });
       }
     },
@@ -4956,6 +4975,14 @@ ${context.details}
 
   const handleProjectConfigPanelChange = useCallback(
     (data: Record<string, unknown>, meta?: ConfigChangeMeta) => {
+      const contextPageId =
+        previewMode === "canvas"
+          ? (configPanelDetailPageId ?? activeDemoIdRef.current)
+          : activeDemoIdRef.current;
+      const activePage = demoPagesRef.current.find(
+        (page) => page.id === contextPageId,
+      );
+      const isReferencePage = Boolean(activePage?.reference);
       const before = { ...projectConfigValuesRef.current };
       const nextProjectConfigValues = {
         ...projectConfigValuesRef.current,
@@ -4963,18 +4990,20 @@ ${context.details}
       };
       replaceProjectConfigValues(
         nextProjectConfigValues,
-        meta?.persistence !== "committed" || projectConfigPersistPendingCountRef.current > 0,
+        !isReferencePage &&
+          (meta?.persistence !== "committed" || projectConfigPersistPendingCountRef.current > 0),
+        !isReferencePage,
       );
       if (!areConfigValuesEqual(before, nextProjectConfigValues)) {
         const after = { ...nextProjectConfigValues };
         recordCommand({
           label: "项目配置变更",
-          undo: () => replaceProjectConfigValues(before),
-          redo: () => replaceProjectConfigValues(after),
+          undo: () => replaceProjectConfigValues(before, !isReferencePage, !isReferencePage),
+          redo: () => replaceProjectConfigValues(after, !isReferencePage, !isReferencePage),
         });
       }
     },
-    [recordCommand, replaceProjectConfigValues],
+    [configPanelDetailPageId, previewMode, recordCommand, replaceProjectConfigValues],
   );
 
   handleProjectConfigPanelChangeRef.current = handleProjectConfigPanelChange;
@@ -9890,6 +9919,7 @@ ${context.details}
                         }
                         canvasCreateDraft={canvasCommentDraft}
                         onCanvasCreateDraftChange={setCanvasCommentDraft}
+                        canvasViewport={previewMode === "canvas" ? canvasState.viewport : undefined}
                       >
                         <HtmlFileDropZone
                           onFilesDrop={handlePreviewHtmlFilesDrop}
@@ -10472,6 +10502,7 @@ ${context.details}
                           setCommentModeActive(false);
                         }}
                         onCreateComment={documentCommentsData.createComment}
+                        uploadCommentImage={commentApi.uploadCommentImage}
                         selectionDraft={documentCommentSelection}
                         onSelectionDraftHandled={() =>
                           setDocumentCommentSelection(null)
@@ -10703,12 +10734,12 @@ ${context.details}
                                 : handleSaveAsDefaults
                             }
                             onRestoreDefaults={
-                              activeDemoPage?.reference
-                                ? undefined
-                                : handleRestoreDefaults
+                              handleRestoreDefaults
                             }
                             onProjectSaveAsDefaults={
-                              handleProjectSaveAsDefaults
+                              projectConfigContextPage?.reference
+                                ? undefined
+                                : handleProjectSaveAsDefaults
                             }
                             onProjectRestoreDefaults={
                               handleProjectRestoreDefaults
@@ -10717,7 +10748,11 @@ ${context.details}
                             referenceContext={pageRequirementsReferenceContext}
                             referenceProvider={markdownReferenceProvider}
                             onReferenceClick={handleMarkdownReferenceClick}
-                            onLaunchWhiteboard={launchWhiteboard}
+                            onLaunchWhiteboard={
+                              activeDemoPage?.reference
+                                ? undefined
+                                : launchWhiteboard
+                            }
                             hideDetailHeader
                             onEnterPositionEdit={handleEnterPositionEdit}
                             onPositionFieldPathChange={
@@ -10737,24 +10772,31 @@ ${context.details}
                                   "")
                                 : (requirementsMap[activeDemoId] ?? "")
                             }
-                            onRequirementsChange={(markdown) =>
-                              handlePageRequirementsChange(
-                                activeDemoId,
-                                markdown,
-                              )
+                            onRequirementsChange={
+                              activeDemoPage?.reference
+                                ? undefined
+                                : (markdown) =>
+                                    handlePageRequirementsChange(
+                                      activeDemoId,
+                                      markdown,
+                                    )
                             }
                             requirementsLoading={requirementsLoading}
                             requirementsPosition="hidden"
-                            readonly={!!activeDemoPage?.reference}
+                            readonly={currentUserRole === "readonly"}
                             designSpecApiContext={{
                               workingDir: workspacePath || undefined,
                               sessionId,
                               projectId: demoId,
                             }}
-                            onEditDesignSpec={(docId, entryId) => {
-                              setDesignSpecFocus({ docId, entryId });
-                              setPreviewMode("document");
-                            }}
+                            onEditDesignSpec={
+                              activeDemoPage?.reference
+                                ? undefined
+                                : (docId, entryId) => {
+                                    setDesignSpecFocus({ docId, entryId });
+                                    setPreviewMode("document");
+                                  }
+                            }
                             configDefinitionFocus={configDefinitionFocus}
                             onConfigDefinitionFocusConsumed={() =>
                               setConfigDefinitionFocus(null)
@@ -10895,12 +10937,12 @@ ${context.details}
                                 : handleSaveAsDefaults
                             }
                             onRestoreDefaults={
-                              activeDemoPage?.reference
-                                ? undefined
-                                : handleRestoreDefaults
+                              handleRestoreDefaults
                             }
                             onProjectSaveAsDefaults={
-                              handleProjectSaveAsDefaults
+                              projectConfigContextPage?.reference
+                                ? undefined
+                                : handleProjectSaveAsDefaults
                             }
                             onProjectRestoreDefaults={
                               handleProjectRestoreDefaults
@@ -10909,7 +10951,11 @@ ${context.details}
                             referenceContext={pageRequirementsReferenceContext}
                             referenceProvider={markdownReferenceProvider}
                             onReferenceClick={handleMarkdownReferenceClick}
-                            onLaunchWhiteboard={launchWhiteboard}
+                            onLaunchWhiteboard={
+                              activeDemoPage?.reference
+                                ? undefined
+                                : launchWhiteboard
+                            }
                             onEnterPositionEdit={handleEnterPositionEdit}
                             onPositionFieldPathChange={
                               handlePositionFieldPathChange
@@ -10927,23 +10973,30 @@ ${context.details}
                                 configPanelDetailPageId ?? activeDemoId
                               ] ?? ""
                             }
-                            onRequirementsChange={(markdown) =>
-                              handlePageRequirementsChange(
-                                configPanelDetailPageId ?? activeDemoId,
-                                markdown,
-                              )
+                            onRequirementsChange={
+                              projectConfigContextPage?.reference
+                                ? undefined
+                                : (markdown) =>
+                                    handlePageRequirementsChange(
+                                      configPanelDetailPageId ?? activeDemoId,
+                                      markdown,
+                                    )
                             }
                             requirementsLoading={requirementsLoading}
-                            readonly={Boolean(projectConfigContextPage?.reference)}
+                            readonly={currentUserRole === "readonly"}
                             designSpecApiContext={{
                               workingDir: workspacePath || undefined,
                               sessionId,
                               projectId: demoId,
                             }}
-                            onEditDesignSpec={(docId, entryId) => {
-                              setDesignSpecFocus({ docId, entryId });
-                              setPreviewMode("document");
-                            }}
+                            onEditDesignSpec={
+                              projectConfigContextPage?.reference
+                                ? undefined
+                                : (docId, entryId) => {
+                                    setDesignSpecFocus({ docId, entryId });
+                                    setPreviewMode("document");
+                                  }
+                            }
                             configDefinitionFocus={configDefinitionFocus}
                             onConfigDefinitionFocusConsumed={() =>
                               setConfigDefinitionFocus(null)

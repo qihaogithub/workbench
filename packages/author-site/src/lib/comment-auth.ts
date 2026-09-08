@@ -100,3 +100,11 @@ export function canModify(
   // 已登录用户：本人或管理员均可操作（当前系统所有登录用户均有管理权限，后续可细化）
   return true;
 }
+
+/** 编辑正文或删除评论时只允许评论发送者本人，管理员也不绕过此边界。 */
+export function canEditOrDeleteComment(
+  operator: CommentAuthorResult,
+  targetAuthorId: string,
+): boolean {
+  return Boolean(operator.author.id && targetAuthorId && operator.author.id === targetAuthorId);
+}

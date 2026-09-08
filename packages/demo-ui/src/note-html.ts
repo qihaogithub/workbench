@@ -86,6 +86,51 @@ function isSafeMediaSrc(
   return true;
 }
 
+/**
+ * SSR 没有 DOMPurify 的浏览器窗口，仍需先做一层保守清洗，避免把评论
+ * 中的 data/blob/javascript 图片或原始脚本直接放进首屏 HTML。客户端挂载
+ * 后会再次使用 DOMPurify 做完整白名单清洗。
+ */
+function sanitizeServerHtml(
+  html: string,
+  { allowExternalMedia = false, mediaBaseUrl }: { allowExternalMedia?: boolean; mediaBaseUrl?: string },
+): string {
+  const mediaPrefix = mediaBaseUrl ? `${mediaBaseUrl.replace(/\/$/, "")}/api/images/` : undefined;
+  let normalized = mediaBaseUrl
+    ? html.replace(
+        /(\bsrc\s*=\s*["'])\/api\/images\//gi,
+        `$1${mediaPrefix}`,
+      )
+    : html;
+
+  // Raw HTML is accepted by markdown-it for legacy notes; discard executable or
+  // embedding elements before handing the string to dangerouslySetInnerHTML.
+  normalized = normalized.replace(
+    /<\s*(script|style|iframe|object|embed|form|base|meta|link)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi,
+    "",
+  );
+  normalized = normalized.replace(
+    /<\s*(script|style|iframe|object|embed|form|base|meta|link)\b[^>]*\/\s*>/gi,
+    "",
+  );
+  normalized = normalized.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+
+  normalized = normalized.replace(
+    /<(img|video|audio|source)\b([^>]*)>/gi,
+    (_tag, element: string, attrs: string) => {
+      const nextAttrs = attrs.replace(
+        /\s+src\s*=\s*(["'])(.*?)\1/gi,
+        (full: string, quote: string, src: string) => {
+          const trusted = Boolean(mediaPrefix && src.startsWith(mediaPrefix));
+          return trusted || isSafeMediaSrc(src, allowExternalMedia) ? ` src=${quote}${src}${quote}` : "";
+        },
+      );
+      return `<${element}${nextAttrs}>`;
+    },
+  );
+  return normalized;
+}
+
 export function sanitizeNoteHtml(
   html: string,
   {
@@ -93,7 +138,9 @@ export function sanitizeNoteHtml(
     mediaBaseUrl,
   }: { allowExternalMedia?: boolean; mediaBaseUrl?: string } = {},
 ): string {
-  if (typeof window === "undefined") return html;
+  if (typeof window === "undefined") {
+    return sanitizeServerHtml(html, { allowExternalMedia, mediaBaseUrl });
+  }
   const DOMPurify = require("dompurify");
   const normalizedHtml = mediaBaseUrl
     ? html.replace(
@@ -113,7 +160,6 @@ export function sanitizeNoteHtml(
       "img, video, audio, source",
     )
     .forEach((node) => {
-      const src = node.getAttribute("src");
       const resolvedSrc = node.getAttribute("src");
       const trustedMediaSrc = mediaBaseUrl
         ? `${mediaBaseUrl.replace(/\/$/, "")}/api/images/`
@@ -140,7 +186,10 @@ function escapeHtml(text: string): string {
 }
 
 /** 将 Markdown 备注渲染为已清洗的安全 HTML（图片/视频/附件内联显示） */
-export function renderNoteMarkdown(markdown: string): string {
+export function renderNoteMarkdown(
+  markdown: string,
+  options: { allowExternalMedia?: boolean; mediaBaseUrl?: string } = {},
+): string {
   if (!markdown) return "";
   const withReferences = replaceCanonicalReferenceMarkup(markdown);
   let html: string;
@@ -149,7 +198,7 @@ export function renderNoteMarkdown(markdown: string): string {
   } catch {
     html = escapeHtml(markdown).replace(/\n/g, "<br>");
   }
-  return sanitizeNoteHtml(html);
+  return sanitizeNoteHtml(html, options);
 }
 
 /** Replace only parser-approved wb:// links (never code or HTML attributes)

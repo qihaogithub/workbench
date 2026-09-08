@@ -274,6 +274,10 @@ export {
   ConfigCommentPopover,
   CommentMarkdownEditor,
   CommentCreatePopover,
+  CommentComposer,
+  COMMENT_VISUAL_TOKENS,
+  COMMENT_AVATAR_COLORS,
+  commentAvatarColor,
   MentionPicker,
   MentionTextarea,
   MentionContent,
@@ -304,6 +308,10 @@ export type {
   CommentUnreadDotProps,
   ConfigCommentPopoverProps,
   CommentMarkdownEditorProps,
+  CommentComposerProps,
+  CommentImageUploadResult,
+  CommentImageUploadHandler,
+  MentionTextareaHandle,
 } from "./comment";
 export { PreviewCanvas } from "./PreviewCanvas";
 export { CanvasViewport } from "./CanvasViewport";

@@ -17,6 +17,11 @@ export interface DOMRectLike {
   height: number;
 }
 
+export interface NormalizedPin {
+  xRatio: number;
+  yRatio: number;
+}
+
 export interface PrototypePinMetrics {
   /** 容器非缩放布局宽度（offsetWidth） */
   offsetWidth: number;
@@ -71,7 +76,7 @@ export function computePrototypePinRatio(
 export function computePrototypePinPosition(
   metrics: PrototypePinMetrics & {
     containerRect: DOMRectLike;
-    pin: { xRatio: number; yRatio: number };
+    pin: NormalizedPin;
   },
 ): { left: number; top: number } {
   const scale = computePrototypeScale(metrics.rect.width, metrics.offsetWidth);
@@ -82,5 +87,29 @@ export function computePrototypePinPosition(
   return {
     left: metrics.rect.left - metrics.containerRect.left + vpX * scale,
     top: metrics.rect.top - metrics.containerRect.top + vpY * scale,
+  };
+}
+
+/**
+ * 将页面内归一化坐标映射为评论层容器内的像素位置。
+ *
+ * 画布页面位于 CanvasViewport 的变换层内，页面元素的
+ * getBoundingClientRect() 已经包含当前平移和缩放，因此这里不再重复应用
+ * viewport 变换，只需把页面盒内的归一化位置转换为容器坐标。
+ */
+export function computeCanvasPinPosition(metrics: {
+  containerRect: DOMRectLike;
+  pageRect: DOMRectLike;
+  pin: NormalizedPin;
+}): { left: number; top: number } {
+  return {
+    left:
+      metrics.pageRect.left -
+      metrics.containerRect.left +
+      clamp01(metrics.pin.xRatio) * metrics.pageRect.width,
+    top:
+      metrics.pageRect.top -
+      metrics.containerRect.top +
+      clamp01(metrics.pin.yRatio) * metrics.pageRect.height,
   };
 }

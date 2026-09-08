@@ -1,0 +1,21 @@
+{
+  "id": "visibility_failed_e425d6d431d1a660",
+  "sessionId": "session-1788874212600-e8lzvqnsg",
+  "projectId": "proj_1787895065566_5wgvzx",
+  "workspaceId": "live-1787895066314-d67ahlorl",
+  "baseRevision": 58,
+  "baseRootHash": "100c97bab208e18f0e2e66a9e5278b645f0379b9a75b2e7830991018c94965da",
+  "changes": [
+    {
+      "path": "demos/video-demo_ab12/config.schema.json",
+      "content": "{\n  \"$demo\": {\n    \"presentation\": {\n      \"version\": 1,\n      \"mode\": \"responsive-page\",\n      \"viewport\": {\n        \"width\": 390,\n        \"height\": 844\n      },\n      \"heightBehavior\": \"content\",\n      \"preset\": \"mobile\",\n      \"source\": \"user\"\n    }\n  },\n  \"type\": \"object\",\n  \"properties\": {\n    \"heroVideo\": {\n      \"type\": \"object\",\n      \"title\": \"主视频\",\n      \"format\": \"video\",\n      \"properties\": {\n        \"url\": {\n          \"type\": \"string\",\n          \"title\": \"视频地址\"\n        },\n        \"poster\": {\n          \"type\": \"string\",\n          \"title\": \"封面地址\",\n          \"format\": \"image\"\n        }\n      },\n      \"required\": [\n        \"url\"\n      ],\n      \"ui:options\": {\n        \"accept\": \"video/mp4,video/webm\",\n        \"videoPreviewStyle\": \"controls\"\n      },\n      \"default\": null\n    },\n    \"heroImage\": {\n      \"type\": \"string\",\n      \"title\": \"展示图片\",\n      \"format\": \"image\",\n      \"description\": \"图片为可选配置，建议 4:3 比例\",\n      \"default\": \"\"\n    }\n  },\n  \"required\": []\n}"
+    }
+  ],
+  "changedPaths": [
+    "demos/video-demo_ab12/config.schema.json"
+  ],
+  "error": "联动草稿必须同时包含 project.visibility-rules.json",
+  "issues": [],
+  "createdAt": 1788880807733,
+  "expiresAt": 1788881407733
+}

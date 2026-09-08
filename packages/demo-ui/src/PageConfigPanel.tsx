@@ -1262,6 +1262,7 @@ export function PageConfigPanel({
   );
   const projectCapabilities = selectedPage.configItemCapabilities?.project;
   const pageCapabilities = selectedPage.configItemCapabilities?.page;
+  const isReferencePage = Boolean(selectedPage.reference);
   const canCreateProjectConfig =
     Boolean(onProjectDefinitionChange) &&
     (projectCapabilities?.canEditDefinition ?? !readonly);
@@ -1275,8 +1276,10 @@ export function PageConfigPanel({
     Boolean(onProjectRestoreDefaults) &&
     (projectCapabilities?.canEditValue ?? !readonly);
   const canSavePageDefaults =
+    !isReferencePage &&
     Boolean(onSaveAsDefaults) && (pageCapabilities?.canEditValue ?? !readonly);
   const canSaveProjectDefaults =
+    !isReferencePage &&
     Boolean(onProjectSaveAsDefaults) &&
     (projectCapabilities?.canEditValue ?? !readonly);
   const restoreDefaultsTarget = canRestorePageDefaults
