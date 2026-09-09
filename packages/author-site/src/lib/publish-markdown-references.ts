@@ -3,6 +3,7 @@ import path from "path";
 import type { KnowledgeIndexItem } from "@workbench/shared";
 import {
   parseMarkdownReferences,
+  encodeMarkdownReferenceUri,
   type MarkdownReferenceTarget,
 } from "@workbench/shared/markdown-reference";
 
@@ -53,9 +54,7 @@ type PublishedPage = {
 };
 
 function publishedTargetKey(target: MarkdownReferenceTarget): string {
-  if (target.kind === "project") return `project:${target.projectId}`;
-  if (target.kind === "page") return `page:${target.projectId}:${target.pageId}`;
-  return `document:${target.projectId}:${target.docId}`;
+  return encodeMarkdownReferenceUri(target);
 }
 
 /**
@@ -207,7 +206,8 @@ export function sanitizePublishedMarkdown(
   for (const reference of references) {
     // A plain label keeps the published text readable without leaking an
     // unpublished project/page/document ID through HTML or source inspection.
-    output = output.slice(0, reference.start) + reference.labelSnapshot + output.slice(reference.end);
+    const label = reference.labelSnapshot.replace(/([\\`*_[\]<>])/g, "\\$1");
+    output = output.slice(0, reference.start) + label + output.slice(reference.end);
   }
   return output;
 }

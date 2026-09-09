@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  encodeMarkdownReferenceUri,
+  serializeMarkdownReference,
+  type MarkdownReferenceTarget,
+} from "@workbench/shared/markdown-reference";
+import {
   sanitizeNoteHtml,
   renderNoteMarkdown,
   renderPageRequirementsMarkdown,
@@ -8,7 +13,8 @@ import {
 
 describe("sanitizeNoteHtml", () => {
   it("允许常规富文本标签与属性", () => {
-    const html = '<p><strong>加粗</strong> 与 <a href="https://example.com">链接</a></p>';
+    const html =
+      '<p><strong>加粗</strong> 与 <a href="https://example.com">链接</a></p>';
     const out = sanitizeNoteHtml(html);
     expect(out).toContain("<strong>加粗</strong>");
     expect(out).toContain('<a href="https://example.com"');
@@ -27,34 +33,46 @@ describe("sanitizeNoteHtml", () => {
   });
 
   it("允许视频标签与控制器属性", () => {
-    const out = sanitizeNoteHtml('<video controls src="/api/attachments/v1"></video>');
+    const out = sanitizeNoteHtml(
+      '<video controls src="/api/attachments/v1"></video>',
+    );
     expect(out).toContain("<video");
     expect(out).toContain("controls");
     expect(out).toContain('src="/api/attachments/v1"');
   });
 
   it("剥离外部/协议相对 src 以防范 XSS", () => {
-    expect(sanitizeNoteHtml('<img src="https://evil.com/x.png">')).not.toContain("src=");
-    expect(sanitizeNoteHtml("<img src=\"//evil.com/x.png\">")).not.toContain("src=");
-    expect(sanitizeNoteHtml('<img src="javascript:alert(1)">')).not.toContain("src=");
+    expect(
+      sanitizeNoteHtml('<img src="https://evil.com/x.png">'),
+    ).not.toContain("src=");
+    expect(sanitizeNoteHtml('<img src="//evil.com/x.png">')).not.toContain(
+      "src=",
+    );
+    expect(sanitizeNoteHtml('<img src="javascript:alert(1)">')).not.toContain(
+      "src=",
+    );
   });
 });
 
 describe("renderNoteMarkdown", () => {
   it("渲染图片与链接 Markdown 为受控 HTML", () => {
-    const html = renderNoteMarkdown("![图](/api/images/img_1)\n\n[pdf](/api/attachments/a1)");
+    const html = renderNoteMarkdown(
+      "![图](/api/images/img_1)\n\n[pdf](/api/attachments/a1)",
+    );
     expect(html).toContain('<img src="/api/images/img_1"');
     expect(html).toContain('<a href="/api/attachments/a1"');
   });
 
   it("渲染内联 video 标签", () => {
-    const html = renderNoteMarkdown('<video controls src="/api/attachments/v1"></video>');
+    const html = renderNoteMarkdown(
+      '<video controls src="/api/attachments/v1"></video>',
+    );
     expect(html).toContain("<video");
     expect(html).toContain('src="/api/attachments/v1"');
   });
 
   it("剥离外部图片 src", () => {
-    const html = renderNoteMarkdown('![外](https://evil.com/x.png)');
+    const html = renderNoteMarkdown("![外](https://evil.com/x.png)");
     expect(html).not.toContain("evil.com");
   });
 
@@ -77,12 +95,12 @@ describe("renderPageRequirementsMarkdown", () => {
     expect(html).not.toContain("pr-ref");
   });
 
-  it("将 canonical wb 引用渲染为带 URI 的安全 chip", () => {
+  it("将 canonical wb 引用渲染为带 URI 和类型的安全行内引用", () => {
     const html = renderPageRequirementsMarkdown(
       "参见 [首页](wb://page/project-1/home)。",
     );
     expect(html).toContain(
-      '<span class="pr-reference" data-reference-uri="wb://page/project-1/home">首页</span>',
+      '<span class="pr-reference wb-reference" data-reference-uri="wb://page/project-1/home" data-reference-kind="page" aria-label="首页">首页</span>',
     );
     expect(html).not.toContain('href="wb://');
   });
@@ -108,7 +126,7 @@ describe("renderPageRequirementsMarkdown", () => {
     );
 
     expect(sized).toContain('data-image-width="360"');
-    expect(sized).toContain('width: min(360px, 100%)');
+    expect(sized).toContain("width: min(360px, 100%)");
     expect(legacy).toContain('data-image-width="default"');
   });
 
@@ -117,9 +135,62 @@ describe("renderPageRequirementsMarkdown", () => {
   });
 });
 
+describe("readonly reference presentation", () => {
+  const targets: MarkdownReferenceTarget[] = [
+    { kind: "project", projectId: "项目" },
+    { kind: "page", projectId: "项目", pageId: "页面" },
+    {
+      kind: "config",
+      projectId: "项目",
+      pageId: "页面",
+      fieldPath: "group/title",
+    },
+    { kind: "document", projectId: "项目", docId: "知识" },
+    {
+      kind: "document",
+      projectId: "项目",
+      docId: "memory",
+      documentKind: "memory",
+    },
+  ];
+  for (const render of [renderNoteMarkdown, renderPageRequirementsMarkdown]) {
+    it(`${render.name} preserves snapshots and uses decoded kinds without navigation or availability claims`, () => {
+      for (const target of targets) {
+        const snapshot = 'Stored "name" <img src=x onerror=alert(1)> & text';
+        const html = render(serializeMarkdownReference(target, snapshot));
+        const template = document.createElement("template");
+        template.innerHTML = html;
+        const reference = template.content.querySelector(
+          "span.pr-reference.wb-reference",
+        )!;
+        expect(reference).not.toBeNull();
+        expect(reference.textContent).toBe(snapshot);
+        expect(reference.getAttribute("aria-label")).toBe(snapshot);
+        expect(reference.getAttribute("data-reference-kind")).toBe(target.kind);
+        expect(reference.getAttribute("data-reference-uri")).toBe(
+          encodeMarkdownReferenceUri(target),
+        );
+        expect(reference.hasAttribute("data-reference-status")).toBe(false);
+        expect(
+          template.content.querySelector("img, a[href^='wb:']"),
+        ).toBeNull();
+      }
+    });
+    it(`${render.name} leaves code, external links, and malformed reference URIs out of presentation`, () => {
+      const html = render(
+        "`[code](wb://page/p/x)`\n\n[bad](wb://config/p/x) [web](https://example.com)",
+      );
+      expect(html).not.toContain('class="pr-reference');
+      expect(html).toContain('href="https://example.com"');
+    });
+  }
+});
+
 describe("stripMarkdown", () => {
   it("提取纯文本并忽略图片与链接语法", () => {
-    expect(stripMarkdown("# 标题\n\n![图](/api/a) 说明 [链接](/api/b)")).toContain("标题");
+    expect(
+      stripMarkdown("# 标题\n\n![图](/api/a) 说明 [链接](/api/b)"),
+    ).toContain("标题");
     expect(stripMarkdown("# 标题\n\n![图](/api/a) 说明")).not.toContain("/api");
   });
 

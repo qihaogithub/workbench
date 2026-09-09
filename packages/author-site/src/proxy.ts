@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { findUserById } from "@/lib/user";
 import {
   extractBearerToken,
   verifyToken,
@@ -58,8 +59,16 @@ function applyPublicModuleCorsHeaders(headers: Headers) {
 export async function proxy(request: NextRequest) {
   const cookieToken = request.cookies.get(getAuthCookieName())?.value;
   const token = cookieToken || extractBearerToken(request.headers.get("authorization"));
-  const user = token ? await verifyToken(token) : null;
+  const payload = token ? await verifyToken(token) : null;
   const pathname = request.nextUrl.pathname;
+  // Page redirects must agree with the workbench's database-backed identity
+  // check. A signed token can outlive its user (or a local database restore).
+  const needsExistingUser = pathname === "/" ||
+    AUTH_ROUTES.some((route) => matchesRoute(pathname, route)) ||
+    PROTECTED_PAGE_ROUTES.some((route) => matchesRoute(pathname, route));
+  const user = payload && needsExistingUser
+    ? (typeof payload.userId === "string" ? findUserById(payload.userId) : null)
+    : payload;
   const origin = request.headers.get("origin");
   const isPreviewRuntimeModuleRoute =
     pathname.startsWith("/preview-runtime/") ||

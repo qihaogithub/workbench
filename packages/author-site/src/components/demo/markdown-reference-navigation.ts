@@ -1,3 +1,11 @@
+import {
+  decodeMarkdownReferenceUri,
+  encodeMarkdownReferenceUri,
+  type MarkdownReferenceCandidate,
+  type MarkdownReferenceTarget,
+} from "@workbench/shared/markdown-reference";
+import type { MarkdownReferenceProvider } from "@workbench/demo-ui/DocumentEditor";
+
 export interface MarkdownReferenceMentionLocation {
   label: string;
   start: number;
@@ -29,8 +37,9 @@ export function navigateToMarkdownMention(
   if (!container || !mention.label) return false;
   if (content.slice(mention.start, mention.end) !== mention.label) return false;
 
-  const editor = container.querySelector<HTMLElement>(".ProseMirror")
-    ?? container.querySelector<HTMLElement>(".markdown-editor-content");
+  const editor =
+    container.querySelector<HTMLElement>(".ProseMirror") ??
+    container.querySelector<HTMLElement>(".markdown-editor-content");
   if (!editor) return false;
 
   const sourcePrefix = content.slice(0, Math.max(0, mention.start));
@@ -56,7 +65,11 @@ export function navigateToMarkdownMention(
   while (node) {
     const textNode = node as Text;
     const nextOffset = textOffset + textNode.data.length;
-    if (!startNode && renderedStart >= textOffset && renderedStart <= nextOffset) {
+    if (
+      !startNode &&
+      renderedStart >= textOffset &&
+      renderedStart <= nextOffset
+    ) {
       startNode = textNode;
       startOffset = renderedStart - textOffset;
     }
@@ -78,11 +91,113 @@ export function navigateToMarkdownMention(
   selection?.removeAllRanges();
   selection?.addRange(range);
 
-  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+  const reducedMotion =
+    window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
   startNode.parentElement?.scrollIntoView({
     block: "center",
     behavior: reducedMotion ? "auto" : "smooth",
   });
   if (editor.isContentEditable) editor.focus({ preventScroll: true });
   return true;
+}
+export type AuthorDocumentReference = Extract<
+  MarkdownReferenceTarget,
+  { kind: "document" }
+>;
+
+/** Only the canonical reference crosses tabs; session/workspace ownership is resolved by bootstrap. */
+export function buildAuthorReferenceUrl(
+  _sourceProjectId: string,
+  target: MarkdownReferenceTarget,
+): string {
+  if (target.kind === "project") {
+    throw new Error("目标类型不受支持");
+  }
+  const reference = encodeMarkdownReferenceUri(target);
+  if (!decodeMarkdownReferenceUri(reference)) throw new Error("无效的项目引用");
+  return `/demo/${encodeURIComponent(target.projectId)}/edit?${new URLSearchParams({ reference })}`;
+}
+
+export function openAuthorReference(
+  projectId: string,
+  target: MarkdownReferenceTarget,
+): void {
+  window.open(
+    buildAuthorReferenceUrl(projectId, target),
+    "_blank",
+    "noopener,noreferrer",
+  );
+}
+
+export function resolveAuthorReference(
+  projectId: string,
+  uri: string,
+  candidates: readonly MarkdownReferenceCandidate[],
+): Exclude<MarkdownReferenceTarget, { kind: "project" }> {
+  const target = decodeMarkdownReferenceUri(uri);
+  if (!target || target.projectId !== projectId || target.kind === "project") {
+    throw new Error("无效或跨项目的引用");
+  }
+  const canonical = encodeMarkdownReferenceUri(target);
+  if (
+    !candidates.some(
+      (candidate) => encodeMarkdownReferenceUri(candidate.target) === canonical,
+    )
+  ) {
+    throw new Error("引用目标不存在或无权访问");
+  }
+  return target;
+}
+
+export async function fetchAuthorReferenceCandidates(
+  projectId: string,
+  sessionId: string | undefined,
+  query: string,
+  signal?: AbortSignal,
+): Promise<MarkdownReferenceCandidate[]> {
+  const params = new URLSearchParams({
+    q: query,
+    kind: "page,config,document",
+  });
+  if (sessionId) params.set("sessionId", sessionId);
+  const response = await fetch(
+    `/api/projects/${encodeURIComponent(projectId)}/markdown-references/candidates?${params}`,
+    { signal },
+  );
+  if (!response.ok) {
+    const error = new Error("引用目录加载失败，请重试") as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+  const payload = await response.json();
+  const candidates = payload?.data?.candidates ?? payload?.data;
+  if (payload?.success === false || !Array.isArray(candidates))
+    throw new Error("引用目录加载失败，请重试");
+  return candidates;
+}
+
+export function createAuthorReferenceProvider(
+  sourceProjectId: string,
+  sessionId?: string,
+): MarkdownReferenceProvider {
+  const provider: MarkdownReferenceProvider = async ({ query, signal, projectId }) => {
+    const targetProjectId = projectId ?? sourceProjectId;
+    return fetchAuthorReferenceCandidates(
+      targetProjectId,
+      targetProjectId === sourceProjectId ? sessionId : undefined,
+      query,
+      signal,
+    );
+  };
+  provider.listProjects = async (signal?: AbortSignal) => {
+    const response = await fetch("/api/demos", { signal });
+    if (!response.ok) throw new Error("项目列表加载失败，请重试");
+    const payload = await response.json();
+    const projects = payload?.data;
+    if (payload?.success === false || !Array.isArray(projects)) throw new Error("项目列表加载失败，请重试");
+    return projects
+      .filter((project): project is { id: string; name: string } => Boolean(project && typeof project.id === "string" && typeof project.name === "string"))
+      .map(({ id, name }) => ({ id, name }));
+  };
+  return provider;
 }

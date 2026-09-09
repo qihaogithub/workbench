@@ -105,6 +105,10 @@ function refToPoolId(ref: { scope: "project" | "page"; pageId?: string; fieldKey
 function referenceTargetKey(target: MarkdownReferenceTarget): string {
   if (target.kind === "project") return `project:${target.projectId}`;
   if (target.kind === "page") return `page:${target.projectId}:${target.pageId}`;
+  // These live-only targets are not in the published directory; never resolve
+  // them by accidentally treating their IDs as published knowledge documents.
+  if (target.kind === "config") return `unpublished-config:${target.projectId}:${target.pageId}:${target.fieldPath}`;
+  if (target.documentKind && target.documentKind !== "knowledge") return `unpublished-document:${target.projectId}:${target.documentKind}:${target.docId}`;
   return `document:${target.projectId}:${target.docId}`;
 }
 

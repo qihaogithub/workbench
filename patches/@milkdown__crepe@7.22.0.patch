@@ -1,0 +1,728 @@
+diff --git a/lib/cjs/feature/top-bar/index.js b/lib/cjs/feature/top-bar/index.js
+index 9f9623b7a7338976203d38aca92163d2eb0d4b89..25b460dafaa96a630f8fb1a71cb916c839829dd0 100644
+--- a/lib/cjs/feature/top-bar/index.js
++++ b/lib/cjs/feature/top-bar/index.js
+@@ -585,6 +585,116 @@ function getGroups(config, ctx) {
+ }
+ 
+ keepAlive(vue.h, vue.Fragment);
++// Kept inside the native renderer so commands and editor state stay authoritative.
++function createTopBarOverflow({ h, ref, onMounted, onUnmounted }) {
++  const root = ref(null)
++  const count = ref(Infinity)
++  const open = ref(false)
++  let observer
++  let frame = 0
++  const labels = { 'document-heading': '标题样式', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
++  function close(focus = false) {
++    open.value = false
++    if (focus) root.value?.querySelector('.top-bar-more')?.focus()
++  }
++  function measure() {
++    const el = root.value
++    if (!el) return
++    const probes = [...el.querySelector('.top-bar-measure').children]
++    const width = el.clientWidth
++    if (!width) return
++    const widths = probes.map(node => {
++      const style = getComputedStyle(node)
++      return node.getBoundingClientRect().width + parseFloat(style.marginLeft || '0') + parseFloat(style.marginRight || '0')
++    })
++    const total = widths.reduce((sum, value) => sum + value, 0)
++    let next = widths.length
++    if (total > width) {
++      let used = 0
++      next = 0
++      const reserve = 38
++      while (next < widths.length && used + widths[next] <= width - reserve) used += widths[next++]
++      while (next > 0 && probes[next - 1].classList.contains('top-bar-divider')) next--
++    }
++    if (count.value !== next) { count.value = next; close() }
++  }
++  const outside = event => { if (!root.value?.contains(event.target)) close() }
++  function bind(el) {
++    if (root.value === el) return
++    observer?.disconnect()
++    root.value = el
++    if (el && observer) {
++      observer.observe(el)
++      observer.observe(el.querySelector('.top-bar-measure'))
++    }
++  }
++  onMounted(() => {
++    if (typeof ResizeObserver === 'undefined') return
++    observer = new ResizeObserver(() => {
++      cancelAnimationFrame(frame)
++      frame = requestAnimationFrame(measure)
++    })
++    if (root.value) {
++      observer.observe(root.value)
++      observer.observe(root.value.querySelector('.top-bar-measure'))
++    }
++    document.addEventListener('pointerdown', outside)
++    measure()
++  })
++  onUnmounted(() => {
++    observer?.disconnect()
++    cancelAnimationFrame(frame)
++    document.removeEventListener('pointerdown', outside)
++  })
++  function render(nodes) {
++    const items = nodes.filter(Boolean)
++    const hidden = items.slice(count.value).filter(node => node.props?.class !== 'top-bar-divider')
++    const button = (node, menu = false, probe = false) => {
++      const label = labels[node.key] || node.key
++      const original = node.props || {}
++      if (node.type !== 'button') return h(node.type, { ...original, key: `${probe ? 'probe-' : ''}${node.key}` }, node.children)
++      const run = event => {
++        event.stopPropagation()
++        original.onPointerdown?.(event)
++        if (menu) {
++          close()
++          if (node.key !== 'document-heading') root.value?.closest('.milkdown')?.querySelector('.ProseMirror')?.focus()
++        }
++      }
++      return h('button', {
++        ...original,
++        key: `${probe ? 'probe-' : ''}${node.key}`,
++        title: label,
++        'aria-label': label,
++        ...(menu ? { role: 'menuitem', class: `${original.class} top-bar-overflow-item` } : {}),
++        ...(probe ? { tabindex: -1, onPointerdown: undefined } : {
++          onPointerdown: event => event.preventDefault(),
++          onClick: run,
++        }),
++      }, menu ? [node.children, h('span', { class: 'top-bar-overflow-label' }, label)] : node.children)
++    }
++    return h('div', { class: 'top-bar-inner', ref: bind, onKeydown: event => {
++      if (event.key === 'Escape' && open.value) { event.preventDefault(); event.stopPropagation(); close(true) }
++      if (open.value && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
++        event.preventDefault()
++        const buttons = [...root.value.querySelectorAll('[role="menuitem"]')]
++        let index = buttons.indexOf(document.activeElement)
++        index = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + buttons.length) % buttons.length
++        buttons[index]?.focus()
++      }
++    }, onFocusout: event => { if (event.relatedTarget && !root.value?.contains(event.relatedTarget)) close() } }, [
++      ...items.slice(0, count.value).map(node => button(node)),
++      hidden.length ? h('button', { type: 'button', class: 'top-bar-item top-bar-more', title: '更多', 'aria-label': '更多', 'aria-haspopup': 'menu', 'aria-expanded': open.value, onPointerdown: event => event.preventDefault(), onClick: () => {
++        open.value = !open.value
++        if (open.value) queueMicrotask(() => root.value?.querySelector('[role="menuitem"]')?.focus())
++      } }, '···') : null,
++      open.value && hidden.length ? h('div', { class: 'top-bar-overflow-menu', role: 'menu', 'aria-label': '更多工具' }, hidden.map(node => button(node, true))) : null,
++      h('div', { class: 'top-bar-measure', 'aria-hidden': 'true', inert: '' }, items.map(node => button(node, false, true))),
++    ])
++  }
++  return { render }
++}
++
+ const TopBar = vue.defineComponent({
+   props: {
+     ctx: {
+@@ -602,6 +712,7 @@ const TopBar = vue.defineComponent({
+   },
+   setup(props) {
+     const { ctx, config } = props;
++    const overflow = createTopBarOverflow(vue);
+     const openSelectorKey = vue.ref(null);
+     const onClick = (fn) => (e) => {
+       e.preventDefault();
+@@ -688,10 +799,11 @@ const TopBar = vue.defineComponent({
+       );
+     }
+     return () => {
++      subscribeState();
+       const view = isReady() ? ctx.get(core.editorViewCtx) : null;
+       const isReadonly = view ? !view.editable : false;
+       if (isReadonly) return null;
+-      return /* @__PURE__ */ vue.h("div", { class: "top-bar-inner" }, groupInfo.value.map((group) => {
++      return overflow.render(groupInfo.value.map((group) => {
+         return group.items.map((item) => {
+           if (item.selector) {
+             return renderSelector(item.key, item.selector);
+diff --git a/lib/cjs/index.js b/lib/cjs/index.js
+index 3acfaf245b6c30ec2a0bb46c9fe93b7ae4362f1d..48740e1eace759b146e48e98f503878708c35378 100644
+--- a/lib/cjs/index.js
++++ b/lib/cjs/index.js
+@@ -4112,6 +4112,116 @@ function getGroups(config, ctx) {
+ }
+ 
+ keepAlive(vue.h, vue.Fragment);
++// Kept inside the native renderer so commands and editor state stay authoritative.
++function createTopBarOverflow({ h, ref, onMounted, onUnmounted }) {
++  const root = ref(null)
++  const count = ref(Infinity)
++  const open = ref(false)
++  let observer
++  let frame = 0
++  const labels = { 'document-heading': '标题样式', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
++  function close(focus = false) {
++    open.value = false
++    if (focus) root.value?.querySelector('.top-bar-more')?.focus()
++  }
++  function measure() {
++    const el = root.value
++    if (!el) return
++    const probes = [...el.querySelector('.top-bar-measure').children]
++    const width = el.clientWidth
++    if (!width) return
++    const widths = probes.map(node => {
++      const style = getComputedStyle(node)
++      return node.getBoundingClientRect().width + parseFloat(style.marginLeft || '0') + parseFloat(style.marginRight || '0')
++    })
++    const total = widths.reduce((sum, value) => sum + value, 0)
++    let next = widths.length
++    if (total > width) {
++      let used = 0
++      next = 0
++      const reserve = 38
++      while (next < widths.length && used + widths[next] <= width - reserve) used += widths[next++]
++      while (next > 0 && probes[next - 1].classList.contains('top-bar-divider')) next--
++    }
++    if (count.value !== next) { count.value = next; close() }
++  }
++  const outside = event => { if (!root.value?.contains(event.target)) close() }
++  function bind(el) {
++    if (root.value === el) return
++    observer?.disconnect()
++    root.value = el
++    if (el && observer) {
++      observer.observe(el)
++      observer.observe(el.querySelector('.top-bar-measure'))
++    }
++  }
++  onMounted(() => {
++    if (typeof ResizeObserver === 'undefined') return
++    observer = new ResizeObserver(() => {
++      cancelAnimationFrame(frame)
++      frame = requestAnimationFrame(measure)
++    })
++    if (root.value) {
++      observer.observe(root.value)
++      observer.observe(root.value.querySelector('.top-bar-measure'))
++    }
++    document.addEventListener('pointerdown', outside)
++    measure()
++  })
++  onUnmounted(() => {
++    observer?.disconnect()
++    cancelAnimationFrame(frame)
++    document.removeEventListener('pointerdown', outside)
++  })
++  function render(nodes) {
++    const items = nodes.filter(Boolean)
++    const hidden = items.slice(count.value).filter(node => node.props?.class !== 'top-bar-divider')
++    const button = (node, menu = false, probe = false) => {
++      const label = labels[node.key] || node.key
++      const original = node.props || {}
++      if (node.type !== 'button') return h(node.type, { ...original, key: `${probe ? 'probe-' : ''}${node.key}` }, node.children)
++      const run = event => {
++        event.stopPropagation()
++        original.onPointerdown?.(event)
++        if (menu) {
++          close()
++          if (node.key !== 'document-heading') root.value?.closest('.milkdown')?.querySelector('.ProseMirror')?.focus()
++        }
++      }
++      return h('button', {
++        ...original,
++        key: `${probe ? 'probe-' : ''}${node.key}`,
++        title: label,
++        'aria-label': label,
++        ...(menu ? { role: 'menuitem', class: `${original.class} top-bar-overflow-item` } : {}),
++        ...(probe ? { tabindex: -1, onPointerdown: undefined } : {
++          onPointerdown: event => event.preventDefault(),
++          onClick: run,
++        }),
++      }, menu ? [node.children, h('span', { class: 'top-bar-overflow-label' }, label)] : node.children)
++    }
++    return h('div', { class: 'top-bar-inner', ref: bind, onKeydown: event => {
++      if (event.key === 'Escape' && open.value) { event.preventDefault(); event.stopPropagation(); close(true) }
++      if (open.value && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
++        event.preventDefault()
++        const buttons = [...root.value.querySelectorAll('[role="menuitem"]')]
++        let index = buttons.indexOf(document.activeElement)
++        index = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + buttons.length) % buttons.length
++        buttons[index]?.focus()
++      }
++    }, onFocusout: event => { if (event.relatedTarget && !root.value?.contains(event.relatedTarget)) close() } }, [
++      ...items.slice(0, count.value).map(node => button(node)),
++      hidden.length ? h('button', { type: 'button', class: 'top-bar-item top-bar-more', title: '更多', 'aria-label': '更多', 'aria-haspopup': 'menu', 'aria-expanded': open.value, onPointerdown: event => event.preventDefault(), onClick: () => {
++        open.value = !open.value
++        if (open.value) queueMicrotask(() => root.value?.querySelector('[role="menuitem"]')?.focus())
++      } }, '···') : null,
++      open.value && hidden.length ? h('div', { class: 'top-bar-overflow-menu', role: 'menu', 'aria-label': '更多工具' }, hidden.map(node => button(node, true))) : null,
++      h('div', { class: 'top-bar-measure', 'aria-hidden': 'true', inert: '' }, items.map(node => button(node, false, true))),
++    ])
++  }
++  return { render }
++}
++
+ const TopBar = vue.defineComponent({
+   props: {
+     ctx: {
+@@ -4129,6 +4239,7 @@ const TopBar = vue.defineComponent({
+   },
+   setup(props) {
+     const { ctx, config } = props;
++    const overflow = createTopBarOverflow(vue);
+     const openSelectorKey = vue.ref(null);
+     const onClick = (fn) => (e) => {
+       e.preventDefault();
+@@ -4215,10 +4326,11 @@ const TopBar = vue.defineComponent({
+       );
+     }
+     return () => {
++      subscribeState();
+       const view = isReady() ? ctx.get(core.editorViewCtx) : null;
+       const isReadonly = view ? !view.editable : false;
+       if (isReadonly) return null;
+-      return /* @__PURE__ */ vue.h("div", { class: "top-bar-inner" }, groupInfo.value.map((group) => {
++      return overflow.render(groupInfo.value.map((group) => {
+         return group.items.map((item) => {
+           if (item.selector) {
+             return renderSelector(item.key, item.selector);
+diff --git a/lib/esm/feature/top-bar/index.js b/lib/esm/feature/top-bar/index.js
+index 82fd0fd68e17dec4394169ffb0d26d03366b3d56..3f5a6c5fa86cae5fcf8da0e0ea9005a6d456f27e 100644
+--- a/lib/esm/feature/top-bar/index.js
++++ b/lib/esm/feature/top-bar/index.js
+@@ -583,6 +583,116 @@ function getGroups(config, ctx) {
+ }
+ 
+ keepAlive(h, Fragment);
++// Kept inside the native renderer so commands and editor state stay authoritative.
++function createTopBarOverflow({ h, ref, onMounted, onUnmounted }) {
++  const root = ref(null)
++  const count = ref(Infinity)
++  const open = ref(false)
++  let observer
++  let frame = 0
++  const labels = { 'document-heading': '标题样式', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
++  function close(focus = false) {
++    open.value = false
++    if (focus) root.value?.querySelector('.top-bar-more')?.focus()
++  }
++  function measure() {
++    const el = root.value
++    if (!el) return
++    const probes = [...el.querySelector('.top-bar-measure').children]
++    const width = el.clientWidth
++    if (!width) return
++    const widths = probes.map(node => {
++      const style = getComputedStyle(node)
++      return node.getBoundingClientRect().width + parseFloat(style.marginLeft || '0') + parseFloat(style.marginRight || '0')
++    })
++    const total = widths.reduce((sum, value) => sum + value, 0)
++    let next = widths.length
++    if (total > width) {
++      let used = 0
++      next = 0
++      const reserve = 38
++      while (next < widths.length && used + widths[next] <= width - reserve) used += widths[next++]
++      while (next > 0 && probes[next - 1].classList.contains('top-bar-divider')) next--
++    }
++    if (count.value !== next) { count.value = next; close() }
++  }
++  const outside = event => { if (!root.value?.contains(event.target)) close() }
++  function bind(el) {
++    if (root.value === el) return
++    observer?.disconnect()
++    root.value = el
++    if (el && observer) {
++      observer.observe(el)
++      observer.observe(el.querySelector('.top-bar-measure'))
++    }
++  }
++  onMounted(() => {
++    if (typeof ResizeObserver === 'undefined') return
++    observer = new ResizeObserver(() => {
++      cancelAnimationFrame(frame)
++      frame = requestAnimationFrame(measure)
++    })
++    if (root.value) {
++      observer.observe(root.value)
++      observer.observe(root.value.querySelector('.top-bar-measure'))
++    }
++    document.addEventListener('pointerdown', outside)
++    measure()
++  })
++  onUnmounted(() => {
++    observer?.disconnect()
++    cancelAnimationFrame(frame)
++    document.removeEventListener('pointerdown', outside)
++  })
++  function render(nodes) {
++    const items = nodes.filter(Boolean)
++    const hidden = items.slice(count.value).filter(node => node.props?.class !== 'top-bar-divider')
++    const button = (node, menu = false, probe = false) => {
++      const label = labels[node.key] || node.key
++      const original = node.props || {}
++      if (node.type !== 'button') return h(node.type, { ...original, key: `${probe ? 'probe-' : ''}${node.key}` }, node.children)
++      const run = event => {
++        event.stopPropagation()
++        original.onPointerdown?.(event)
++        if (menu) {
++          close()
++          if (node.key !== 'document-heading') root.value?.closest('.milkdown')?.querySelector('.ProseMirror')?.focus()
++        }
++      }
++      return h('button', {
++        ...original,
++        key: `${probe ? 'probe-' : ''}${node.key}`,
++        title: label,
++        'aria-label': label,
++        ...(menu ? { role: 'menuitem', class: `${original.class} top-bar-overflow-item` } : {}),
++        ...(probe ? { tabindex: -1, onPointerdown: undefined } : {
++          onPointerdown: event => event.preventDefault(),
++          onClick: run,
++        }),
++      }, menu ? [node.children, h('span', { class: 'top-bar-overflow-label' }, label)] : node.children)
++    }
++    return h('div', { class: 'top-bar-inner', ref: bind, onKeydown: event => {
++      if (event.key === 'Escape' && open.value) { event.preventDefault(); event.stopPropagation(); close(true) }
++      if (open.value && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
++        event.preventDefault()
++        const buttons = [...root.value.querySelectorAll('[role="menuitem"]')]
++        let index = buttons.indexOf(document.activeElement)
++        index = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + buttons.length) % buttons.length
++        buttons[index]?.focus()
++      }
++    }, onFocusout: event => { if (event.relatedTarget && !root.value?.contains(event.relatedTarget)) close() } }, [
++      ...items.slice(0, count.value).map(node => button(node)),
++      hidden.length ? h('button', { type: 'button', class: 'top-bar-item top-bar-more', title: '更多', 'aria-label': '更多', 'aria-haspopup': 'menu', 'aria-expanded': open.value, onPointerdown: event => event.preventDefault(), onClick: () => {
++        open.value = !open.value
++        if (open.value) queueMicrotask(() => root.value?.querySelector('[role="menuitem"]')?.focus())
++      } }, '···') : null,
++      open.value && hidden.length ? h('div', { class: 'top-bar-overflow-menu', role: 'menu', 'aria-label': '更多工具' }, hidden.map(node => button(node, true))) : null,
++      h('div', { class: 'top-bar-measure', 'aria-hidden': 'true', inert: '' }, items.map(node => button(node, false, true))),
++    ])
++  }
++  return { render }
++}
++
+ const TopBar = defineComponent({
+   props: {
+     ctx: {
+@@ -600,6 +710,7 @@ const TopBar = defineComponent({
+   },
+   setup(props) {
+     const { ctx, config } = props;
++    const overflow = createTopBarOverflow({ h, ref, onMounted, onUnmounted });
+     const openSelectorKey = ref(null);
+     const onClick = (fn) => (e) => {
+       e.preventDefault();
+@@ -686,10 +797,11 @@ const TopBar = defineComponent({
+       );
+     }
+     return () => {
++      subscribeState();
+       const view = isReady() ? ctx.get(editorViewCtx) : null;
+       const isReadonly = view ? !view.editable : false;
+       if (isReadonly) return null;
+-      return /* @__PURE__ */ h("div", { class: "top-bar-inner" }, groupInfo.value.map((group) => {
++      return overflow.render(groupInfo.value.map((group) => {
+         return group.items.map((item) => {
+           if (item.selector) {
+             return renderSelector(item.key, item.selector);
+diff --git a/lib/esm/index.js b/lib/esm/index.js
+index f17d9b1e95303427378d444861a4307733dc0e0d..a0be4a9f2762ac1b58f6b887d36e1782bf555ae1 100644
+--- a/lib/esm/index.js
++++ b/lib/esm/index.js
+@@ -4110,6 +4110,116 @@ function getGroups(config, ctx) {
+ }
+ 
+ keepAlive(h, Fragment);
++// Kept inside the native renderer so commands and editor state stay authoritative.
++function createTopBarOverflow({ h, ref, onMounted, onUnmounted }) {
++  const root = ref(null)
++  const count = ref(Infinity)
++  const open = ref(false)
++  let observer
++  let frame = 0
++  const labels = { 'document-heading': '标题样式', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
++  function close(focus = false) {
++    open.value = false
++    if (focus) root.value?.querySelector('.top-bar-more')?.focus()
++  }
++  function measure() {
++    const el = root.value
++    if (!el) return
++    const probes = [...el.querySelector('.top-bar-measure').children]
++    const width = el.clientWidth
++    if (!width) return
++    const widths = probes.map(node => {
++      const style = getComputedStyle(node)
++      return node.getBoundingClientRect().width + parseFloat(style.marginLeft || '0') + parseFloat(style.marginRight || '0')
++    })
++    const total = widths.reduce((sum, value) => sum + value, 0)
++    let next = widths.length
++    if (total > width) {
++      let used = 0
++      next = 0
++      const reserve = 38
++      while (next < widths.length && used + widths[next] <= width - reserve) used += widths[next++]
++      while (next > 0 && probes[next - 1].classList.contains('top-bar-divider')) next--
++    }
++    if (count.value !== next) { count.value = next; close() }
++  }
++  const outside = event => { if (!root.value?.contains(event.target)) close() }
++  function bind(el) {
++    if (root.value === el) return
++    observer?.disconnect()
++    root.value = el
++    if (el && observer) {
++      observer.observe(el)
++      observer.observe(el.querySelector('.top-bar-measure'))
++    }
++  }
++  onMounted(() => {
++    if (typeof ResizeObserver === 'undefined') return
++    observer = new ResizeObserver(() => {
++      cancelAnimationFrame(frame)
++      frame = requestAnimationFrame(measure)
++    })
++    if (root.value) {
++      observer.observe(root.value)
++      observer.observe(root.value.querySelector('.top-bar-measure'))
++    }
++    document.addEventListener('pointerdown', outside)
++    measure()
++  })
++  onUnmounted(() => {
++    observer?.disconnect()
++    cancelAnimationFrame(frame)
++    document.removeEventListener('pointerdown', outside)
++  })
++  function render(nodes) {
++    const items = nodes.filter(Boolean)
++    const hidden = items.slice(count.value).filter(node => node.props?.class !== 'top-bar-divider')
++    const button = (node, menu = false, probe = false) => {
++      const label = labels[node.key] || node.key
++      const original = node.props || {}
++      if (node.type !== 'button') return h(node.type, { ...original, key: `${probe ? 'probe-' : ''}${node.key}` }, node.children)
++      const run = event => {
++        event.stopPropagation()
++        original.onPointerdown?.(event)
++        if (menu) {
++          close()
++          if (node.key !== 'document-heading') root.value?.closest('.milkdown')?.querySelector('.ProseMirror')?.focus()
++        }
++      }
++      return h('button', {
++        ...original,
++        key: `${probe ? 'probe-' : ''}${node.key}`,
++        title: label,
++        'aria-label': label,
++        ...(menu ? { role: 'menuitem', class: `${original.class} top-bar-overflow-item` } : {}),
++        ...(probe ? { tabindex: -1, onPointerdown: undefined } : {
++          onPointerdown: event => event.preventDefault(),
++          onClick: run,
++        }),
++      }, menu ? [node.children, h('span', { class: 'top-bar-overflow-label' }, label)] : node.children)
++    }
++    return h('div', { class: 'top-bar-inner', ref: bind, onKeydown: event => {
++      if (event.key === 'Escape' && open.value) { event.preventDefault(); event.stopPropagation(); close(true) }
++      if (open.value && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
++        event.preventDefault()
++        const buttons = [...root.value.querySelectorAll('[role="menuitem"]')]
++        let index = buttons.indexOf(document.activeElement)
++        index = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + buttons.length) % buttons.length
++        buttons[index]?.focus()
++      }
++    }, onFocusout: event => { if (event.relatedTarget && !root.value?.contains(event.relatedTarget)) close() } }, [
++      ...items.slice(0, count.value).map(node => button(node)),
++      hidden.length ? h('button', { type: 'button', class: 'top-bar-item top-bar-more', title: '更多', 'aria-label': '更多', 'aria-haspopup': 'menu', 'aria-expanded': open.value, onPointerdown: event => event.preventDefault(), onClick: () => {
++        open.value = !open.value
++        if (open.value) queueMicrotask(() => root.value?.querySelector('[role="menuitem"]')?.focus())
++      } }, '···') : null,
++      open.value && hidden.length ? h('div', { class: 'top-bar-overflow-menu', role: 'menu', 'aria-label': '更多工具' }, hidden.map(node => button(node, true))) : null,
++      h('div', { class: 'top-bar-measure', 'aria-hidden': 'true', inert: '' }, items.map(node => button(node, false, true))),
++    ])
++  }
++  return { render }
++}
++
+ const TopBar = defineComponent({
+   props: {
+     ctx: {
+@@ -4127,6 +4237,7 @@ const TopBar = defineComponent({
+   },
+   setup(props) {
+     const { ctx, config } = props;
++    const overflow = createTopBarOverflow({ h, ref, onMounted, onUnmounted });
+     const openSelectorKey = ref(null);
+     const onClick = (fn) => (e) => {
+       e.preventDefault();
+@@ -4213,10 +4324,11 @@ const TopBar = defineComponent({
+       );
+     }
+     return () => {
++      subscribeState();
+       const view = isReady() ? ctx.get(editorViewCtx) : null;
+       const isReadonly = view ? !view.editable : false;
+       if (isReadonly) return null;
+-      return /* @__PURE__ */ h("div", { class: "top-bar-inner" }, groupInfo.value.map((group) => {
++      return overflow.render(groupInfo.value.map((group) => {
+         return group.items.map((item) => {
+           if (item.selector) {
+             return renderSelector(item.key, item.selector);
+diff --git a/src/feature/top-bar/component.tsx b/src/feature/top-bar/component.tsx
+index 3bfd29702f2b80e1cb7cc9b7945d314306968202..44d90127930d4ed598c13b3b03b181f84e84e93a 100644
+--- a/src/feature/top-bar/component.tsx
++++ b/src/feature/top-bar/component.tsx
+@@ -1,3 +1,4 @@
++import { createTopBarOverflow } from './overflow'
+ import type { Ctx } from '@milkdown/kit/ctx'
+ 
+ import { Icon } from '@milkdown/kit/component'
+@@ -45,6 +46,7 @@ export const TopBar = defineComponent<TopBarProps>({
+   },
+   setup(props) {
+     const { ctx, config } = props
++    const overflow = createTopBarOverflow({ h, ref, onMounted, onUnmounted })
+     const openSelectorKey = ref<string | null>(null)
+ 
+     const onClick = (fn: (ctx: Ctx) => void) => (e: MouseEvent) => {
+@@ -157,14 +159,14 @@ export const TopBar = defineComponent<TopBarProps>({
+     }
+ 
+     return () => {
++      subscribeState()
+       const view = isReady() ? ctx.get(editorViewCtx) : null
+       const isReadonly = view ? !view.editable : false
+ 
+       if (isReadonly) return null
+ 
+-      return (
+-        <div class="top-bar-inner">
+-          {groupInfo.value
++      return overflow.render(
++          groupInfo.value
+             .map((group) => {
+               return group.items.map((item) => {
+                 if (item.selector) {
+@@ -190,8 +192,7 @@ export const TopBar = defineComponent<TopBarProps>({
+                 )
+               }
+               return acc
+-            }, [] as VNode[])}
+-        </div>
++            }, [] as VNode[])
+       )
+     }
+   },
+diff --git a/src/feature/top-bar/overflow.js b/src/feature/top-bar/overflow.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..db9723e7f844cb9b3e6ee6ac38231b5190a92dba
+--- /dev/null
++++ b/src/feature/top-bar/overflow.js
+@@ -0,0 +1,109 @@
++// Kept inside the native renderer so commands and editor state stay authoritative.
++export function createTopBarOverflow({ h, ref, onMounted, onUnmounted }) {
++  const root = ref(null)
++  const count = ref(Infinity)
++  const open = ref(false)
++  let observer
++  let frame = 0
++  const labels = { 'document-heading': '标题样式', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
++  function close(focus = false) {
++    open.value = false
++    if (focus) root.value?.querySelector('.top-bar-more')?.focus()
++  }
++  function measure() {
++    const el = root.value
++    if (!el) return
++    const probes = [...el.querySelector('.top-bar-measure').children]
++    const width = el.clientWidth
++    if (!width) return
++    const widths = probes.map(node => {
++      const style = getComputedStyle(node)
++      return node.getBoundingClientRect().width + parseFloat(style.marginLeft || '0') + parseFloat(style.marginRight || '0')
++    })
++    const total = widths.reduce((sum, value) => sum + value, 0)
++    let next = widths.length
++    if (total > width) {
++      let used = 0
++      next = 0
++      const reserve = 38
++      while (next < widths.length && used + widths[next] <= width - reserve) used += widths[next++]
++      while (next > 0 && probes[next - 1].classList.contains('top-bar-divider')) next--
++    }
++    if (count.value !== next) { count.value = next; close() }
++  }
++  const outside = event => { if (!root.value?.contains(event.target)) close() }
++  function bind(el) {
++    if (root.value === el) return
++    observer?.disconnect()
++    root.value = el
++    if (el && observer) {
++      observer.observe(el)
++      observer.observe(el.querySelector('.top-bar-measure'))
++    }
++  }
++  onMounted(() => {
++    if (typeof ResizeObserver === 'undefined') return
++    observer = new ResizeObserver(() => {
++      cancelAnimationFrame(frame)
++      frame = requestAnimationFrame(measure)
++    })
++    if (root.value) {
++      observer.observe(root.value)
++      observer.observe(root.value.querySelector('.top-bar-measure'))
++    }
++    document.addEventListener('pointerdown', outside)
++    measure()
++  })
++  onUnmounted(() => {
++    observer?.disconnect()
++    cancelAnimationFrame(frame)
++    document.removeEventListener('pointerdown', outside)
++  })
++  function render(nodes) {
++    const items = nodes.filter(Boolean)
++    const hidden = items.slice(count.value).filter(node => node.props?.class !== 'top-bar-divider')
++    const button = (node, menu = false, probe = false) => {
++      const label = labels[node.key] || node.key
++      const original = node.props || {}
++      if (node.type !== 'button') return h(node.type, { ...original, key: `${probe ? 'probe-' : ''}${node.key}` }, node.children)
++      const run = event => {
++        event.stopPropagation()
++        original.onPointerdown?.(event)
++        if (menu) {
++          close()
++          if (node.key !== 'document-heading') root.value?.closest('.milkdown')?.querySelector('.ProseMirror')?.focus()
++        }
++      }
++      return h('button', {
++        ...original,
++        key: `${probe ? 'probe-' : ''}${node.key}`,
++        title: label,
++        'aria-label': label,
++        ...(menu ? { role: 'menuitem', class: `${original.class} top-bar-overflow-item` } : {}),
++        ...(probe ? { tabindex: -1, onPointerdown: undefined } : {
++          onPointerdown: event => event.preventDefault(),
++          onClick: run,
++        }),
++      }, menu ? [node.children, h('span', { class: 'top-bar-overflow-label' }, label)] : node.children)
++    }
++    return h('div', { class: 'top-bar-inner', ref: bind, onKeydown: event => {
++      if (event.key === 'Escape' && open.value) { event.preventDefault(); event.stopPropagation(); close(true) }
++      if (open.value && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
++        event.preventDefault()
++        const buttons = [...root.value.querySelectorAll('[role="menuitem"]')]
++        let index = buttons.indexOf(document.activeElement)
++        index = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + buttons.length) % buttons.length
++        buttons[index]?.focus()
++      }
++    }, onFocusout: event => { if (event.relatedTarget && !root.value?.contains(event.relatedTarget)) close() } }, [
++      ...items.slice(0, count.value).map(node => button(node)),
++      hidden.length ? h('button', { type: 'button', class: 'top-bar-item top-bar-more', title: '更多', 'aria-label': '更多', 'aria-haspopup': 'menu', 'aria-expanded': open.value, onPointerdown: event => event.preventDefault(), onClick: () => {
++        open.value = !open.value
++        if (open.value) queueMicrotask(() => root.value?.querySelector('[role="menuitem"]')?.focus())
++      } }, '···') : null,
++      open.value && hidden.length ? h('div', { class: 'top-bar-overflow-menu', role: 'menu', 'aria-label': '更多工具' }, hidden.map(node => button(node, true))) : null,
++      h('div', { class: 'top-bar-measure', 'aria-hidden': 'true', inert: '' }, items.map(node => button(node, false, true))),
++    ])
++  }
++  return { render }
++}

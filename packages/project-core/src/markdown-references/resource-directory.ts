@@ -1,3 +1,4 @@
+import { encodeMarkdownReferenceUri } from "@workbench/shared/markdown-reference";
 import type {
   MarkdownReferenceCandidate,
   MarkdownReferenceTarget,
@@ -9,7 +10,7 @@ import type {
 export class ResourceDirectory {
   private readonly entries = new Map<string, ResourceDirectoryEntry>();
 
-  constructor(snapshot: ResourceDirectorySnapshot) {
+  constructor(private readonly snapshot: ResourceDirectorySnapshot) {
     this.add({ target: { kind: "project", projectId: snapshot.project.id }, label: snapshot.project.name, displayPath: snapshot.project.name });
     for (const page of snapshot.pages ?? []) {
       this.add({
@@ -27,11 +28,14 @@ export class ResourceDirectory {
         displayPath: `${snapshot.project.name} / ${document.title}`,
         materializedPath: `knowledge/${document.fileName}`,
         aliases: [document.fileName, ...(document.tags ?? [])],
+        documentGroup: "知识文档",
+        hierarchy: [{ id: `group:documents:${snapshot.project.id}:knowledge`, label: "知识文档", kind: "group" }],
         // `readonly` describes editing capability, not read permission. Access
         // filtering belongs to EntityResolver and the caller's policy.
         state: "active",
       });
     }
+    for (const entry of snapshot.entries ?? []) this.add(entry);
   }
 
   get(target: MarkdownReferenceTarget): ResourceDirectoryEntry | null {
@@ -45,20 +49,22 @@ export class ResourceDirectory {
   list(policy: ReferencePolicy = {}, query = ""): MarkdownReferenceCandidate[] {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return [...this.entries.values()]
-      .filter((entry) => entry.state !== "forbidden")
+      .filter((entry) => !entry.state || entry.state === "active")
       .filter((entry) => !policy.allowedTargetKinds || policy.allowedTargetKinds.includes(entry.target.kind))
       .filter((entry) => !normalizedQuery || [entry.label, entry.displayPath, ...(entry.aliases ?? [])].some((value) => value.toLocaleLowerCase().includes(normalizedQuery)))
-      .map((entry) => ({ ...entry, aliases: entry.aliases ?? [], score: score(entry, normalizedQuery) }))
+      .map((entry) => ({ target: entry.target, label: entry.label, displayPath: entry.displayPath, hierarchy: entry.hierarchy, documentGroup: entry.documentGroup, aliases: entry.aliases ?? [], score: score(entry, normalizedQuery) }))
       .sort((a, b) => b.score - a.score || a.displayPath.localeCompare(b.displayPath));
   }
 
   values(): ResourceDirectoryEntry[] { return [...this.entries.values()]; }
 
-  private add(entry: ResourceDirectoryEntry): void { this.entries.set(key(entry.target), entry); }
+  add(entry: ResourceDirectoryEntry): void {
+    if (entry.target.projectId === this.snapshot.project.id) this.entries.set(key(entry.target), entry);
+  }
 }
 
 function key(target: MarkdownReferenceTarget): string {
-  return target.kind === "project" ? `project:${target.projectId}` : target.kind === "page" ? `page:${target.projectId}:${target.pageId}` : `document:${target.projectId}:${target.docId}`;
+  return encodeMarkdownReferenceUri(target);
 }
 
 function score(entry: ResourceDirectoryEntry, query: string): number {
@@ -70,4 +76,6 @@ function score(entry: ResourceDirectoryEntry, query: string): number {
   return 30;
 }
 
-export function createResourceDirectory(snapshot: ResourceDirectorySnapshot): ResourceDirectory { return new ResourceDirectory(snapshot); }
+export function createResourceDirectory(snapshot: ResourceDirectorySnapshot): ResourceDirectory {
+  return new ResourceDirectory(snapshot);
+}

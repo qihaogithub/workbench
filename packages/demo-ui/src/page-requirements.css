@@ -69,13 +69,5 @@
   color: hsl(var(--foreground));
   font-size: 0.9em;
 }
-.page-requirements-content .pr-reference {
-  display: inline-flex;
-  margin: 0 0.15rem;
-  border-radius: 9999px;
-  background: hsl(217 91% 65% / 0.12);
-  padding: 0.05rem 0.45rem;
-  color: hsl(217 91% 65%);
-  font-size: 0.9em;
-  cursor: pointer;
-}
+/* Canonical .pr-reference presentation belongs to
+   markdown/project-reference-presentation.css (loaded by note-html). */

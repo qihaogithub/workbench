@@ -14,6 +14,9 @@ patchedDependencies:
   '@milkdown/components@7.22.0':
     hash: huk6qcuvwjik7vvkrpe2e42vhu
     path: patches/@milkdown__components@7.22.0.patch
+  '@milkdown/crepe@7.22.0':
+    hash: 2g37id52yx3gmh6maap3ob4jke
+    path: patches/@milkdown__crepe@7.22.0.patch
 
 importers:
 
@@ -711,7 +714,7 @@ importers:
         version: 1.7.6
       '@milkdown/crepe':
         specifier: ^7.22.0
-        version: 7.22.0(typescript@5.9.3)
+        version: 7.22.0(patch_hash=2g37id52yx3gmh6maap3ob4jke)(typescript@5.9.3)
       '@milkdown/kit':
         specifier: ^7.22.0
         version: 7.22.0(@codemirror/language@6.12.3)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)(typescript@5.9.3)
@@ -4526,7 +4529,7 @@ packages:
       - supports-color
     dev: false
 
-  /@milkdown/crepe@7.22.0(typescript@5.9.3):
+  /@milkdown/crepe@7.22.0(patch_hash=2g37id52yx3gmh6maap3ob4jke)(typescript@5.9.3):
     resolution: {integrity: sha512-vtKRBxBADFWMJbmscwlkYiHErDdJSF84KnoCvA6LSApCU0riFAgjnRLLRT2rvd589ICS52V+WUDKg6tFgwvA3w==}
     dependencies:
       '@codemirror/commands': 6.10.3
@@ -4553,6 +4556,7 @@ packages:
       - supports-color
       - typescript
     dev: false
+    patched: true
 
   /@milkdown/ctx@7.22.0:
     resolution: {integrity: sha512-R2OGYqbOVPGeZv1EAY0QNl8pgkXDN+uwy+1GW3g7QMLvcmgJaSTfhFoYMStbtmrGpIh1VAMVHxG06aT1ZMYpag==}

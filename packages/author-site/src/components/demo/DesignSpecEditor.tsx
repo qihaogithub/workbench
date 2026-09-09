@@ -564,8 +564,8 @@ function EntryCard({
                         entryId: entry.id,
                       },
                       policy: {
-                        allowedTargetKinds: ["project", "page", "document"],
-                        sameProjectOnly: true,
+                        allowedTargetKinds: ["page", "config", "document"],
+                        sameProjectOnly: false,
                         allowUnresolved: false,
                       },
                     } satisfies MarkdownReferenceContext)

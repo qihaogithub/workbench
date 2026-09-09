@@ -1,4 +1,5 @@
 export { ResourceDirectory, createResourceDirectory } from "./resource-directory.js";
+export { buildCandidateDirectoryEntries } from "./candidate-directory.js";
 export { EntityResolver, createEntityResolver } from "./entity-resolver.js";
 export { InMemoryMarkdownReferenceIndex, findUnlinkedMentions } from "./link-index.js";
 export { SqliteMarkdownReferenceIndex } from "./sqlite-index.js";

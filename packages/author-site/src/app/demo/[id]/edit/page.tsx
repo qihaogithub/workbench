@@ -41,9 +41,15 @@ import type {
 import type {
   MarkdownReferenceClickHandler,
   MarkdownReferenceContext,
-  MarkdownReferenceProvider,
 } from "@workbench/demo-ui/DocumentEditor";
-import type { MarkdownReferenceCandidate } from "@workbench/shared/markdown-reference";
+import { resolveReferenceConfigDefinition } from "@/components/demo/markdown-reference-config-locator";
+import { ConfigDefinitionTree } from "@/components/demo/DesignSpecConfigPanel";
+import { useAuthorReferenceDeepLink } from "@/components/demo/use-author-reference-deep-link";
+import {
+  createAuthorReferenceProvider,
+  openAuthorReference,
+  type AuthorDocumentReference,
+} from "@/components/demo/markdown-reference-navigation";
 import {
   classifyConfigField,
   extractDeclaredRegionIds,
@@ -1415,19 +1421,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       ? (configPanelDetailPageId ?? activeDemoId)
       : activeDemoId;
 
-  const markdownReferenceProvider = useCallback<MarkdownReferenceProvider>(
-    async ({ query, signal }) => {
-      const params = new URLSearchParams({ q: query, kind: "project,page,document" });
-      if (sessionId) params.set("sessionId", sessionId);
-      const response = await fetch(
-        `/api/projects/${encodeURIComponent(demoId)}/markdown-references/candidates?${params.toString()}`,
-        { signal },
-      );
-      if (!response.ok) return [];
-      const payload = await response.json();
-      const candidates = payload?.data?.candidates ?? payload?.data;
-      return Array.isArray(candidates) ? (candidates as MarkdownReferenceCandidate[]) : [];
-    },
+  const markdownReferenceProvider = useMemo(
+    () => createAuthorReferenceProvider(demoId, sessionId),
     [demoId, sessionId],
   );
 
@@ -1441,8 +1436,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         pageId: activeDemoId,
       },
       policy: {
-        allowedTargetKinds: ["project", "page", "document"],
-        sameProjectOnly: true,
+        allowedTargetKinds: ["page", "config", "document"],
+        sameProjectOnly: false,
         allowUnresolved: false,
       },
     };
@@ -5877,25 +5872,17 @@ ${context.details}
     },
     [handleConfigPanelPageSelect, setCanvasEditingPageId],
   );
+  const [documentReferenceFocus, setDocumentReferenceFocus] = useState<AuthorDocumentReference | null>(null);
+  const [referenceConfigTreeFocus, setReferenceConfigTreeFocus] = useState<{ pageId: string; fieldKey: string; page: { id: string; name: string; schema: string } } | undefined>();
   const handleMarkdownReferenceClick = useCallback<MarkdownReferenceClickHandler>(
     ({ target }) => {
-      if (target.projectId !== demoId) return;
-      if (target.kind === "page") {
-        void handleConfigPanelPageSelectRef.current(target.pageId, undefined, {
-          openConfigDetail: true,
-        });
-        return;
+      try {
+        openAuthorReference(demoId, target);
+      } catch (error) {
+        toast({ title: "无法打开引用", description: error instanceof Error ? error.message : "无效引用", variant: "destructive" });
       }
-      if (target.kind === "document") {
-        setPreviewMode("document");
-        window.dispatchEvent(
-          new CustomEvent("knowledge-open-document", { detail: { docId: target.docId } }),
-        );
-        return;
-      }
-      setPreviewMode("document");
     },
-    [demoId, setPreviewMode],
+    [demoId, toast],
   );
   const ensureConfigDefinitionPageLoaded = useCallback(
     async (pageId: string) => {
@@ -5970,6 +5957,48 @@ ${context.details}
     },
     [demoPages, ensureConfigDefinitionPageLoaded, toast],
   );
+  const referenceNavigationContextRef = useRef({ demoPages, ensureConfigDefinitionPageLoaded, getPageConfigCapabilities, setPreviewMode, toast });
+  referenceNavigationContextRef.current = { demoPages, ensureConfigDefinitionPageLoaded, getPageConfigCapabilities, setPreviewMode, toast };
+  const referenceNavigationReady = !isLoading && !isInitialPageLoading && Boolean(sessionId && workspaceId);
+  useAuthorReferenceDeepLink({
+    ready: referenceNavigationReady,
+    projectId: demoId,
+    sessionId,
+    workspaceId,
+    navigate: async (target, signal) => {
+        if (target.kind === "document") {
+          setDocumentReferenceFocus(target);
+          referenceNavigationContextRef.current.setPreviewMode("document");
+        } else {
+          if (!referenceNavigationContextRef.current.demoPages.some((page) => page.id === target.pageId)) throw new Error("引用页面不存在");
+          if (target.kind === "config" && !(await referenceNavigationContextRef.current.ensureConfigDefinitionPageLoaded(target.pageId))) {
+            throw new Error("配置定义加载失败，请刷新重试");
+          }
+          if (signal.aborted) return;
+          referenceNavigationContextRef.current.setPreviewMode("single");
+          setRightPanelTab("config");
+          await handleConfigPanelPageSelectRef.current(target.pageId, undefined, { openConfigDetail: true });
+          if (signal.aborted) return;
+          if (activeDemoIdRef.current !== target.pageId) throw new Error("引用页面加载失败，请刷新重试");
+          if (target.kind === "config") {
+            const targetSchema = pageSchemaMapRef.current[target.pageId] ?? (activeDemoIdRef.current === target.pageId ? schemaRef.current : "");
+            const definition = resolveReferenceConfigDefinition(targetSchema, target.pageId, target.fieldPath);
+            const focus = { pageId: target.pageId, fieldKey: target.fieldPath };
+            const page = referenceNavigationContextRef.current.demoPages.find((entry) => entry.id === target.pageId);
+            if (!page) throw new Error("引用页面不存在");
+            if (!definition.draft || !referenceNavigationContextRef.current.getPageConfigCapabilities(page).page.canEditDefinition) {
+              setReferenceConfigTreeFocus({ ...focus, page: { id: page.id, name: page.name, schema: targetSchema } });
+            } else {
+              setReferenceConfigTreeFocus(undefined);
+              setConfigDefinitionPageId(target.pageId);
+              setConfigDefinitionFocus({ scope: "page", ...focus });
+            }
+          }
+        }
+    },
+    onError: (error) => toast({ title: "无法打开引用", description: error instanceof Error ? error.message : "请刷新重试", variant: "destructive" }),
+  });
+
   const handlePreviewHtmlFilesDrop = useCallback(
     (files: File[]) => {
       if (!sessionId) {
@@ -9849,6 +9878,8 @@ ${context.details}
                       workspaceId={workspaceId}
                       sessionId={sessionId}
                       onReferenceClick={handleMarkdownReferenceClick}
+                      referenceFocus={documentReferenceFocus}
+                      onReferenceFocusConsumed={() => setDocumentReferenceFocus(null)}
                       userRole={
                         currentUserRole === "admin" || currentUserRole === "editor"
                           ? currentUserRole
@@ -10487,7 +10518,9 @@ ${context.details}
 
               {isConfigPanelVisible && (
                 <ResizablePanel className="relative flex flex-col overflow-hidden border-l bg-card">
-                  {previewMode === "document" ? (
+                  {previewMode === "single" && referenceConfigTreeFocus?.pageId === activeDemoId ? (
+                    <ConfigDefinitionTree page={referenceConfigTreeFocus.page} fieldKey={referenceConfigTreeFocus.fieldKey} onClose={() => setReferenceConfigTreeFocus(undefined)} />
+                  ) : previewMode === "document" ? (
                     <>
                       <DocumentModeRightPanel
                         target={activeDocumentCommentTarget}

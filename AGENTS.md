@@ -286,6 +286,9 @@ Next 开发编译性能约束：
 - author-site Turbopack 已通过 Markdown raw-text rule 与 NodeNext workspace 源码 `.js`→`.ts/.tsx` 精确重写支持；规则只可覆盖 `knowledge-*`、`preview-contract` 与 `project-*` 的源码目录，不能扩展到所有 workspace 文件，否则会破坏共享包的导出分析。
 - 修改 `@workbench/demo-ui` 等共享 UI 源码后，如果源码、单测与运行页面行为不一致，先正常重启根目录 `pnpm dev` 并用全新浏览器上下文复验；产物仍旧时再执行现有 `pnpm dev:repair` 清理 Next 缓存。不得通过移动 `visibleWhen` 等业务 Schema 声明绕过旧开发产物；只有干净启动后仍稳定复现时才采集 Turbopack trace，并临时使用 author-site 的 `dev:webpack` 诊断回退。
 - `tailwind.config.ts` 在 Next 16 的 ESM 加载环境中不得调用 CommonJS `require()`；插件使用标准 ESM import。Markdown 资源必须同时保留 Webpack 的 `asset/source` 和 Turbopack raw-text rule，二者缺一会让编辑页的系统 prompt 首编译失败。
+- Markdown 项目引用的稳定身份使用共享 `wb://` 协议；Milkdown 会清洗该协议的 HTML href，点击和悬浮适配必须读取 `data-reference-uri`，不能依赖 `a.href`。当前名称使用展示 decoration，不通过改写正文刷新标签；配置引用使用 Schema 定义路径，不转换为数组实例索引。
+- 项目引用应在原生链接预览的最终 `show` 入口隔离，不能只过滤 DOM 事件（坐标命中和延迟任务仍可能触发）。悬浮提示设置的 `aria-describedby` 需由 markView 作为展示属性忽略；不得忽略正文变更，测试需等待异步 DOM 观察后断言文档未变。
+- 跨项目引用保持 source context 不变，通过 provider 的目标 projectId 选择目录；禁止向其他项目转发来源 sessionId。候选 API 复用项目领域访问校验，展示缓存按项目独立记录已解析状态，不能用某项目成功响应判定其他项目引用失效；跳转必须打开目标项目并在目标端重验 canonical URI。
 - Next 16 的 Playwright 开发服务若以 `127.0.0.1` 访问，应用 `next.config.js` 必须将其加入 `allowedDevOrigins`；否则 HMR 资源会被安全策略阻断，表现为画布交互用例无法完成。
 - 编辑页和根布局不得从 `@workbench/demo-ui`、`@workbench/ai-chat-shared` 或 `date-fns/locale` 桶入口获取单个轻量能力；优先使用 package exports 公开的精确子路径，并维护高频路由静态导入测试。
 - 编辑页不得直接动态引用 `author-ai-chat`；保留 `deferred-author-ai-chat` 二级延迟边界，只在初始页面文件就绪后挂载 AI 对话，避免 Mermaid、Shiki 等富文本依赖与预览区争抢首屏资源。
