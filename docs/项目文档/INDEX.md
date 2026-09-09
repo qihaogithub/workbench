@@ -1,10 +1,14 @@
 # 项目文档索引
 
+整项目引用双入口见[Markdown 能力需求](./共享能力/Markdown文档/Markdown编辑器_需求文档.md)；Agent 引用读取与参考图输入见[Agent 核心模块](./独立Agent服务层/03-核心模块设计.md#markdown-引用读取与图片输入)。
+
+创作端 Markdown 文档的统一保存协调器、失败暂停、本地草稿恢复和 Authority 重试边界见[Markdown 宿主保存设计](./共享能力/Markdown文档/技术/04_宿主接入、保存边界与测试.md)。
+
 文档头部工具栏的单行与更多菜单收纳见[Markdown 文档与编辑器](./共享能力/Markdown文档/INDEX.md)。
 
 页面、配置字段与文档引用的跨项目选择、双 Tab 目录、完整悬停热区、来源提示及新页签定位见[Markdown 文档与编辑器](./共享能力/Markdown文档/INDEX.md)和[引用协议](./创作端/09-知识库/技术/03_项目页面文档引用与双向链接.md)。
 
-> 更新日期：2026-09-08
+> 更新日期：2026-09-09
 
 2026-09-06：配置面板的 `visibleWhen` 现已覆盖顶层、对象数组、`oneOf` 变体与详情 Sheet，并按当前对象兄弟字段独立求值；Agent Schema 校验同步递归检查条件引用，并明确只验证契约、不代表运行中的 UI 已验收；共享 UI 页面仍加载旧逻辑时使用现有 `dev` / `dev:repair` 恢复，不修改业务 Schema 绕过开发缓存。live Workspace Bash 会返回具体拒绝原因和单命令替代。AI 对话执行链路同时保留选区源码定位、Authority 提交/运行时校验/预览未验证状态、晚到 projection ack 和 finish 阶段指标。
 
