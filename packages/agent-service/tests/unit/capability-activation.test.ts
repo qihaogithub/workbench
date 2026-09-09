@@ -15,8 +15,15 @@ describe("on-demand tool activation", () => {
     expect(tools.map((tool) => tool.name)).toContain("deletePages");
     expect(initial).toContain("activateCapabilities");
     expect(initial).toContain("readPreinstalledSkill");
+    expect(initial).toContain("readProjectReference");
     expect(initial).not.toContain("deletePages");
     expect(initial).not.toContain("figmaMcp");
+  });
+
+  it("does not expose author reference reads or image generation in viewer mode", () => {
+    const names = createWorkbenchTools({ sessionId: "viewer" }, undefined, { mode: "viewer-readonly" }).map(tool => tool.name);
+    expect(names).not.toContain("readProjectReference");
+    expect(names).not.toContain("generateReferenceImage");
   });
 
   it("activates requested task capabilities without narrowing the available server toolset", () => {
@@ -25,6 +32,7 @@ describe("on-demand tool activation", () => {
     expect(names).toContain("writeFile");
     expect(names).toContain("deletePages");
     expect(names).toContain("activateCapabilities");
+    expect(names).toContain("readProjectReference");
     expect(tools.map((tool) => tool.name)).toContain("figmaMcp");
   });
 

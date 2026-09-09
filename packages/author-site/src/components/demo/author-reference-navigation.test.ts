@@ -3,6 +3,7 @@ import { buildAuthorReferenceUrl, resolveAuthorReference, openAuthorReference, f
 
 const projectId = "项目 &%/?";
 const destinations: MarkdownReferenceTarget[] = [
+  { kind: "project", projectId },
   { kind: "page", projectId, pageId: "页 &%/#" },
   { kind: "config", projectId, pageId: "页面", fieldPath: "cards[].title" },
   { kind: "config", projectId, pageId: "页面", fieldPath: "cards[type=图文].image" },
@@ -27,7 +28,7 @@ describe("Author 项目引用导航", () => {
     expect(() => resolveAuthorReference("other", encodeMarkdownReferenceUri(target), [{ target, displayPath: "" }])).toThrow();
     expect(() => resolveAuthorReference(projectId, encodeMarkdownReferenceUri(target), [])).toThrow();
     expect(() => resolveAuthorReference(projectId, "javascript:alert(1)", [])).toThrow();
-    expect(() => buildAuthorReferenceUrl(projectId, { kind: "project", projectId })).toThrow();
+    expect(new URL(buildAuthorReferenceUrl(projectId, { kind: "project", projectId }), "https://author.example").pathname).toBe(`/demo/${encodeURIComponent(projectId)}/edit`);
   });
   it("知识文档显式分类与省略分类使用相同身份", () => {
     const target: MarkdownReferenceTarget = { kind: "document", projectId, docId: "doc" };
@@ -67,7 +68,7 @@ describe("Author 项目引用导航", () => {
     try {
       expect(await fetchAuthorReferenceCandidates(projectId, "session", "")).toEqual(candidates);
       const url = new URL(fetchMock.mock.calls[0][0], "https://author.example");
-      expect(url.searchParams.get("kind")).toBe("page,config,document");
+      expect(url.searchParams.get("kind")).toBe("project,page,config,document");
       expect(url.searchParams.get("q")).toBe("");
       expect(url.searchParams.has("limit")).toBe(false);
     } finally { global.fetch = original; }

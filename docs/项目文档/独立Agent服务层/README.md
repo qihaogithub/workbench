@@ -8,6 +8,8 @@
 
 ## 文档概览
 
+Markdown 引用发现、按权限读取与受控参考图生成见[核心模块设计](./03-核心模块设计.md#markdown-引用读取与图片输入)。
+
 本系列文档用于指导 `@workbench/agent-service`、`@workbench/agent-client` 与 `@workbench/screenshot-service` 的开发工作。当前服务层已经从历史多后端方案收敛为 **Pi Agent 单后端**：Fastify 负责 HTTP/WebSocket、Session、工作空间与项目管理，Pi Agent 负责模型调用、工具执行和流式事件，并通过 session 级配置接收当前用户的外部工具授权。活动 live Workspace 的所有写入收敛到 **Workspace Mutation Authority** 单写者事务，旧直接写入路径已删除。
 
 核心原则：

@@ -11924,6 +11924,54 @@
       "projectRefs": [
         "proj_1785135808250_r4cb4a"
       ]
+    },
+    {
+      "id": "img_Ck5cFOAvPYjjgw",
+      "sha256": "605a3cf1399f5c1b8f4545dc7ab77e7c727d2fed2d2a8432b2cba01713de7375",
+      "filename": "5eecdaf48460cde5fb90400405d28218916dd330b0a27715.png",
+      "mimeType": "image/png",
+      "sizeBytes": 30825,
+      "width": 750,
+      "height": 1624,
+      "sourceType": "remote_url",
+      "sourceUrl": "https://alidocs.dingtalk.com/core/api/resources/img/5eecdaf48460cde5fb90400405d28218916dd330b0a277156b86c429978a4f2bf68b56ca798d558d65a117e96928706495bb2e27d89c0c6d7d4a2afe9901755c7197cda2a6951d1917eca6f85c5e841ae21e24f193d1e2d407afbbdd4225fe9b?tmpCode=027d7737-6d90-4e61-acf3-2fb246235e7e",
+      "createdAt": 1788863059789,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1788278430986_3gt1n0"
+      ]
+    },
+    {
+      "id": "img_QvNWpLnvCGLgAg",
+      "sha256": "886fadab688756b8917a3a1486c95c3ac5554781063e17f732095ea5582cade4",
+      "filename": "5eecdaf48460cde5fb90400405d28218916dd330b0a27715.png",
+      "mimeType": "image/png",
+      "sizeBytes": 34938,
+      "width": 750,
+      "height": 1800,
+      "sourceType": "remote_url",
+      "sourceUrl": "https://alidocs.dingtalk.com/core/api/resources/img/5eecdaf48460cde5fb90400405d28218916dd330b0a277156b86c429978a4f2bf68b56ca798d558d65a117e969287064c72dcc42f30885638a595e40b81a4d3e62db639b15f3e22826db955f259a5b6e64375accf8277a42a8af4430009de0b1?tmpCode=027d7737-6d90-4e61-acf3-2fb246235e7e",
+      "createdAt": 1788863059796,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1788278430986_3gt1n0"
+      ]
+    },
+    {
+      "id": "img_en8ORlLMfGFn9A",
+      "sha256": "b58eb7f0b8a1206a079201acc48dd0ce99a7f7a08aea69ce664142f14ad84629",
+      "filename": "5eecdaf48460cde5fb90400405d28218916dd330b0a27715.png",
+      "mimeType": "image/png",
+      "sizeBytes": 30095,
+      "width": 750,
+      "height": 1624,
+      "sourceType": "remote_url",
+      "sourceUrl": "https://alidocs.dingtalk.com/core/api/resources/img/5eecdaf48460cde5fb90400405d28218916dd330b0a277156b86c429978a4f2bf68b56ca798d558d65a117e969287064d13b0c65d39c38f71fb46c5d5ffc04d2e40c4f2413246a516d711435162105ec0f3fdb24e1e239eaa5f44275aa76f220?tmpCode=027d7737-6d90-4e61-acf3-2fb246235e7e",
+      "createdAt": 1788863059812,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1788278430986_3gt1n0"
+      ]
     }
   ]
 }

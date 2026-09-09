@@ -65,6 +65,19 @@ describe('createReadFileTool - 权限感知', () => {
     expect(result.content[0].text).toBe('content');
   });
 
+  it('读取文档自动发现引用，但不自动读取目标', async () => {
+    (fs.promises.readFile as any).mockResolvedValue('[参考](wb://project/brand)');
+    const result = await createReadFileTool(mockConfig).execute('id', { path: 'knowledge/brief.md' });
+    expect(result.content[0].text).toContain('尚未读取');
+    expect(result.content[0].text).toContain('readProjectReference');
+  });
+
+  it('使用端只读文件不暴露创作端引用读取指令', async () => {
+    (fs.promises.readFile as any).mockResolvedValue('[参考](wb://project/brand)');
+    const result = await createReadFileTool({ ...mockConfig, toolMode: 'viewer-readonly' }).execute('id', { path: 'knowledge/brief.md' });
+    expect(result.content[0].text).not.toContain('readProjectReference');
+  });
+
   it('黑名单中 .env 应被拒（isError）', async () => {
     const tool = createReadFileTool(mockConfig);
     const result = await tool.execute('id', { path: '.env' } as any);
@@ -262,7 +275,7 @@ describe('createWorkbenchTools - permissions 透传', () => {
         durationMs: 1,
       }),
     });
-    expect(tools).toHaveLength(43);
+    expect(tools).toHaveLength(44);
     expect(tools.some(t => t.name === 'readUploadedFile')).toBe(true);
     expect(tools.some(t => t.name === 'webRead')).toBe(true);
     expect(tools.some(t => t.name === 'webSearch')).toBe(false);
@@ -289,7 +302,7 @@ describe('createWorkbenchTools - permissions 透传', () => {
       }),
     });
 
-    expect(tools).toHaveLength(44);
+    expect(tools).toHaveLength(45);
     expect(tools.some(t => t.name === 'webSearch')).toBe(true);
     expect(tools.some(t => t.name === 'readUploadedFile')).toBe(true);
     expect(tools.some(t => t.name === 'readPreinstalledSkill')).toBe(true);

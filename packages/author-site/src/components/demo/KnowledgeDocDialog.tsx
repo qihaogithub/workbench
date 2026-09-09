@@ -177,7 +177,7 @@ export function KnowledgeDocDialog({
     return {
       source: { kind: "knowledge-document", projectId, workspaceId, docId: item.id },
       policy: {
-        allowedTargetKinds: ["page", "config", "document"],
+        allowedTargetKinds: ["project", "page", "config", "document"],
         sameProjectOnly: false,
         allowUnresolved: false,
       },

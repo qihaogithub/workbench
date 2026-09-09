@@ -110,9 +110,6 @@ export function buildAuthorReferenceUrl(
   _sourceProjectId: string,
   target: MarkdownReferenceTarget,
 ): string {
-  if (target.kind === "project") {
-    throw new Error("目标类型不受支持");
-  }
   const reference = encodeMarkdownReferenceUri(target);
   if (!decodeMarkdownReferenceUri(reference)) throw new Error("无效的项目引用");
   return `/demo/${encodeURIComponent(target.projectId)}/edit?${new URLSearchParams({ reference })}`;
@@ -133,9 +130,9 @@ export function resolveAuthorReference(
   projectId: string,
   uri: string,
   candidates: readonly MarkdownReferenceCandidate[],
-): Exclude<MarkdownReferenceTarget, { kind: "project" }> {
+): MarkdownReferenceTarget {
   const target = decodeMarkdownReferenceUri(uri);
-  if (!target || target.projectId !== projectId || target.kind === "project") {
+  if (!target || target.projectId !== projectId) {
     throw new Error("无效或跨项目的引用");
   }
   const canonical = encodeMarkdownReferenceUri(target);
@@ -157,7 +154,7 @@ export async function fetchAuthorReferenceCandidates(
 ): Promise<MarkdownReferenceCandidate[]> {
   const params = new URLSearchParams({
     q: query,
-    kind: "page,config,document",
+    kind: "project,page,config,document",
   });
   if (sessionId) params.set("sessionId", sessionId);
   const response = await fetch(

@@ -1436,7 +1436,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         pageId: activeDemoId,
       },
       policy: {
-        allowedTargetKinds: ["page", "config", "document"],
+        allowedTargetKinds: ["project", "page", "config", "document"],
         sameProjectOnly: false,
         allowUnresolved: false,
       },
@@ -5966,7 +5966,11 @@ ${context.details}
     sessionId,
     workspaceId,
     navigate: async (target, signal) => {
-        if (target.kind === "document") {
+        if (target.kind === "project") {
+          // The project target is intentionally a no-op after the current
+          // project candidate has revalidated the permission-bearing URI.
+          return;
+        } else if (target.kind === "document") {
           setDocumentReferenceFocus(target);
           referenceNavigationContextRef.current.setPreviewMode("document");
         } else {

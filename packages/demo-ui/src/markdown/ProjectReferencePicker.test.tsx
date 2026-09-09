@@ -36,6 +36,16 @@ const doc: MarkdownReferenceCandidate = {
   documentGroup: "知识文档",
 };
 const candidates = [field, page, doc];
+const project: MarkdownReferenceCandidate = {
+  target: { kind: "project", projectId: "p" },
+  label: "项目",
+  displayPath: "项目",
+};
+const otherProject: MarkdownReferenceCandidate = {
+  target: { kind: "project", projectId: "other" },
+  label: "其他项目",
+  displayPath: "其他项目",
+};
 
 describe("project reference picker", () => {
   it("merges a selectable parent arriving after children without duplicating it", () => {
@@ -95,6 +105,37 @@ describe("project reference picker", () => {
     });
     expect(buildReferenceTree(list, "page")).toHaveLength(120);
   });
+  it("keeps the project entry above tabs and separates switching from insertion", async () => {
+    const onProjectChange = vi.fn();
+    const onProjectInsert = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <ProjectReferencePicker
+        candidates={[project, otherProject, ...candidates]}
+        status="ready"
+        anchor={{ left: 0, top: 0 }}
+        onSelect={onSelect}
+        onClose={() => {}}
+        onRetry={() => {}}
+        projects={[{ id: "p", name: "项目" }, { id: "other", name: "其他项目" }]}
+        projectId="p"
+        currentProjectId="p"
+        onProjectChange={onProjectChange}
+        onProjectInsert={onProjectInsert}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /引用整个项目/ }));
+    expect(onSelect).toHaveBeenCalledWith(project);
+    expect(onProjectChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("dialog", { name: "插入项目引用" }).querySelector(".project-reference-project-trigger")!);
+    const otherOption = await screen.findByRole("option", { name: /其他项目/ });
+    const shortcut = within(otherOption).getByRole("button", { name: "插入项目引用：其他项目" });
+    expect(shortcut.textContent).toBe("插入");
+    expect(shortcut.getAttribute("title")).toBe("引用整个项目：其他项目");
+    fireEvent.click(shortcut);
+    expect(onProjectInsert).toHaveBeenCalledWith("other");
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
   it("shows loading, retry and empty states", () => {
     const onRetry = vi.fn();
     const props = {
@@ -140,7 +181,8 @@ describe("project reference picker", () => {
     expect(
       await screen.findByRole("option", { name: /当前项目.*当前/ }),
     ).toBeTruthy();
-    fireEvent.click(screen.getByRole("option", { name: /另一个项目/ }));
+    const otherOption = screen.getByRole("option", { name: /另一个项目/ });
+    fireEvent.click(within(otherOption).getByRole("button", { name: "另一个项目" }));
     expect(onProjectChange).toHaveBeenCalledWith("other");
     expect(onSelect).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
@@ -171,8 +213,8 @@ describe("project reference picker", () => {
         target: { value: "bet" },
       },
     );
-    expect(screen.getByRole("option", { name: "Beta" })).toBeTruthy();
-    expect(screen.queryByRole("option", { name: "Alpha" })).toBeNull();
+    expect(screen.getByRole("option", { name: /^Beta\b/ })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /^Alpha\b/ })).toBeNull();
     fireEvent.keyDown(screen.getByRole("searchbox", { name: "搜索项目" }), {
       key: "Escape",
     });

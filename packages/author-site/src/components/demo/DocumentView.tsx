@@ -292,7 +292,7 @@ export function DocumentView({
     return {
       source,
       policy: {
-        allowedTargetKinds: ["page", "config", "document"],
+        allowedTargetKinds: ["project", "page", "config", "document"],
         sameProjectOnly: false,
         allowUnresolved: false,
       },

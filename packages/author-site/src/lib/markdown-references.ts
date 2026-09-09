@@ -136,18 +136,27 @@ export function resolveMarkdownReferenceWorkspace(
 
 export function buildMarkdownReferenceIndex(
   context: MarkdownReferenceWorkspaceContext,
-  options: { readMarkdown?: boolean; rebuild?: boolean } = {},
+  options: { readMarkdown?: boolean; rebuild?: boolean; maxResourceBytes?: number } = {},
 ): MarkdownReferenceIndexResult {
   const readMarkdown = options.readMarkdown !== false;
+  const readIndexJson = (relativePath: string) => {
+    if (options.maxResourceBytes !== undefined) {
+      const file = referenceFile(context.workspacePath, relativePath);
+      if (file && fs.statSync(file).size > options.maxResourceBytes) {
+        throw new Error("REFERENCE_RESOURCE_TOO_LARGE");
+      }
+    }
+    return readWorkspaceJson(context.workspacePath, relativePath);
+  };
   const project = readProjectMeta(context.projectId);
-  const tree = readWorkspaceJson(context.workspacePath, "workspace-tree.json");
+  const tree = readIndexJson("workspace-tree.json");
   if (tree && (!Array.isArray(tree.pages) || !Array.isArray(tree.folders))) throw new Error("REFERENCE_DIRECTORY_INVALID_TREE");
   const pages = (tree?.pages ?? []) as NonNullable<ResourceDirectorySnapshot["pages"]>;
   const folders = (tree?.folders ?? []) as Array<{ id: string; name: string; parentId?: string | null }>;
   for (const node of [...pages, ...folders]) {
     if (!node || typeof node.id !== "string" || !isValidWorkspacePathSegment(node.id) || typeof node.name !== "string") throw new Error("REFERENCE_DIRECTORY_INVALID_TREE");
   }
-  const parsed = readWorkspaceJson(context.workspacePath, "knowledge/manifest.json");
+  const parsed = readIndexJson("knowledge/manifest.json");
   if (parsed && !Array.isArray(parsed.items)) throw new Error("REFERENCE_DIRECTORY_INVALID_MANIFEST");
   const documents: Array<Record<string, unknown>> = Array.isArray(parsed?.items)
       ? parsed.items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
@@ -179,7 +188,7 @@ export function buildMarkdownReferenceIndex(
   }
   for (const entry of buildCandidateDirectoryEntries({
     projectId: context.projectId,
-    pages: pages.map(page => ({ ...page, schema: JSON.stringify(readWorkspaceJson(context.workspacePath, `demos/${page.id}/config.schema.json`)) })),
+    pages: pages.map(page => ({ ...page, schema: JSON.stringify(readIndexJson(`demos/${page.id}/config.schema.json`)) })),
     folders,
   })) directory.add({ ...directory.get(entry.target), ...entry, displayPath: `${snapshot.project.name} / ${entry.displayPath}` });
   const addDocument = (documentKind: "memory" | "project-convention" | "page-convention" | "design-spec", docId: string, label: string, relativePath: string) => {
@@ -191,7 +200,7 @@ export function buildMarkdownReferenceIndex(
   addDocument("memory", "memory", "AI 记忆", "memory.md");
   addDocument("project-convention", "convention", "项目公约", "convention.md");
   for (const page of pages) addDocument("page-convention", page.id, `${page.name} 页面公约`, `demos/${page.id}/convention.md`);
-  const specManifest = readWorkspaceJson(context.workspacePath, "design-spec/manifest.json");
+  const specManifest = readIndexJson("design-spec/manifest.json");
   if (specManifest && !Array.isArray(specManifest.items)) throw new Error("REFERENCE_DIRECTORY_INVALID_MANIFEST");
   for (const item of Array.isArray(specManifest?.items) ? specManifest.items : []) {
     if (!item || typeof item !== "object" || typeof item.id !== "string" || !/^[A-Za-z0-9_-]{1,120}$/.test(item.id)) continue;
@@ -266,9 +275,9 @@ export function buildMarkdownReferenceIndex(
     ...pages.map((page) => ({ scope: "page" as const, pageId: page.id, schemaPath: path.join("demos", page.id, "config.schema.json"), valuesPath: path.join("demos", page.id, "config.values.json"), label: page.name })),
   ];
   for (const config of configScopes) {
-    const schema = readWorkspaceJson(context.workspacePath, config.schemaPath);
+    const schema = readIndexJson(config.schemaPath);
     if (!schema) continue;
-    const values = readWorkspaceJson(context.workspacePath, config.valuesPath);
+    const values = readIndexJson(config.valuesPath);
     for (const field of schemaFields(schema)) {
       if (field.note?.trim()) {
         const source: MarkdownReferenceSource = {
@@ -425,7 +434,7 @@ export function toCandidateList(
   kinds?: MarkdownReferenceTarget["kind"][],
 ): MarkdownReferenceCandidate[] {
   const resolver = createEntityResolver(result.directory, result.context.projectId);
-  return resolver.candidates({ allowedTargetKinds: kinds, sameProjectOnly: true }, query).filter(candidate => candidate.target.kind !== "project");
+  return resolver.candidates({ allowedTargetKinds: kinds, sameProjectOnly: true }, query);
 }
 
 export function serializeLinkRecord(record: MarkdownLinkRecord, sourceLabels: Map<string, string>) {

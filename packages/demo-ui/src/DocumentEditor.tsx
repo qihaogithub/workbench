@@ -244,6 +244,8 @@ function DocumentEditorInstance({
   const referenceTriggerRef = useRef<number | null>(null);
   const referenceRequestRef = useRef(0);
   const referenceAbortRef = useRef<AbortController | null>(null);
+  const projectInsertAbortRef = useRef<AbortController | null>(null);
+  const projectInsertGenerationRef = useRef(0);
   const openReferenceMenuRef = useRef<(() => void) | null>(null);
   const forceReferenceMenuRef = useRef(false);
   const referenceDirectoriesRef = useRef(
@@ -270,6 +272,7 @@ function DocumentEditorInstance({
       ),
     ].sort(),
   );
+  const referenceSourceSignature = JSON.stringify(referenceContext?.source ?? null);
   const retryReferenceMenuRef = useRef<(() => void) | null>(null);
   const closeReferenceMenuRef = useRef<(() => void) | null>(null);
   const dismissReferenceMenu = useCallback(
@@ -281,6 +284,9 @@ function DocumentEditorInstance({
     referenceDirectoryVersionsRef.current.clear();
     referenceAbortRef.current?.abort();
     referenceRequestRef.current += 1;
+    projectInsertAbortRef.current?.abort();
+    projectInsertAbortRef.current = null;
+    projectInsertGenerationRef.current += 1;
     setReferenceMenu(null);
     setReferenceProjects([]);
     selectedReferenceProjectRef.current = referenceContext?.source.projectId;
@@ -289,8 +295,7 @@ function DocumentEditorInstance({
     view?.dispatch(view.state.tr.setMeta("project-reference-directory", true));
   }, [
     referenceProvider,
-    referenceContext?.source.projectId,
-    referenceContext?.source.workspaceId,
+    referenceSourceSignature,
   ]);
   useEffect(() => {
     if (
@@ -404,6 +409,9 @@ function DocumentEditorInstance({
   ]);
   const insertReferenceCandidateRef = useRef<
     ((candidate: MarkdownReferenceCandidate) => void) | null
+  >(null);
+  const insertProjectReferenceRef = useRef<
+    ((projectId: string) => Promise<void>) | null
   >(null);
   const [mentionMenu, setMentionMenu] = useState<{
     query: string;
@@ -641,6 +649,9 @@ function DocumentEditorInstance({
     root.addEventListener("paste", handlePaste, true);
 
     const closeReferenceMenu = () => {
+      projectInsertAbortRef.current?.abort();
+      projectInsertAbortRef.current = null;
+      projectInsertGenerationRef.current += 1;
       selectedReferenceProjectRef.current =
         referenceContextRef.current?.source.projectId;
       referenceRequestRef.current += 1;
@@ -826,7 +837,6 @@ function DocumentEditorInstance({
           const allowedKinds = context.policy.allowedTargetKinds;
           const visibleCandidates = candidates.filter((candidate) => {
             if (candidate.target.projectId !== projectId) return false;
-            if (candidate.target.kind === "project") return false;
             if (allowedKinds && !allowedKinds.includes(candidate.target.kind))
               return false;
             if (
@@ -939,6 +949,50 @@ function DocumentEditorInstance({
       onReferenceInsertedRef.current?.(candidate);
     };
     insertReferenceCandidateRef.current = insertReferenceCandidate;
+    insertProjectReferenceRef.current = async (projectId) => {
+      const provider = referenceProviderRef.current;
+      const context = referenceContextRef.current;
+      if (!provider || !context) throw new Error("项目引用上下文不可用");
+      if (!context.policy.allowedTargetKinds.includes("project")) {
+        throw new Error("当前编辑器不允许引用整个项目");
+      }
+      const trigger = referenceTriggerRef.current;
+      if (trigger === null || !referenceMenuRef.current) return;
+      projectInsertAbortRef.current?.abort();
+      const controller = new AbortController();
+      projectInsertAbortRef.current = controller;
+      const generation = ++projectInsertGenerationRef.current;
+      const sourceSignature = JSON.stringify(context.source);
+      try {
+        const candidates = await provider({
+          query: "",
+          trigger: "@",
+          context,
+          signal: controller.signal,
+          projectId,
+        });
+        if (
+          controller.signal.aborted ||
+          !mountedRef.current ||
+          generation !== projectInsertGenerationRef.current ||
+          !referenceMenuRef.current ||
+          referenceTriggerRef.current !== trigger ||
+          JSON.stringify(referenceContextRef.current?.source ?? null) !==
+            sourceSignature
+        )
+          return;
+        const candidate = candidates.find(
+          (item) =>
+            item.target.kind === "project" && item.target.projectId === projectId,
+        );
+        if (!candidate) throw new Error("项目不存在或无权访问");
+        insertReferenceCandidate(candidate);
+      } finally {
+        if (projectInsertAbortRef.current === controller) {
+          projectInsertAbortRef.current = null;
+        }
+      }
+    };
 
     const handleReferenceKeyDown = (event: KeyboardEvent) => {
       if (
@@ -1175,6 +1229,7 @@ function DocumentEditorInstance({
       referenceDirectoryVersionsRef.current.clear();
       selectedReferenceProjectRef.current = undefined;
       insertReferenceCandidateRef.current = null;
+      insertProjectReferenceRef.current = null;
       insertMentionCandidateRef.current = null;
       if (crepeRef.current === crepe) {
         crepeRef.current = null;
@@ -1320,6 +1375,16 @@ function DocumentEditorInstance({
                     }
                   : undefined
               }
+              onProjectInsert={
+                referenceProvider?.listProjects &&
+                !referenceContext?.policy.sameProjectOnly &&
+                referenceContext?.policy.allowedTargetKinds.includes("project")
+                  ? (projectId) => insertProjectReferenceRef.current?.(projectId)
+                  : undefined
+              }
+              allowProjectReferences={Boolean(
+                referenceContext?.policy.allowedTargetKinds.includes("project"),
+              )}
               candidates={referenceMenu.candidates}
               status={referenceMenu.status}
               anchor={referenceMenu.anchor}

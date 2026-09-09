@@ -47,6 +47,15 @@ describe("authorized workspace metadata directory", () => {
     fs.mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
     fs.writeFileSync(path.join(root, relative), content);
   }
+  it("rejects oversized catalog resources before reading their contents", () => {
+    write("demos/home/config.schema.json", JSON.stringify({ title: "x".repeat(2048) }));
+    const read = jest.spyOn(fs, "readFileSync");
+    expect(() => buildMarkdownReferenceIndex(
+      { projectId: "p", workspaceId: "w", workspacePath: root },
+      { readMarkdown: false, maxResourceBytes: 1024 },
+    )).toThrow();
+    expect(read.mock.calls.some(([file]) => String(file).endsWith("config.schema.json"))).toBe(false);
+  });
   it("collects all metadata without reading bodies, retains missing, and excludes arbitrary paths", () => {
     write("memory.md", "");
     write("convention.md", "");
@@ -96,7 +105,7 @@ describe("authorized workspace metadata directory", () => {
     ).toEqual(expect.arrayContaining(["AI 记忆", "公约", "设计规范"]));
     expect(
       candidates.some((candidate) => candidate.target.kind === "project"),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       candidates.some(
         (candidate) =>

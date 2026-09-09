@@ -75,14 +75,14 @@ AI agent 在启动任务前应优先读取 `memory.md`（如果存在），以�
 
 ## OF Team repo-local Skill 团队
 
-本仓库在 `.agents/skills/` 维护 OF Team 总控和四位组长级 Skill，用于 Codex 研发协作；治理说明见 `docs/项目文档/维护治理/OF-Team协作治理_说明.md`。它们不属于 `packages/agent-service/` 的产品运行时预装 Skill。
+本仓库在 `.agents/skills/` 维护 OF Team 总控和五位组长级 Skill，用于 Codex 研发协作；治理说明见 `docs/项目文档/维护治理/OF-Team协作治理_说明.md`。它们不属于 `packages/agent-service/` 的产品运行时预装 Skill。
 
 - `of-team` 是总控，允许通过“OF Team”“OF 团队”隐式召唤，负责按主意图选择最少必要成员、明确授权并组织交接。
-- 四位成员是 `of-jobs`（产品）、`of-picasso`（体验）、`of-turing`（研发）和 `of-ford`（交付）；成员关闭隐式召唤，直接使用时写 `$of-jobs`、`$of-picasso`、`$of-turing` 或 `$of-ford`。
+- 五位成员是 `of-jobs`（产品）、`of-picasso`（体验）、`of-turing`（研发）、`of-holmes`（验收）和 `of-ford`（交付）；成员关闭隐式召唤，直接使用时写 `$of-jobs`、`$of-picasso`、`$of-turing`、`$of-holmes` 或 `$of-ford`。
 - 总控只加载本仓库相邻的 `of-*` Skill，不引用用户目录或其他项目的同名角色。现有 `codebase-research`、`系统化调试`、`playwright-cli` 等仍是能力型 Skill，不计入 OF Team 成员。
-- 团队按意图起手：新功能由乔布斯主责，体验问题由毕加索主责，研发、Bug 与诊断由图灵主责，工程与发布问题由福特主责；业务验收由用户确认。
-- “只讨论”“只诊断”和“发布前检查”都是只读授权；修复、部署或发布必须由用户明确允许。用户保留最终业务验收权。
-- 发布前必须完成图灵的功能验证与福特的交付检查；存在未解决项时，只有用户对报告中列明的具体风险作出显式豁免才能继续，且不能绕过更高层安全和不可逆操作确认。
+- 团队按意图起手：新功能由乔布斯主责，体验问题由毕加索主责，研发任务由图灵主责，验收、Bug 与诊断由福尔摩斯主责，工程与发布问题由福特主责。只有验收、找 Bug、诊断和回归任务默认 Holmes-first。
+- “只讨论”“只验收”“只诊断”和“发布前检查”都是只读授权；修复、部署或发布必须由用户明确允许。用户保留最终业务验收权。
+- 发布还必须通过福尔摩斯质量门禁；存在未解决项时，只有用户对报告中列明的具体风险作出显式豁免才能继续，且不能绕过更高层安全和不可逆操作确认。
 - OF Team 的角色指令不能覆盖本文件、适用的子级 `AGENTS.md` 或项目文档；调整团队职责或路由时同步更新各 Skill 和维护治理说明。
 
 ### 子智能体模型路由
@@ -289,6 +289,7 @@ Next 开发编译性能约束：
 - Markdown 项目引用的稳定身份使用共享 `wb://` 协议；Milkdown 会清洗该协议的 HTML href，点击和悬浮适配必须读取 `data-reference-uri`，不能依赖 `a.href`。当前名称使用展示 decoration，不通过改写正文刷新标签；配置引用使用 Schema 定义路径，不转换为数组实例索引。
 - 项目引用应在原生链接预览的最终 `show` 入口隔离，不能只过滤 DOM 事件（坐标命中和延迟任务仍可能触发）。悬浮提示设置的 `aria-describedby` 需由 markView 作为展示属性忽略；不得忽略正文变更，测试需等待异步 DOM 观察后断言文档未变。
 - 跨项目引用保持 source context 不变，通过 provider 的目标 projectId 选择目录；禁止向其他项目转发来源 sessionId。候选 API 复用项目领域访问校验，展示缓存按项目独立记录已解析状态，不能用某项目成功响应判定其他项目引用失效；跳转必须打开目标项目并在目标端重验 canonical URI。
+- Agent 的 Markdown 引用使用 `readProjectReference`，不得把 `wb://` 转成任意磁盘路径或沿用旧 `ref://` 文件读取授权。引用清单只代表发现，正文/图片按请求重新校验操作者和项目权限；`generateReferenceImage` 只消费来源绑定的图片并生成候选素材，不开放 live Workspace 子 Agent 写权限，也不自动回填配置。
 - Next 16 的 Playwright 开发服务若以 `127.0.0.1` 访问，应用 `next.config.js` 必须将其加入 `allowedDevOrigins`；否则 HMR 资源会被安全策略阻断，表现为画布交互用例无法完成。
 - 编辑页和根布局不得从 `@workbench/demo-ui`、`@workbench/ai-chat-shared` 或 `date-fns/locale` 桶入口获取单个轻量能力；优先使用 package exports 公开的精确子路径，并维护高频路由静态导入测试。
 - 编辑页不得直接动态引用 `author-ai-chat`；保留 `deferred-author-ai-chat` 二级延迟边界，只在初始页面文件就绪后挂载 AI 对话，避免 Mermaid、Shiki 等富文本依赖与预览区争抢首屏资源。

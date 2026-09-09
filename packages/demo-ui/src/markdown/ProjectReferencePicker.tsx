@@ -100,6 +100,18 @@ export function buildReferenceTree(
   return roots;
 }
 
+function getProjectCandidate(
+  candidates: readonly MarkdownReferenceCandidate[],
+  projectId: string | undefined,
+): MarkdownReferenceCandidate | undefined {
+  if (!projectId) return undefined;
+  return candidates.find(
+    (candidate) =>
+      candidate.target.kind === "project" &&
+      candidate.target.projectId === projectId,
+  );
+}
+
 export function ProjectReferencePicker({
   candidates,
   status,
@@ -111,6 +123,8 @@ export function ProjectReferencePicker({
   projectId,
   currentProjectId,
   onProjectChange,
+  onProjectInsert,
+  allowProjectReferences = true,
   projectsStatus = "ready",
   onProjectsRetry,
 }: {
@@ -124,6 +138,8 @@ export function ProjectReferencePicker({
   projectId?: string;
   currentProjectId?: string;
   onProjectChange?: (id: string) => void;
+  onProjectInsert?: (id: string) => void | Promise<void>;
+  allowProjectReferences?: boolean;
   projectsStatus?: "loading" | "ready" | "error";
   onProjectsRetry?: () => void;
 }) {
@@ -133,9 +149,14 @@ export function ProjectReferencePicker({
   const [collapsed, setCollapsed] = useState(new Set<string>());
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [projectSearch, setProjectSearch] = useState("");
+  const [projectInsertState, setProjectInsertState] = useState<{
+    projectId: string;
+    status: "loading" | "error";
+  } | null>(null);
   const projectMenu = useRef<HTMLDivElement>(null);
   const projectTrigger = useRef<HTMLButtonElement>(null);
   const projectSearchInput = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(true);
   const selectedProjectId = projectId ?? currentProjectId;
   const selectedProject = projects?.find(
     (project) => project.id === selectedProjectId,
@@ -158,6 +179,10 @@ export function ProjectReferencePicker({
   const tree = useMemo(
     () => buildReferenceTree(candidates, tab),
     [candidates, tab],
+  );
+  const projectCandidate = useMemo(
+    () => getProjectCandidate(candidates, selectedProjectId),
+    [candidates, selectedProjectId],
   );
   const [position, setPosition] = useState({ left: 8, top: 8 });
   useLayoutEffect(() => {
@@ -243,6 +268,11 @@ export function ProjectReferencePicker({
     })();
   }, [projectMenuOpen]);
   useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  useEffect(() => {
     root.current
       ?.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')
       ?.focus({ preventScroll: true });
@@ -272,6 +302,17 @@ export function ProjectReferencePicker({
     root.current
       ?.querySelector<HTMLButtonElement>(".project-reference-project-trigger")
       ?.focus();
+  };
+  const insertProject = async (nextProjectId: string) => {
+    if (!onProjectInsert || projectInsertState?.status === "loading") return;
+    setProjectInsertState({ projectId: nextProjectId, status: "loading" });
+    try {
+      await onProjectInsert(nextProjectId);
+      if (mountedRef.current) setProjectInsertState(null);
+    } catch {
+      if (mountedRef.current)
+        setProjectInsertState({ projectId: nextProjectId, status: "error" });
+    }
   };
   const renderNode = (node: ReferenceTreeNode, depth: number) => {
     const expanded = !collapsed.has(node.id);
@@ -489,14 +530,38 @@ export function ProjectReferencePicker({
                               : "其他项目"}
                           </div>
                         )}
-                        <button
-                          type="button"
+                        <div
                           role="option"
                           aria-selected={project.id === selectedProjectId}
                           className="project-reference-project-option"
-                          onClick={() => selectProject(project.id)}
                         >
-                          <span>{project.name || project.id}</span>
+                          <button
+                            type="button"
+                            className="project-reference-project-name"
+                            onClick={() => selectProject(project.id)}
+                          >
+                            <span>{project.name || project.id}</span>
+                          </button>
+                          {allowProjectReferences && (
+                            <button
+                              type="button"
+                              className="project-reference-project-insert"
+                              aria-label={`插入项目引用：${project.name || project.id}`}
+                              title={`引用整个项目：${project.name || project.id}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void insertProject(project.id);
+                              }}
+                              disabled={!onProjectInsert || projectInsertState?.status === "loading"}
+                            >
+                              {projectInsertState?.projectId === project.id &&
+                              projectInsertState.status === "loading" ? (
+                                <span aria-label="正在验证" role="status">插入中…</span>
+                              ) : (
+                                <span>插入</span>
+                              )}
+                            </button>
+                          )}
                           {project.id === currentProjectId && (
                             <span className="project-reference-current-badge">
                               当前
@@ -505,7 +570,7 @@ export function ProjectReferencePicker({
                           {project.id === selectedProjectId && (
                             <Check size={14} aria-hidden="true" />
                           )}
-                        </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -514,13 +579,31 @@ export function ProjectReferencePicker({
                     {projects?.length ? "没有匹配的项目" : "暂无可用项目"}
                   </p>
                 )}
+                {projectInsertState?.status === "error" && (
+                  <p className="project-reference-project-state" role="alert">
+                    项目引用验证失败，请重试
+                  </p>
+                )}
                 <div className="project-reference-project-state">
-                  仅显示有访问权限的项目
+                  仅显示有访问权限的项目，右侧按钮可直接引用整个项目
                 </div>
               </div>,
               root.current?.parentElement ?? document.body,
             )}
         </div>
+      )}
+      {allowProjectReferences && projectCandidate && (
+        <button
+          type="button"
+          className="project-reference-project-entry"
+          onClick={() => onSelect(projectCandidate)}
+        >
+          <Folder size={16} aria-hidden="true" />
+          <span>引用整个项目</span>
+          <span className="project-reference-project-entry-label">
+            {projectCandidate.label || selectedProject?.name || selectedProjectId}
+          </span>
+        </button>
       )}
       <div
         className="project-reference-tabs"
