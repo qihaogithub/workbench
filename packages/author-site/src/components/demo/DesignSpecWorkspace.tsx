@@ -30,6 +30,17 @@ import {
   reorderDesignSpecEntries,
   type DesignSpecDropPosition,
 } from "./design-spec-order";
+import {
+  DocumentSaveCoordinator,
+  DocumentSaveError,
+  type DocumentSaveReceipt,
+  type DocumentSaveSnapshot,
+  toDocumentSaveError,
+} from "@/lib/document-save-coordinator";
+import {
+  createOfflineDraftStore,
+  type OfflineDraftStore,
+} from "@/lib/workspace-offline-drafts";
 
 interface DesignSpecWorkspaceValue {
   projectId?: string;
@@ -43,7 +54,11 @@ interface DesignSpecWorkspaceValue {
   saving: boolean;
   readOnly: boolean;
   dirty: boolean;
-  save: () => void;
+  save: () => Promise<boolean>;
+  retrySave: () => Promise<boolean>;
+  restoreLocalDraft: () => Promise<void>;
+  discardLocalDraft: () => Promise<void>;
+  saveSnapshot: DocumentSaveSnapshot;
   addEntry: (title?: string, markdown?: string) => void;
   addEntryWithPage: (pageId: string) => void;
   addEntryWithItem: (itemId: string) => void;
@@ -201,12 +216,14 @@ export function DesignSpecWorkspaceProvider({
   workingDir,
   sessionId,
   projectId,
+  workspaceId,
   readOnly = false,
   children,
 }: {
   workingDir?: string;
   sessionId?: string;
   projectId?: string;
+  workspaceId?: string;
   readOnly?: boolean;
   children: ReactNode;
 }) {
@@ -217,12 +234,20 @@ export function DesignSpecWorkspaceProvider({
   const pagesRef = useRef(pages);
   pagesRef.current = pages;
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const saveRevisionRef = useRef(0);
-  const saveRequestIdRef = useRef(0);
-  const activeSaveCountRef = useRef(0);
+  const [saveSnapshot, setSaveSnapshot] = useState<DocumentSaveSnapshot>({
+    status: "clean",
+    error: null,
+    localRevision: 0,
+    committedRevision: 0,
+    hasLocalDraft: false,
+  });
+  const docRef = useRef<DesignSpecDoc | null>(null);
+  docRef.current = doc;
+  const serverDocRef = useRef<DesignSpecDoc | null>(null);
   const savingRef = useRef(false);
+  const draftStoreRef = useRef<OfflineDraftStore | null>(null);
+  if (!draftStoreRef.current) draftStoreRef.current = createOfflineDraftStore();
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [poolView, setPoolView] = useState<"pages" | "configs">("configs");
@@ -258,15 +283,113 @@ export function DesignSpecWorkspaceProvider({
     setActiveDocIdState(id);
   }, []);
 
+  const saveDesignSpec = useCallback(
+    async (value: DesignSpecDoc): Promise<DocumentSaveReceipt | void> => {
+      if (readOnly) {
+        throw new DocumentSaveError("当前没有保存此设计规范的权限。", {
+          code: "PERMISSION_DENIED",
+        });
+      }
+      try {
+        const response = await fetch(`/api/design-specs/${value.id}${qs}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ doc: value }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.success) {
+          throw toDocumentSaveError(
+            payload ? { ...payload, status: response.status } : { status: response.status },
+            "设计规范保存失败",
+          );
+        }
+        const authority = payload.data?.authority;
+        if (
+          authority &&
+          typeof authority === "object" &&
+          typeof authority.revision === "number" &&
+          typeof authority.rootHash === "string"
+        ) {
+          return {
+            revision: authority.revision,
+            rootHash: authority.rootHash,
+          };
+        }
+        return undefined;
+      } catch (error) {
+        throw toDocumentSaveError(error, "设计规范保存失败");
+      }
+    },
+    [qs, readOnly],
+  );
+
+  const coordinator = useMemo<DocumentSaveCoordinator<DesignSpecDoc> | null>(
+    () => {
+      if (!activeDocId) return null;
+      const currentStore = draftStoreRef.current;
+      return new DocumentSaveCoordinator<DesignSpecDoc>({
+        save: saveDesignSpec,
+        draft:
+          projectId && workspaceId && currentStore
+            ? {
+                store: currentStore,
+                workspaceId,
+                projectId,
+                path: `design-spec:${activeDocId}`,
+                serialize: (value) => JSON.stringify(value),
+                deserialize: (content) => JSON.parse(content) as DesignSpecDoc,
+              }
+            : undefined,
+        onStateChange: (snapshot) => {
+          savingRef.current = snapshot.status === "saving";
+          setSaveSnapshot(snapshot);
+        },
+        onCommitted: ({ value, latest }) => {
+          if (!latest) {
+            setDirty(true);
+            return;
+          }
+          docRef.current = value;
+          setDoc(value);
+          setDirty(false);
+          window.dispatchEvent(new Event("design-spec-updated"));
+        },
+        onError: () => {
+          setDirty(true);
+        },
+      });
+    },
+    [activeDocId, projectId, saveDesignSpec, workspaceId],
+  );
+  const coordinatorRef = useRef<DocumentSaveCoordinator<DesignSpecDoc> | null>(
+    null,
+  );
+  coordinatorRef.current = coordinator;
+
+  useEffect(() => {
+    const current = coordinator;
+    return () => {
+      if (current) void current.dispose();
+    };
+  }, [coordinator]);
+
   // 加载文档 + 素材池（仅在选中设计规范时加载）
   useEffect(() => {
-    saveRevisionRef.current += 1;
     if (!activeDocId) {
+      docRef.current = null;
+      serverDocRef.current = null;
       setDoc(null);
       setPool([]);
       setPages([]);
       setPageFilter("all");
       setDirty(false);
+      setSaveSnapshot({
+        status: "clean",
+        error: null,
+        localRevision: 0,
+        committedRevision: 0,
+        hasLocalDraft: false,
+      });
       setOpenIds(new Set());
       return;
     }
@@ -282,8 +405,21 @@ export function DesignSpecWorkspaceProvider({
         const poolData = await poolRes.json();
         if (cancelled) return;
         if (docData.success) {
-          setDoc(docData.data);
-          setDirty(false);
+          const serverDoc = docData.data as DesignSpecDoc;
+          serverDocRef.current = serverDoc;
+          coordinator?.setBase(serverDoc);
+          const draft = coordinator
+            ? await coordinator.readDraft(serverDoc)
+            : { status: "none" as const };
+          if (cancelled) return;
+          const nextDoc =
+            draft.status === "match" ? draft.value : serverDoc;
+          docRef.current = nextDoc;
+          setDoc(nextDoc);
+          setDirty(draft.status === "match");
+          if (draft.status === "match" && !readOnly) {
+            coordinator?.markDirty(nextDoc);
+          }
           setOpenIds(new Set());
         }
         if (poolData.success) {
@@ -313,7 +449,7 @@ export function DesignSpecWorkspaceProvider({
     return () => {
       cancelled = true;
     };
-  }, [activeDocId, qs]);
+  }, [activeDocId, coordinator, qs, readOnly]);
 
   // 配置定义编辑器保存 Schema 后，素材池中的标题、类型和尺寸也必须
   // 重新投影；否则设计规范卡片会继续展示首次打开时的旧字段信息。
@@ -385,70 +521,67 @@ export function DesignSpecWorkspaceProvider({
     const handleTitleUpdate = (event: Event) => {
       const update = readDesignSpecTitleUpdate(event);
       if (!update || update.docId !== activeDocId) return;
-      saveRevisionRef.current += 1;
-      setDoc((current) => (current ? { ...current, title: update.title } : current));
-      if (savingRef.current) setDirty(true);
+      const current = docRef.current;
+      if (!current) return;
+      const next = { ...current, title: update.title };
+      docRef.current = next;
+      setDoc(next);
+      const snapshot = coordinatorRef.current?.getSnapshot();
+      if (
+        snapshot &&
+        snapshot.status !== "clean" &&
+        snapshot.status !== "saved"
+      ) {
+        setDirty(true);
+        coordinatorRef.current?.markDirty(next);
+      }
     };
     window.addEventListener("design-spec-updated", handleTitleUpdate);
     return () => window.removeEventListener("design-spec-updated", handleTitleUpdate);
   }, [activeDocId]);
 
-  const save = useCallback(async () => {
-    if (!doc || readOnly) return;
-    const requestId = ++saveRequestIdRef.current;
-    const requestRevision = saveRevisionRef.current;
-    activeSaveCountRef.current += 1;
-    savingRef.current = true;
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/design-specs/${doc.id}${qs}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doc }),
-      });
-      const data = await res.json();
-      if (
-        data.success &&
-        requestId === saveRequestIdRef.current &&
-        requestRevision === saveRevisionRef.current
-      ) {
-        setDirty(false);
-        setDoc(data.data);
-        window.dispatchEvent(new Event("design-spec-updated"));
-      }
-    } catch {
-      // 静默失败
-    } finally {
-      activeSaveCountRef.current -= 1;
-      if (activeSaveCountRef.current === 0) {
-        savingRef.current = false;
-        setSaving(false);
-      }
-    }
-  }, [doc, qs, readOnly]);
+  const saving = saveSnapshot.status === "saving";
+
+  const save = useCallback(
+    () => coordinatorRef.current?.flush() ?? Promise.resolve(true),
+    [],
+  );
+  const retrySave = useCallback(
+    () => coordinatorRef.current?.retry() ?? Promise.resolve(false),
+    [],
+  );
+  const restoreLocalDraft = useCallback(async () => {
+    const value = await coordinatorRef.current?.restoreDraft();
+    if (!value) return;
+    docRef.current = value;
+    setDoc(value);
+    setDirty(true);
+  }, []);
+  const discardLocalDraft = useCallback(
+    async () => {
+      await coordinatorRef.current?.discardDraft();
+      const serverDoc = serverDocRef.current;
+      if (!serverDoc) return;
+      docRef.current = serverDoc;
+      setDoc(serverDoc);
+      setDirty(false);
+    },
+    [],
+  );
 
   const updateDoc = useCallback(
     (updater: (d: DesignSpecDoc) => DesignSpecDoc) => {
       if (readOnly) return;
-      setDoc((prev) => {
-        if (!prev) return prev;
-        return updater(prev);
-      });
+      const current = docRef.current;
+      if (!current) return;
+      const next = updater(current);
+      docRef.current = next;
+      setDoc(next);
       setDirty(true);
+      coordinatorRef.current?.markDirty(next);
     },
     [readOnly],
   );
-
-  // 自动保存：脏数据出现后防抖 800ms 落盘
-  const saveRef = useRef(save);
-  saveRef.current = save;
-  useEffect(() => {
-    if (!dirty || !doc || readOnly) return;
-    const t = window.setTimeout(() => {
-      void saveRef.current();
-    }, 800);
-    return () => window.clearTimeout(t);
-  }, [dirty, doc, readOnly]);
 
   const addEntry = useCallback(
     (title?: string, markdown = "") => {
@@ -822,6 +955,10 @@ export function DesignSpecWorkspaceProvider({
       readOnly,
       dirty,
       save,
+      retrySave,
+      restoreLocalDraft,
+      discardLocalDraft,
+      saveSnapshot,
       addEntry,
       addEntryWithPage,
       addEntryWithItem,
@@ -861,6 +998,7 @@ export function DesignSpecWorkspaceProvider({
     [
       activeDocId,
       projectId,
+      sessionId,
       setActiveDocId,
       doc,
       pool,
@@ -870,6 +1008,10 @@ export function DesignSpecWorkspaceProvider({
       readOnly,
       dirty,
       save,
+      retrySave,
+      restoreLocalDraft,
+      discardLocalDraft,
+      saveSnapshot,
       addEntry,
       addEntryWithPage,
       addEntryWithItem,

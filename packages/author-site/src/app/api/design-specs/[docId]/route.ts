@@ -79,6 +79,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (!existing) return notFound();
 
   try {
+    let authority:
+      | { revision: number; rootHash: string }
+      | undefined;
     const normalized: typeof existing = {
       id: existing.id,
       title:
@@ -115,7 +118,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           expectedHash: hashText(JSON.stringify(previousManifest, null, 2)),
         },
       ];
-      await commitWorkspaceMutation({
+      authority = await commitWorkspaceMutation({
         mutationId: crypto.randomUUID(),
         projectId: liveContext.projectId,
         workspaceId: liveContext.workspaceId,
@@ -129,7 +132,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       saveDesignSpecDoc(workingDir, normalized);
     }
 
-    return NextResponse.json(createApiSuccess(normalized));
+    return NextResponse.json(
+      createApiSuccess(
+        authority ? { ...normalized, authority } : normalized,
+      ),
+    );
   } catch (error) {
     if (error instanceof WorkspaceAuthorityClientError) return mutationErrorResponse(error);
     const message = error instanceof Error ? error.message : "Unknown error";

@@ -9086,6 +9086,7 @@ ${context.details}
           workingDir={workspacePath || undefined}
           sessionId={sessionId}
           projectId={demoId}
+          workspaceId={workspaceId || undefined}
           readOnly={currentUserRole !== "admin"}
         >
           <SketchEditorEngineBoundary

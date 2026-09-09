@@ -39,6 +39,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { DesignSpecEntry, DesignSpecRef } from "@/lib/design-specs";
 import { useDesignSpecWorkspace } from "./DesignSpecWorkspace";
+import { DocumentSaveStatusBar } from "./DocumentSaveStatusBar";
 import {
   formatSize,
   KIND_META,
@@ -71,6 +72,14 @@ export function DesignSpecEditor({
   onEditConfigDefinition,
 }: DesignSpecEditorProps) {
   const ws = useDesignSpecWorkspace();
+  const openEntry = ws.openEntry;
+  const saveSnapshot = ws.saveSnapshot ?? {
+    status: "clean" as const,
+    error: null,
+    localRevision: 0,
+    committedRevision: 0,
+    hasLocalDraft: false,
+  };
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const [overEntryId, setOverEntryId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<DesignSpecDropPosition | null>(null);
@@ -89,8 +98,8 @@ export function DesignSpecEditor({
     return () => setActiveDocIdRef.current(null);
   }, []);
   useEffect(() => {
-    if (focusEntryId) ws.openEntry(focusEntryId);
-  }, [focusEntryId, ws.openEntry]);
+    if (focusEntryId) openEntry(focusEntryId);
+  }, [focusEntryId, openEntry]);
 
   const clearDragState = useCallback(() => {
     setActiveEntryId(null);
@@ -158,6 +167,18 @@ export function DesignSpecEditor({
 
   return (
     <div className="relative flex h-full min-w-0 flex-col overflow-hidden">
+      <DocumentSaveStatusBar
+        snapshot={saveSnapshot}
+        onRetry={() => {
+          void ws.retrySave?.();
+        }}
+        onRestoreDraft={readOnly ? undefined : () => {
+          void ws.restoreLocalDraft?.();
+        }}
+        onDiscardDraft={() => {
+          void ws.discardLocalDraft?.();
+        }}
+      />
       {/* 中栏：卡片列表 */}
       <div
         data-testid="design-spec-scroll-area"

@@ -64,6 +64,17 @@ import {
 } from "./document-view-knowledge";
 import { toKnowledgeItem, toKnowledgeItems } from "./document-api-adapter";
 import { localizeRemoteImageForSession } from "@workbench/demo-ui/markdown/remote-image-localizer";
+import {
+  DocumentSaveCoordinator,
+  DocumentSaveError,
+  type DocumentSaveSnapshot,
+  toDocumentSaveError,
+} from "@/lib/document-save-coordinator";
+import {
+  createOfflineDraftStore,
+  type OfflineDraftStore,
+} from "@/lib/workspace-offline-drafts";
+import { DocumentSaveStatusBar } from "./DocumentSaveStatusBar";
 
 export interface PageItem {
   id: string;
@@ -75,45 +86,6 @@ const EMPTY_PAGE_ITEMS: PageItem[] = [];
 function isWithinDropdownMenu(target: EventTarget | null): target is Element {
   return target instanceof Element && Boolean(target.closest('[role="menu"]'));
 }
-
-interface DocumentSaveError extends Error {
-  code?: string;
-  details?: unknown;
-}
-
-interface ApiErrorPayload {
-  code?: unknown;
-  message?: unknown;
-  details?: unknown;
-}
-
-function readApiErrorPayload(value: unknown): ApiErrorPayload {
-  if (!value || typeof value !== "object") return {};
-  const error = (value as { error?: unknown }).error;
-  return error && typeof error === "object" ? error as ApiErrorPayload : {};
-}
-
-function createDocumentSaveError(value: unknown, fallback: string): DocumentSaveError {
-  const payload = readApiErrorPayload(value);
-  const error = new Error(
-    typeof payload.message === "string" && payload.message.trim()
-      ? payload.message
-      : fallback,
-  ) as DocumentSaveError;
-  if (typeof payload.code === "string") error.code = payload.code;
-  if (payload.details !== undefined) error.details = payload.details;
-  return error;
-}
-
-function isWorkspaceBackupMissingError(error: unknown): boolean {
-  return error instanceof Error && (
-    (error as DocumentSaveError).code === "DOCUMENT_AUTHORITY_BACKUP_MISSING" ||
-    (error as DocumentSaveError).code === "WORKSPACE_AUTHORITY_BACKUP_MISSING"
-  );
-}
-
-const WORKSPACE_BACKUP_MISSING_MESSAGE =
-  "工作区备份不完整，自动保存已暂停。请管理员先运行 Workspace Authority preflight；确认保留当前磁盘内容后执行 reconcile-adopt，完成后刷新页面。";
 
 /** 右侧编辑区当前打开的目标：知识库文档 / AI 记忆 / 项目公约 / 页面公约 / 设计规范 */
 type ActiveTarget =
@@ -205,6 +177,8 @@ export function DocumentView({
   onReferenceClick,
 }: DocumentViewProps) {
   const { toast } = useToast();
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -215,10 +189,22 @@ export function DocumentView({
   const [contentLoading, setContentLoading] = useState(false);
   const [contentReloadRevision, setContentReloadRevision] = useState(0);
   const [workspaceSaveBlocked, setWorkspaceSaveBlocked] = useState(false);
-  const workspaceSaveBlockedRef = useRef(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingSaveRef = useRef<{ target: ActiveTarget; markdown: string } | null>(null);
-  const saveInFlightRef = useRef<Promise<boolean> | null>(null);
+  const [saveSnapshot, setSaveSnapshot] = useState<DocumentSaveSnapshot>({
+    status: "clean",
+    error: null,
+    localRevision: 0,
+    committedRevision: 0,
+    hasLocalDraft: false,
+  });
+  const activeTargetRef = useRef<ActiveTarget | null>(null);
+  activeTargetRef.current = activeTarget;
+  const activeDocumentReadOnly = Boolean(
+    activeTarget &&
+      (activeTarget.kind === "convention" || activeTarget.kind === "pageConvention") &&
+      !canManageGovernance,
+  );
+  const draftStoreRef = useRef<OfflineDraftStore | null>(null);
+  if (!draftStoreRef.current) draftStoreRef.current = createOfflineDraftStore();
   const [userExpanded, setUserExpanded] = useState(true);
   const [conventionExpanded, setConventionExpanded] = useState(true);
   const [existingConventionPaths, setExistingConventionPaths] = useState<Set<string>>(
@@ -321,14 +307,6 @@ export function DocumentView({
   useEffect(() => {
     contentCacheRef.current.clear();
   }, [documentApiMode, projectId, workingDir, sessionId]);
-
-  useEffect(() => {
-    workspaceSaveBlockedRef.current = false;
-    setWorkspaceSaveBlocked(false);
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = null;
-    pendingSaveRef.current = null;
-  }, [documentApiMode, projectId, sessionId, workspaceId, workingDir]);
 
   const localizeRemoteImage = useMemo(
     () =>
@@ -497,88 +475,81 @@ export function DocumentView({
     }
   }, [activeTarget, userItems, loading, referenceFocus]);
 
-  const blockWorkspaceSaves = useCallback(() => {
-    workspaceSaveBlockedRef.current = true;
-    setWorkspaceSaveBlocked(true);
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = null;
-    pendingSaveRef.current = null;
-  }, []);
-
   /** 把指定目标的 markdown 内容写回服务端 */
   const saveTarget = useCallback(
     async (target: ActiveTarget, markdown: string) => {
       if ((target.kind === "convention" || target.kind === "pageConvention") && !canManageGovernance) {
-        return false;
+        throw new DocumentSaveError("当前没有保存此公约的权限。", {
+          code: "PERMISSION_DENIED",
+        });
       }
-      try {
-        if (target.kind === "knowledge") {
-          if (!workingDir && !(documentApiMode === "project" && projectId)) return false;
-          const params = workingDir ? new URLSearchParams({ workingDir }) : new URLSearchParams();
-          if (projectId && documentApiMode === "legacy") params.set("projectId", projectId);
-          if (sessionId && documentApiMode === "legacy") params.set("sessionId", sessionId);
-          const res = await fetch(
-            documentApiMode === "project" && projectId
-              ? `/api/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(target.item.id)}${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`
-              : `/api/knowledge/${target.item.id}?${params.toString()}`,
-            {
-              method: documentApiMode === "project" ? "PATCH" : "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ content: markdown }),
-            },
-          );
-          const data = await res.json();
-          if (res.ok && data.success) {
-            const updated = documentApiMode === "project"
-              ? toKnowledgeItem(data.data.snapshot)
-              : data.data as KnowledgeItem;
-            const currentItems = itemsRef.current;
-            const nextItems = currentItems.some((item) => item.id === updated.id)
-              ? currentItems.map((item) => (item.id === updated.id ? updated : item))
-              : [...currentItems, updated];
-            setItems(nextItems);
-            onItemsChangeRef.current?.(nextItems);
-            window.dispatchEvent(new Event("knowledge-updated"));
-            return true;
-          }
-          throw createDocumentSaveError(data, "保存失败");
-        } else {
-          if (!sessionId) return false;
-          const filePath = resolveWorkspaceFilePath(target);
-          if (!filePath) return false;
-          const res = await fetch(
-            `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
-            {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ content: markdown }),
-            },
-          );
-          const data = await res.json();
-          if (!res.ok || !data.success) {
-            throw createDocumentSaveError(data, "保存失败");
-          }
-          return true;
+      if (target.kind === "knowledge") {
+        if (!workingDir && !(documentApiMode === "project" && projectId)) {
+          throw new DocumentSaveError("工作空间尚未准备好保存。", {
+            code: "UNKNOWN",
+          });
         }
-      } catch (err) {
-        if (isWorkspaceBackupMissingError(err)) {
-          const alreadyBlocked = workspaceSaveBlockedRef.current;
-          blockWorkspaceSaves();
-          if (!alreadyBlocked) {
-            toast({
-              title: "保存失败：工作区备份不完整",
-              description: WORKSPACE_BACKUP_MISSING_MESSAGE,
-              variant: "destructive",
-            });
-          }
-          return false;
+        const params = workingDir ? new URLSearchParams({ workingDir }) : new URLSearchParams();
+        if (projectId && documentApiMode === "legacy") params.set("projectId", projectId);
+        if (sessionId && documentApiMode === "legacy") params.set("sessionId", sessionId);
+        const res = await fetch(
+          documentApiMode === "project" && projectId
+            ? `/api/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(target.item.id)}${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`
+            : `/api/knowledge/${target.item.id}?${params.toString()}`,
+          {
+            method: documentApiMode === "project" ? "PATCH" : "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: markdown }),
+          },
+        );
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          throw toDocumentSaveError(
+            data ? { ...data, status: res.status } : { status: res.status },
+            "保存失败",
+          );
         }
-        const message = err instanceof Error ? err.message : "保存失败";
-        toast({ title: message, variant: "destructive" });
-        return false;
+        const updated = documentApiMode === "project"
+          ? toKnowledgeItem(data.data.snapshot)
+          : data.data as KnowledgeItem;
+        const currentItems = itemsRef.current;
+        const nextItems = currentItems.some((item) => item.id === updated.id)
+          ? currentItems.map((item) => (item.id === updated.id ? updated : item))
+          : [...currentItems, updated];
+        setItems(nextItems);
+        onItemsChangeRef.current?.(nextItems);
+        window.dispatchEvent(new Event("knowledge-updated"));
+        return;
+      }
+
+      if (!sessionId) {
+        throw new DocumentSaveError("当前会话尚未准备好保存。", {
+          code: "UNKNOWN",
+        });
+      }
+      const filePath = resolveWorkspaceFilePath(target);
+      if (!filePath) {
+        throw new DocumentSaveError("当前文档没有可保存的路径。", {
+          code: "VALIDATION_FAILED",
+        });
+      }
+      const res = await fetch(
+        `/api/sessions/${sessionId}/workspace/files/${encodeURIComponent(filePath)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: markdown }),
+        },
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw toDocumentSaveError(
+          data ? { ...data, status: res.status } : { status: res.status },
+          "保存失败",
+        );
       }
     },
-    [blockWorkspaceSaves, documentApiMode, workingDir, projectId, sessionId, toast, canManageGovernance],
+    [documentApiMode, workingDir, projectId, sessionId, canManageGovernance],
   );
 
   const openOrCreateConvention = useCallback(
@@ -592,15 +563,23 @@ export function DocumentView({
         return;
       }
       const initialContent = buildInitialConventionContent(target);
-      const created = await saveTarget(target, initialContent);
-      if (!created) return;
+      try {
+        await saveTarget(target, initialContent);
+      } catch (error) {
+        toast({
+          title: "创建公约失败",
+          description: error instanceof Error ? error.message : undefined,
+          variant: "destructive",
+        });
+        return;
+      }
       setExistingConventionPaths((current) => new Set(current).add(filePath));
       contentCacheRef.current.set(getContentCacheKey(target), initialContent);
       setContent(initialContent);
       setActiveTarget(target);
       setConventionExpanded(true);
     },
-    [existingConventionPaths, saveTarget, canManageGovernance],
+    [existingConventionPaths, saveTarget, canManageGovernance, toast],
   );
 
   const deleteConvention = useCallback(
@@ -637,69 +616,110 @@ export function DocumentView({
     [sessionId, toast, canManageGovernance],
   );
 
-  // ── 自动保存：在内容变化路径上防抖，切换目标/卸载时冲刷 ──────────────
-  // 在 markdownUpdated 触发 onChange 时捕获目标与内容，调度一次 800ms 防抖写回，
-  // 避免绕回 React state 用 effect 监听 content 造成的额外渲染与丢失。
-  const saveTargetRef = useRef(saveTarget);
-  saveTargetRef.current = saveTarget;
+  // ── 文档保存协调器：编辑、切换目标和卸载共用同一条提交链路 ──────────
+  // 目标对象可能因为重命名而重新创建，所以保存回调始终从 ref 读取最新目标；
+  // 协调器本身只按稳定 cache key 重建，避免重命名或列表刷新丢失未提交内容。
+  const activeTargetKey = activeTarget ? getContentCacheKey(activeTarget) : null;
+  const coordinatorRef = useRef<DocumentSaveCoordinator<string> | null>(null);
 
-  const persistPendingSave = useCallback((pending: { target: ActiveTarget; markdown: string }) => {
-    if (workspaceSaveBlockedRef.current) return Promise.resolve(false);
-    const promise = saveTargetRef.current(pending.target, pending.markdown);
-    saveInFlightRef.current = promise;
-    return promise;
-  }, []);
+  const coordinator = useMemo<DocumentSaveCoordinator<string> | null>(() => {
+    if (!activeTargetKey) return null;
+    const targetAtCreation = activeTarget;
+    const saveTargetAtCreation = saveTarget;
+    const currentStore = draftStoreRef.current;
+    let instance: DocumentSaveCoordinator<string>;
+    instance = new DocumentSaveCoordinator<string>({
+      save: async (markdown) => {
+        if (!targetAtCreation || getContentCacheKey(targetAtCreation) !== activeTargetKey) {
+          throw new DocumentSaveError("当前文档已切换，保存目标已失效。", {
+            code: "RESOURCE_CONFLICT",
+          });
+        }
+        await saveTargetAtCreation(targetAtCreation, markdown);
+      },
+      draft:
+        projectId && workspaceId && currentStore
+          ? {
+              store: currentStore,
+              workspaceId,
+              projectId,
+              path: activeTargetKey,
+              serialize: (value) => value,
+              deserialize: (value) => value,
+            }
+          : undefined,
+      onStateChange: (snapshot) => {
+        if (coordinatorRef.current !== instance) return;
+        setSaveSnapshot(snapshot);
+        setWorkspaceSaveBlocked(snapshot.status === "authority-degraded");
+      },
+      onCommitted: ({ value, latest }) => {
+        if (coordinatorRef.current !== instance || !latest) return;
+        contentCacheRef.current.set(activeTargetKey, value);
+        if (activeTargetRef.current && getContentCacheKey(activeTargetRef.current) === activeTargetKey) {
+          setContent(value);
+        }
+      },
+      onError: (error) => {
+        if (coordinatorRef.current !== instance) return;
+        if (error.code === "AUTHORITY_BACKUP_MISSING") {
+          toastRef.current({
+            title: "保存失败：工作区备份不完整",
+            description: error.message,
+            variant: "destructive",
+          });
+          return;
+        }
+        toastRef.current({ title: error.message, variant: "destructive" });
+      },
+    });
+    return instance;
+  }, [activeTarget, activeTargetKey, projectId, saveTarget, workspaceId]);
+  coordinatorRef.current = coordinator;
 
-  const flushSave = useCallback(async (): Promise<boolean> => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-    if (workspaceSaveBlockedRef.current) {
-      pendingSaveRef.current = null;
-      return false;
-    }
-    const pending = pendingSaveRef.current;
-    pendingSaveRef.current = null;
-    let saved = true;
-    if (pending) {
-      saved = await persistPendingSave(pending);
-    }
-    const inFlight = saveInFlightRef.current;
-    if (inFlight) saved = (await inFlight) && saved;
-    return saved;
-  }, [persistPendingSave]);
+  useEffect(() => {
+    setSaveSnapshot(
+      coordinator?.getSnapshot() ?? {
+        status: "clean",
+        error: null,
+        localRevision: 0,
+        committedRevision: 0,
+        hasLocalDraft: false,
+      },
+    );
+    setWorkspaceSaveBlocked(false);
+    const current = coordinator;
+    return () => {
+      if (current) void current.dispose();
+    };
+  }, [coordinator]);
+
+  const flushSave = useCallback(
+    () => coordinatorRef.current?.flush() ?? Promise.resolve(true),
+    [],
+  );
 
   const scheduleSave = useCallback((target: ActiveTarget, markdown: string) => {
     if ((target.kind === "convention" || target.kind === "pageConvention") && !canManageGovernance) {
       return;
     }
-    if (workspaceSaveBlockedRef.current) return;
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-    pendingSaveRef.current = { target, markdown };
-    saveTimerRef.current = setTimeout(() => {
-      saveTimerRef.current = null;
-      if (workspaceSaveBlockedRef.current) {
-        pendingSaveRef.current = null;
-        return;
-      }
-      const pending = pendingSaveRef.current;
-      pendingSaveRef.current = null;
-      if (pending) {
-        void persistPendingSave(pending);
-      }
-    }, 800);
-  }, [canManageGovernance, persistPendingSave]);
+    if (!activeTargetKey || getContentCacheKey(target) !== activeTargetKey) return;
+    coordinatorRef.current?.markDirty(markdown);
+  }, [activeTargetKey, canManageGovernance]);
 
-  // 卸载时冲刷未落盘的编辑
-  useEffect(
-    () => () => {
-      void flushSave();
-    },
-    [flushSave],
-  );
+  const restoreLocalDraft = useCallback(async () => {
+    const value = await coordinatorRef.current?.restoreDraft();
+    if (value === undefined || value === null || !activeTargetKey) return;
+    contentCacheRef.current.set(activeTargetKey, value);
+    setContent(value);
+  }, [activeTargetKey]);
+
+  const discardLocalDraft = useCallback(async () => {
+    await coordinatorRef.current?.discardDraft();
+    if (!activeTargetKey) return;
+    contentCacheRef.current.delete(activeTargetKey);
+    setContentReloadRevision((current) => current + 1);
+  }, [activeTargetKey]);
 
   // 加载当前目标内容
   useEffect(() => {
@@ -752,8 +772,20 @@ export function DocumentView({
           }
         }
         if (!cancelled) {
-          if (loaded) contentCacheRef.current.set(cacheKey, text);
-          setContent(text);
+          let nextContent = text;
+          if (loaded) {
+            coordinator?.setBase(text);
+            const draft = coordinator
+              ? await coordinator.readDraft(text)
+              : { status: "none" as const };
+            if (cancelled) return;
+            if (draft.status === "match") {
+              nextContent = draft.value;
+              if (!activeDocumentReadOnly) coordinator?.markDirty(nextContent);
+            }
+            contentCacheRef.current.set(cacheKey, nextContent);
+          }
+          setContent(nextContent);
         }
       } catch {
         if (!cancelled) setContent("");
@@ -766,7 +798,17 @@ export function DocumentView({
     return () => {
       cancelled = true;
     };
-  }, [activeTarget, documentApiMode, projectId, workingDir, sessionId, flushSave, contentReloadRevision]);
+  }, [
+    activeTarget,
+    activeDocumentReadOnly,
+    coordinator,
+    documentApiMode,
+    projectId,
+    workingDir,
+    sessionId,
+    flushSave,
+    contentReloadRevision,
+  ]);
 
   const createKnowledgeDocument = useCallback(
     async (title: string, markdown: string): Promise<KnowledgeItem | null> => {
@@ -1107,12 +1149,6 @@ export function DocumentView({
   const handleUnlinkedMentionNavigate = useCallback((mention: MarkdownReferenceMention) => {
     navigateToMarkdownMention(referenceEditorContainerRef.current, content, mention);
   }, [content]);
-  const activeDocumentReadOnly = Boolean(
-    activeTarget &&
-      (activeTarget.kind === "convention" || activeTarget.kind === "pageConvention") &&
-      !canManageGovernance,
-  );
-
   useEffect(() => {
     if (!activeTarget) return;
     // Every directory category uses the same active-row highlight.
@@ -1483,15 +1519,19 @@ export function DocumentView({
 
       {/* 文档编辑区 */}
       <div ref={referenceEditorContainerRef} className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        {workspaceSaveBlocked && (
-          <div
-            role="alert"
-            data-testid="workspace-save-blocked"
-            className="shrink-0 border-b border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-          >
-            {WORKSPACE_BACKUP_MISSING_MESSAGE}
-          </div>
-        )}
+        <DocumentSaveStatusBar
+          snapshot={saveSnapshot}
+          testId={workspaceSaveBlocked ? "workspace-save-blocked" : undefined}
+          onRetry={() => {
+            void coordinatorRef.current?.retry();
+          }}
+          onRestoreDraft={activeDocumentReadOnly ? undefined : () => {
+            void restoreLocalDraft();
+          }}
+          onDiscardDraft={() => {
+            void discardLocalDraft();
+          }}
+        />
         {proposalId && !proposalReviewOpen && (
           <div className="flex items-center justify-between border-b bg-violet-500/5 px-3 py-2 text-xs">
             <span className="text-muted-foreground">有一项 AI 文档修改待审核</span>
@@ -1595,9 +1635,7 @@ export function DocumentView({
           if (!(await flushSave())) throw new Error("本地文档保存失败，请修复后再审核");
         }}
         onApplied={() => {
-          if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-          saveTimerRef.current = null;
-          pendingSaveRef.current = null;
+          void coordinatorRef.current?.discardDraft();
           contentCacheRef.current.clear();
           setContentReloadRevision((current) => current + 1);
           void fetchItems();
