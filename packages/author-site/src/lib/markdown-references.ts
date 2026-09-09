@@ -21,10 +21,10 @@ import { parseMarkdownReferences, decodeMarkdownReferenceUri, MARKDOWN_REFERENCE
 import { isValidWorkspacePathSegment } from "@workbench/shared/workspace-path";
 import {
   findWorkspacePath,
-  getProjectPath,
   getSessionMeta,
   isSessionExpired,
   readProjectMeta,
+  resolveProjectWorkspacePath,
 } from "@/lib/fs-utils";
 
 export interface MarkdownReferenceWorkspaceContext {
@@ -123,8 +123,8 @@ export function resolveMarkdownReferenceWorkspace(
     return { projectId, workspaceId: session.workspaceId, workspacePath, observedRevision: project?.canonicalSyncedRevision, observedRootHash: project?.canonicalSyncedRootHash };
   }
   const project = readProjectMeta(projectId);
-  const workspacePath = project?.workspacePath || path.join(getProjectPath(projectId), "workspace");
-  if (!fs.existsSync(workspacePath)) return null;
+  const workspacePath = resolveProjectWorkspacePath(projectId, project?.workspacePath);
+  if (!workspacePath) return null;
   return {
     projectId,
     workspaceId: project?.activeWorkspaceId || project?.canonicalSyncedWorkspaceId || "project-workspace",

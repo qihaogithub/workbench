@@ -182,13 +182,13 @@ export function listProjectTemplates(): ProjectTemplateMeta[] {
   return templates.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-function resolveProjectWorkspacePath(
+export function resolveProjectWorkspacePath(
   projectId: string,
   workspacePath?: string,
 ): string | null {
   const candidates = [
-    workspacePath,
     path.join(getProjectPath(projectId), "workspace"),
+    workspacePath,
     workspacePath ? findWorkspacePath(workspacePath) : null,
   ].filter((item): item is string => Boolean(item));
 

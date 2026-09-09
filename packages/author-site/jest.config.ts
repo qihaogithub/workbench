@@ -42,6 +42,7 @@ const config: Config = {
     '^\\./content-graph-admin\\.js$': '<rootDir>/../project-core/src/content-graph-admin.ts',
     '^\\./document-proposal\\.js$': '<rootDir>/../project-core/src/document-proposal.ts',
     '^\\./resource-directory\\.js$': '<rootDir>/../project-core/src/markdown-references/resource-directory.ts',
+    '^\\./candidate-directory\\.js$': '<rootDir>/../project-core/src/markdown-references/candidate-directory.ts',
     '^\\./entity-resolver\\.js$': '<rootDir>/../project-core/src/markdown-references/entity-resolver.ts',
     '^\\./link-index\\.js$': '<rootDir>/../project-core/src/markdown-references/link-index.ts',
     '^\\./sqlite-index\\.js$': '<rootDir>/../project-core/src/markdown-references/sqlite-index.ts',
