@@ -34,6 +34,7 @@ import { readUserBackendProvidersConfig } from "@/lib/user-model-config";
 import { findUserById, type UserRole } from "@/lib/user";
 import { parseVisibilityRules } from "@workbench/shared";
 import { getConversationService } from "@/lib/conversation";
+import { DATA_DIR } from "@/lib/paths";
 
 function createSessionBootstrap(input: {
   sessionId: string;
@@ -184,6 +185,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         createApiError("INVALID_REQUEST", "projectId 参数必填"),
         { status: 400 },
+      );
+    }
+
+    if (
+      fs.existsSync(
+        path.join(DATA_DIR, "workspace-recovery", "locks", `${projectId}.lock`),
+      )
+    ) {
+      return NextResponse.json(
+        createApiError(
+          "WORKSPACE_RECOVERY_IN_PROGRESS",
+          "Workspace 正在恢复，暂停创建或恢复 Session",
+        ),
+        { status: 503 },
       );
     }
 

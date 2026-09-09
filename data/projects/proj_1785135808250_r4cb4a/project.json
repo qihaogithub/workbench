@@ -3,7 +3,7 @@
   "name": "闯关活动-竖版",
   "projectType": "standard",
   "category": "营销活动",
-  "workspacePath": "/app/data/projects/proj_1785135808250_r4cb4a/workspace",
+  "workspacePath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/projects/proj_1785135808250_r4cb4a/workspace",
   "demoPages": [
     {
       "id": "page_swfq",
@@ -20,14 +20,6 @@
       "order": 0,
       "parentId": null,
       "runtimeType": "high-fidelity-react"
-    },
-    {
-      "id": "page_g5ky",
-      "name": "挑战成功",
-      "routeKey": "page-3",
-      "order": 1,
-      "parentId": null,
-      "runtimeType": "prototype-html-css"
     },
     {
       "id": "page_yw72",
@@ -76,18 +68,6 @@
       "order": 7,
       "parentId": "folder_1785397477311_od13vu",
       "runtimeType": "prototype-html-css"
-    },
-    {
-      "id": "nn_g9ct",
-      "name": "N对N填空题",
-      "order": 9,
-      "parentId": null,
-      "runtimeType": "high-fidelity-react",
-      "reference": {
-        "sourceProjectId": "proj_1788141806566_0aps89",
-        "sourcePageId": "clipboard-import_e05e9d"
-      },
-      "routeKey": "nn"
     }
   ],
   "demoFolders": [
@@ -642,16 +622,75 @@
       "workspaceRevision": 976,
       "workspaceRootHash": "c9fb6837e518df2f8da058a9fda9eaf92a07e5ec8209da87525253736addb85a",
       "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v42",
+      "type": "restore_snapshot",
+      "savedAt": 1788939283820,
+      "savedBy": "Codex Admin Recovery",
+      "sessionId": "workspace-recovery:recovery-7ff07028dea1da33241e",
+      "snapshotPath": "../../data/snapshots/proj_1785135808250_r4cb4a/v42",
+      "fileCount": 52,
+      "workspaceId": "live-1788939283818-d0cfe8647b",
+      "workspaceRevision": 1,
+      "workspaceRootHash": "c9fb6837e518df2f8da058a9fda9eaf92a07e5ec8209da87525253736addb85a",
+      "note": "Workspace recovery 从 v41 重建 (recovery-7ff07028dea1da33241e)"
+    },
+    {
+      "versionId": "v43",
+      "type": "restore_snapshot",
+      "savedAt": 1788949828274,
+      "savedBy": "qihao",
+      "sessionId": "session-1788948883942-6ak6am4tb",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1785135808250_r4cb4a/v43",
+      "fileCount": 51,
+      "note": "从页面版本 prv_1788450929633_7hkbw2 恢复"
+    },
+    {
+      "versionId": "v44",
+      "type": "named_version",
+      "savedAt": 1788951935662,
+      "savedBy": "qh2",
+      "sessionId": "edit_1788951451357_ory851",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1785135808250_r4cb4a/v44",
+      "fileCount": 81,
+      "note": "从 recovery-7ff07028dea1da33241e 的 candidate-02 恢复；合并 v43 revision 2-4 与最新画布布局；隔离不可恢复设计规范元数据及未引用超限视频"
+    },
+    {
+      "versionId": "v45",
+      "type": "auto_checkpoint",
+      "savedAt": 1788960871946,
+      "savedBy": "qihao",
+      "sessionId": "session-1788960220036-0a4xmiyz7",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1785135808250_r4cb4a/v45",
+      "fileCount": 75,
+      "workspaceId": "live-1788952527446-q0p0d9jab",
+      "workspaceRevision": 23,
+      "workspaceRootHash": "f1c2bc440ebce1e4545f08f4d3f321dac011ed3a5dbc09b70eb1db2815ba80b6",
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v46",
+      "type": "auto_checkpoint",
+      "savedAt": 1788963666129,
+      "savedBy": "qihao",
+      "sessionId": "session-1788963357552-56hlfdi8i",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1785135808250_r4cb4a/v46",
+      "fileCount": 75,
+      "workspaceId": "live-1788952527446-q0p0d9jab",
+      "workspaceRevision": 41,
+      "workspaceRootHash": "ccd16bdf8c40cc29410936cce201d81a4fcefb59dfce7f74d34f586b87f4b181",
+      "note": "停止编辑后自动保存记录"
     }
   ],
   "createdAt": 1785135808251,
-  "updatedAt": 1788677967428,
-  "activeWorkspaceId": "live-1785205322879-latagwnoh",
-  "activeWorkspaceUpdatedAt": 1788230612559,
-  "canonicalSyncedWorkspaceId": "live-1785205322879-latagwnoh",
-  "canonicalSyncedRevision": 1715,
-  "canonicalSyncedRootHash": "56d615d745da33c6d0c9ed8e7e1d4961e39bdb75e8a416cade29a3fd3167a74b",
-  "canonicalSyncedAt": 1788677967428,
+  "updatedAt": 1788963666129,
+  "activeWorkspaceId": "live-1788952527446-q0p0d9jab",
+  "activeWorkspaceUpdatedAt": 1788960871948,
+  "canonicalSyncedWorkspaceId": "live-1788952527446-q0p0d9jab",
+  "canonicalSyncedRevision": 41,
+  "canonicalSyncedRootHash": "ccd16bdf8c40cc29410936cce201d81a4fcefb59dfce7f74d34f586b87f4b181",
+  "canonicalSyncedAt": 1788963664499,
   "publishedVersion": "v30",
   "publishedAt": 1786007287380
 }

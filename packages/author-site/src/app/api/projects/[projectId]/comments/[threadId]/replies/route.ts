@@ -3,6 +3,8 @@ import type { CommentMention } from "@workbench/shared";
 import { createApiSuccess, createApiError } from "@/lib/fs-utils";
 import { createReply } from "@/lib/comment-store";
 import { resolveCommentAuthor } from "@/lib/comment-auth";
+import { normalizeCommentMentions, registerCommentParticipant } from "@/lib/comment-participants";
+import { anonymousIpDigest } from "@/lib/dingtalk-comment-notifications";
 
 type RouteParams = { params: Promise<{ projectId: string; threadId: string }> };
 
@@ -36,24 +38,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // 匿名用户不能 @人
     const mentions = Array.isArray(body.mentions) ? body.mentions : undefined;
-    if (authorResult.author.isAnonymous && mentions?.some((m) => m.type === "user")) {
-      return NextResponse.json(
-        createApiError("VALIDATION_ERROR", "匿名用户不能 @其他用户"),
-        { status: 400 },
-      );
-    }
+    if (authorResult.userId && authorResult.authSource === "cookie") registerCommentParticipant(projectId, authorResult.userId);
+    let normalizedMentions: CommentMention[] | undefined;
+    try { normalizedMentions = normalizeCommentMentions(projectId, mentions, authorResult.author.isAnonymous ? 5 : 20); }
+    catch (error) { return NextResponse.json(createApiError("VALIDATION_ERROR", String(error).includes("TOO_MANY") ? "@人数超过限制" : "@对象无效"), { status: 400 }); }
 
     const result = await createReply({
       projectId,
       threadId,
       content: body.content.trim(),
       author: authorResult.author,
-      mentions,
+      mentions: normalizedMentions,
       aiTaskAuthorization: authorResult.userId && authorResult.role
         ? { userId: authorResult.userId, role: authorResult.role, expiresAt: Date.now() + 2 * 60 * 60 * 1000 }
         : undefined,
+      anonymousIpDigest: authorResult.author.isAnonymous ? anonymousIpDigest(request) : undefined,
     });
 
     if (!result) {

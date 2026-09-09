@@ -14,7 +14,7 @@ import {
 import { Bot, User } from "lucide-react";
 import type { CommentMention } from "@workbench/shared";
 import { cn } from "../utils";
-import type { MentionCandidate } from "./types";
+import type { MentionCandidate, MentionCandidateSearch } from "./types";
 
 export function filterMentionCandidates(
   candidates: MentionCandidate[],
@@ -31,6 +31,7 @@ export interface MentionPickerProps {
   activeIndex: number;
   onActiveIndexChange: (index: number) => void;
   onSelect: (candidate: MentionCandidate) => void;
+  status?: "loading" | "error" | "rate-limited";
   className?: string;
 }
 
@@ -39,12 +40,13 @@ export function MentionPicker({
   activeIndex,
   onActiveIndexChange,
   onSelect,
+  status,
   className,
 }: MentionPickerProps) {
   if (candidates.length === 0) {
     return (
       <div className={cn("rounded-md border border-border bg-popover px-3 py-2 text-xs text-muted-foreground shadow-md", className)}>
-        无匹配的提及对象
+        {status === "loading" ? "正在搜索…" : status === "rate-limited" ? "搜索过于频繁，请稍后重试" : status === "error" ? "搜索失败，可继续输入" : "无匹配的提及对象"}
       </div>
     );
   }
@@ -77,6 +79,7 @@ export interface MentionTextareaProps {
   mentions: CommentMention[];
   onMentionsChange: (mentions: CommentMention[]) => void;
   candidates: MentionCandidate[];
+  searchMentionCandidates?: MentionCandidateSearch;
   placeholder?: string;
   autoFocus?: boolean;
   onSubmit?: () => void;
@@ -181,11 +184,44 @@ function renderEditor(root: HTMLElement, value: string, mentions: CommentMention
   if (lastIndex < value.length || root.childNodes.length === 0) root.append(document.createTextNode(value.slice(lastIndex)));
 }
 
-export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextareaProps>(function MentionTextarea({ value, onChange, mentions, onMentionsChange, candidates, placeholder, autoFocus, onSubmit, rows = 3, className, style }, ref) {
+export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextareaProps>(function MentionTextarea({ value, onChange, mentions, onMentionsChange, candidates, searchMentionCandidates, placeholder, autoFocus, onSubmit, rows = 3, className, style }, ref) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState<ActiveMention | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const filtered = useMemo(() => active ? filterMentionCandidates(candidates, active.query) : [], [active, candidates]);
+  const [remoteCandidates, setRemoteCandidates] = useState<MentionCandidate[] | null>(null);
+  const [searchStatus, setSearchStatus] = useState<"idle" | "loading" | "error" | "rate-limited">("idle");
+  const filtered = useMemo(() => {
+    if (!active) return [];
+    const local = filterMentionCandidates(candidates, active.query);
+    if (remoteCandidates === null) return local;
+    return [...local, ...remoteCandidates].filter(
+      (candidate, index, all) => all.findIndex((item) => item.type === candidate.type && item.id === candidate.id) === index,
+    );
+  }, [active, candidates, remoteCandidates]);
+
+  useEffect(() => {
+    if (!active || !searchMentionCandidates || !active.query.trim()) {
+      setRemoteCandidates(null);
+      setSearchStatus("idle");
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setSearchStatus("loading");
+      void searchMentionCandidates(active.query, { signal: controller.signal }).then((result) => {
+        if (!controller.signal.aborted) {
+          setRemoteCandidates(result);
+          setSearchStatus("idle");
+        }
+      }).catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        const status = error && typeof error === "object" && "status" in error && (error as { status?: number }).status === 429 ? "rate-limited" : "error";
+        setRemoteCandidates([]);
+        setSearchStatus(status);
+      });
+    }, 180);
+    return () => { controller.abort(); window.clearTimeout(timer); };
+  }, [active, searchMentionCandidates]);
 
   const updateActive = useCallback(() => {
     const editor = editorRef.current;
@@ -304,9 +340,9 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
         style={style}
         className={cn("min-h-[2.5rem] w-full whitespace-pre-wrap break-words rounded-md border border-input bg-background px-2.5 py-2 text-xs text-foreground empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] focus:outline-none focus:ring-1 focus:ring-ring", rows === 2 ? "min-h-[4rem]" : "min-h-[5.5rem]", className)}
       />
-      {active && candidates.length > 0 && (
+      {active && (candidates.length > 0 || searchMentionCandidates) && (
         <div className="absolute bottom-full left-0 z-50 mb-1 w-56">
-          <MentionPicker candidates={filtered} activeIndex={activeIndex} onActiveIndexChange={setActiveIndex} onSelect={selectCandidate} />
+          <MentionPicker candidates={filtered} activeIndex={activeIndex} onActiveIndexChange={setActiveIndex} onSelect={selectCandidate} status={searchStatus === "idle" ? undefined : searchStatus} />
         </div>
       )}
     </div>

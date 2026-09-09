@@ -14,6 +14,7 @@ import type {
   CommentThread,
   CommentTarget,
   DocumentCommentAnchor,
+  CommentDeliverySummary as SharedCommentDeliverySummary,
 } from "@workbench/shared";
 import type { CanvasViewportState } from "../types";
 
@@ -22,7 +23,19 @@ export interface MentionCandidate {
   id: string;
   name: string;
   type: "user" | "agent";
+  subtitle?: string;
 }
+
+export interface MentionSearchOptions {
+  signal?: AbortSignal;
+}
+
+export type MentionCandidateSearch = (
+  query: string,
+  options?: MentionSearchOptions,
+) => Promise<MentionCandidate[]>;
+
+export type CommentDeliverySummary = SharedCommentDeliverySummary;
 
 /** 创建评论线程的输入 */
 export interface CreateCommentInput {
@@ -73,6 +86,8 @@ export interface ConfigCommentController {
   /** 将 canonical /api/images 地址解析到数据源 origin。 */
   mediaBaseUrl?: string;
   mentionCandidates?: MentionCandidate[];
+  /** 服务端异步搜索项目参与者。 */
+  searchMentionCandidates?: MentionCandidateSearch;
   canMentionAgent?: boolean;
   readOnly?: boolean;
   onCreateComment?: (input: CreateCommentInput) => Promise<unknown>;
@@ -89,6 +104,7 @@ export interface ConfigCommentController {
   onSetResolved?: (threadId: string, resolved: boolean) => Promise<unknown>;
   onDeleteThread?: (threadId: string) => Promise<unknown>;
   onDeleteReply?: (threadId: string, replyId: string) => Promise<unknown>;
+  onRetryDingtalkNotifications?: (threadId: string, replyId?: string) => Promise<unknown>;
 }
 
 /**
@@ -117,7 +133,11 @@ export interface CommentApiAdapter {
   /** @AI 任务失败后重试（重新入队） */
   retryAiTask?(threadId: string): Promise<void>;
   /** @候选人列表（浏览端为访问者；创作端可含 AI） */
-  listMentionCandidates(): Promise<MentionCandidate[]>;
+  listMentionCandidates?(): Promise<MentionCandidate[]>;
+  /** 按输入查询项目参与者；未实现时回退静态候选人。 */
+  searchMentionCandidates?: MentionCandidateSearch;
+  /** 重试评论相关钉钉通知（仅创作端暴露）。 */
+  retryDingtalkNotifications?(threadId: string, replyId?: string): Promise<void>;
 }
 
 /** 评论列表筛选模式 */
@@ -178,6 +198,7 @@ export interface CommentLayerProps {
   onDeleteReply?: (threadId: string, replyId: string) => Promise<void>;
   /** @AI 失败后重试（重新入队） */
   onRetryAiTask?: (threadId: string) => Promise<void>;
+  onRetryDingtalkNotifications?: (threadId: string, replyId?: string) => Promise<void>;
   /** 是否显示预览区评论标记，默认 true。 */
   showPins?: boolean;
   /** 外部数据模式下覆盖 API 适配器的图片上传实现。 */

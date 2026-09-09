@@ -98,6 +98,46 @@ export function initializeDatabase(): void {
   `);
 
   db.exec(`
+    CREATE TABLE IF NOT EXISTS comment_participants (
+      participant_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, user_id TEXT,
+      corp_id TEXT NOT NULL, dingtalk_user_id TEXT NOT NULL, union_id TEXT,
+      display_name TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+      last_seen_at INTEGER NOT NULL, UNIQUE(project_id, corp_id, dingtalk_user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_comment_participants_project ON comment_participants(project_id, last_seen_at DESC);
+    CREATE TABLE IF NOT EXISTS comment_notification_outbox (
+      id TEXT PRIMARY KEY, project_id TEXT NOT NULL, thread_id TEXT NOT NULL, reply_id TEXT,
+      participant_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', task_id TEXT,
+      intent_id TEXT, author_label TEXT, content_text TEXT, target_json TEXT,
+      lease_until INTEGER,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_comment_outbox_pending ON comment_notification_outbox(status, updated_at);
+    CREATE TABLE IF NOT EXISTS comment_notification_attempts (
+      id TEXT PRIMARY KEY, outbox_id TEXT NOT NULL, status TEXT NOT NULL, error_code TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS comment_guest_rate_events (
+      id TEXT PRIMARY KEY, bucket TEXT NOT NULL, project_id TEXT NOT NULL, participant_id TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_comment_guest_rate ON comment_guest_rate_events(bucket, project_id, created_at);
+  `);
+  const outboxColumns = db.prepare("PRAGMA table_info(comment_notification_outbox)").all() as Array<{ name: string }>;
+  for (const [name, type] of [
+    ["intent_id", "TEXT"],
+    ["author_label", "TEXT"],
+    ["content_text", "TEXT"],
+    ["target_json", "TEXT"],
+    ["lease_until", "INTEGER"],
+  ] as const) {
+    if (!outboxColumns.some((column) => column.name === name)) {
+      db.exec(`ALTER TABLE comment_notification_outbox ADD COLUMN ${name} ${type}`);
+    }
+  }
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_comment_outbox_intent ON comment_notification_outbox(intent_id) WHERE intent_id IS NOT NULL");
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS password_reset_logs (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,

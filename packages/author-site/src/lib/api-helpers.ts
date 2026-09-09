@@ -1,15 +1,18 @@
 import { ErrorCodeType, ERROR_MESSAGES } from "@workbench/shared";
 
 export function createApiError(
-  code: ErrorCodeType,
+  code: ErrorCodeType | (string & {}),
   message?: string,
   details?: unknown,
 ) {
+  const fallbackMessage = code in ERROR_MESSAGES
+    ? ERROR_MESSAGES[code as ErrorCodeType]
+    : code;
   return {
     success: false as const,
     error: {
       code,
-      message: message || ERROR_MESSAGES[code],
+      message: message || fallbackMessage,
       details,
     },
   };

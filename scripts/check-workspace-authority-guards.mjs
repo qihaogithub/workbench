@@ -323,6 +323,35 @@ const projectCliWorkspaceAuthorityClientSource = read(
 const projectCliWorkspaceAuthorityClientTestSource = read(
   "packages/project-cli/src/workspace-authority-client.test.ts",
 );
+const workspaceManagerGuardSource = read(
+  "packages/author-site/src/lib/workspace-manager.ts",
+);
+const piToolSources = [
+  "packages/agent-service/src/backends/pi-tools/file-tools.ts",
+  "packages/agent-service/src/backends/pi-tools/edit-file-tool.ts",
+  "packages/agent-service/src/backends/pi-tools/delete-file-tool.ts",
+].map(read).join("\n");
+if (fs.existsSync(path.join(root, "packages/author-site/src/app/api/sessions/[sessionId]/sync-project/route.ts"))) {
+  errors.push("legacy sync-project route must not exist");
+}
+requireNotMatches(
+  workspaceManagerGuardSource,
+  /syncSessionFromProject\s*\(/,
+  "workspace manager",
+  "live Workspace directory replacement bypass is forbidden",
+);
+requireNotMatches(
+  piToolSources,
+  /\.reconcileAdopt\s*\(/,
+  "Pi file tools",
+  "AI tools must fail closed on external drift",
+);
+requireNotMatches(
+  workspaceAuthoritySource,
+  /mutate:[^\n]*auto-adopt|auto-adopting filesystem state/,
+  "workspace mutation authority",
+  "normal mutations must never implicitly adopt external drift",
+);
 for (const contract of [
   "WorkspaceMutationRequest",
   "WorkspaceMutationOperation",
@@ -2087,6 +2116,18 @@ const workspaceWriteAllowlist = new Map([
   [
     "scripts/migrate-page-presentation.mjs",
     "operator-triggered project page presentation migration",
+  ],
+  [
+    "scripts/archive-legacy-conversation-data.mjs",
+    "operator-triggered legacy conversation archive outside live Workspace",
+  ],
+  [
+    "scripts/archive-legacy-conversation-data.test.mjs",
+    "isolated temporary legacy conversation archive fixtures only",
+  ],
+  [
+    "scripts/inventory-legacy-conversations.test.mjs",
+    "isolated temporary legacy conversation inventory fixtures only",
   ],
 ]);
 

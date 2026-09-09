@@ -1,6 +1,25 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
+  "properties": {
+    "spineAsset": {
+      "type": "object",
+      "format": "spine",
+      "title": "Spine 素材",
+      "properties": {
+        "kind": { "const": "spine" },
+        "version": { "const": 1 },
+        "assetId": { "type": "string", "pattern": "^spine_[a-f0-9]{64}$" }
+      },
+      "required": ["kind", "version", "assetId"],
+      "additionalProperties": false,
+      "description": "只上传一个 Spine ZIP 素材包（内含骨架、图集、纹理和可选音效），骨架/图集/纹理路径由服务端解析，不需要逐个填写",
+      "ui:options": {
+        "accept": ".zip",
+        "group": "Spine 动画"
+      },
+      "x-fixed-behavior": "播放素材第一条动画并固定循环，不提供动画名称与循环开关配置"
+    }
+  },
   "$demo": {
     "presentation": {
       "version": 1,
@@ -12,41 +31,6 @@
       "heightBehavior": "fixed",
       "preset": "custom",
       "source": "figma"
-    }
-  },
-  "properties": {
-    "spineAsset": {
-      "type": "object",
-      "format": "spine",
-      "title": "Spine 素材",
-      "description": "上传包含骨架、图集和全部纹理的 Spine ZIP 素材包。",
-      "properties": {
-        "kind": { "const": "spine" },
-        "version": { "const": 1 },
-        "assetId": {
-          "type": "string",
-          "pattern": "^spine_[a-f0-9]{64}$"
-        }
-      },
-      "required": ["kind", "version", "assetId"],
-      "additionalProperties": false,
-      "ui:options": {
-        "accept": ".zip",
-        "group": "Spine 动画"
-      }
-    },
-    "spineAnimation": {
-      "type": "string",
-      "title": "动画名",
-      "description": "要播放的动画名，留空则播放第一条",
-      "default": "",
-      "ui:options": { "group": "Spine 动画" }
-    },
-    "spineLoop": {
-      "type": "boolean",
-      "title": "循环播放",
-      "default": true,
-      "ui:options": { "group": "Spine 动画" }
     }
   },
   "required": []

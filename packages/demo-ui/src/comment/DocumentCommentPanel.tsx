@@ -6,7 +6,7 @@ import type { CommentAuthor, CommentTarget, CommentThread, DocumentCommentAnchor
 import { cn } from "../utils";
 import { CommentSidebar } from "./CommentSidebar";
 import { CommentCreatePopover } from "./CommentCreatePopover";
-import type { CommentImageUploadHandler, CreateCommentInput, MentionCandidate } from "./types";
+import type { CommentImageUploadHandler, CreateCommentInput, MentionCandidate, MentionCandidateSearch } from "./types";
 
 export interface DocumentCommentPanelProps {
   target: CommentTarget | null;
@@ -14,6 +14,7 @@ export interface DocumentCommentPanelProps {
   currentUserId?: string;
   currentUser: CommentAuthor | null;
   mentionCandidates: MentionCandidate[];
+  searchMentionCandidates?: MentionCandidateSearch;
   canMentionAgent?: boolean;
   activeThreadId?: string | null;
   onSelectThread: (threadId: string) => void;
@@ -27,7 +28,7 @@ export interface DocumentCommentPanelProps {
 
 /** 文档专用评论栏：不进入页面落点模式，只创建整篇文档线程。 */
 export function DocumentCommentPanel({
-  target, threads, currentUserId, mentionCandidates, canMentionAgent,
+  target, threads, currentUserId, mentionCandidates, searchMentionCandidates, canMentionAgent,
   activeThreadId, onSelectThread, onCreateComment, selectionDraft, onSelectionDraftHandled, uploadCommentImage, mediaBaseUrl, className,
 }: DocumentCommentPanelProps) {
   const [creating, setCreating] = useState(false);
@@ -51,6 +52,6 @@ export function DocumentCommentPanel({
         <MessageSquarePlus className="h-3.5 w-3.5" /> 添加评论
       </button>
     </div>
-    {creating && <CommentCreatePopover draft={draft} mentionCandidates={candidates} canMentionAgent={canMentionAgent} left={160} top={80} uploadCommentImage={uploadCommentImage} onCancel={() => setCreating(false)} onSubmit={async (input) => { await onCreateComment(input); setCreating(false); }} />}
+    {creating && <CommentCreatePopover draft={draft} mentionCandidates={candidates} searchMentionCandidates={searchMentionCandidates} canMentionAgent={canMentionAgent} left={160} top={80} uploadCommentImage={uploadCommentImage} onCancel={() => setCreating(false)} onSubmit={async (input) => { await onCreateComment(input); setCreating(false); }} />}
   </div>;
 }

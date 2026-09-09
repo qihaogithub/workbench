@@ -108,6 +108,11 @@ export interface DocumentEditorProps {
   autoFocus?: boolean;
   /** 评论 Markdown 编辑器可选的 @ 提及候选。 */
   mentionCandidates?: MarkdownMentionCandidate[];
+  /** 评论编辑器输入 @ 后异步查询项目参与者。 */
+  searchMentionCandidates?: (
+    query: string,
+    options?: { signal?: AbortSignal },
+  ) => Promise<MarkdownMentionCandidate[]>;
   /** 当前 Markdown 中已解析的结构化提及。 */
   mentions?: CommentMention[];
   /** 提及候选选择或内容删除后的结构化提及回调。 */
@@ -176,6 +181,7 @@ function DocumentEditorInstance({
   onSubmit,
   autoFocus = false,
   mentionCandidates,
+  searchMentionCandidates,
   mentions = [],
   onMentionsChange,
   canMentionAgent = false,
@@ -196,6 +202,7 @@ function DocumentEditorInstance({
   const localizeRemoteImageRef = useRef(localizeRemoteImage);
   const referenceCandidatesRef = useRef(referenceCandidates);
   const mentionCandidatesRef = useRef(mentionCandidates);
+  const searchMentionCandidatesRef = useRef(searchMentionCandidates);
   const mentionsRef = useRef(mentions);
   const onMentionsChangeRef = useRef(onMentionsChange);
   const canMentionAgentRef = useRef(canMentionAgent);
@@ -220,6 +227,7 @@ function DocumentEditorInstance({
   onCommentSelectionRef.current = onCommentSelection;
   referenceCandidatesRef.current = referenceCandidates;
   mentionCandidatesRef.current = mentionCandidates;
+  searchMentionCandidatesRef.current = searchMentionCandidates;
   mentionsRef.current = mentions;
   onMentionsChangeRef.current = onMentionsChange;
   canMentionAgentRef.current = canMentionAgent;
@@ -410,6 +418,7 @@ function DocumentEditorInstance({
     candidates: MarkdownMentionCandidate[];
     selectedIndex: number;
     anchor: DocumentMenuAnchor;
+    status?: "ready" | "loading" | "empty" | "error" | "rate_limited";
   } | null>(null);
   const mentionMenuRef = useRef(mentionMenu);
   mentionMenuRef.current = mentionMenu;
@@ -417,6 +426,49 @@ function DocumentEditorInstance({
   const insertMentionCandidateRef = useRef<
     ((candidate: MarkdownMentionCandidate) => void) | null
   >(null);
+
+  useEffect(() => {
+    const query = mentionMenu?.query.trim();
+    if (!query || !searchMentionCandidates) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setMentionMenu((current) =>
+        current?.query.trim() === query ? { ...current, status: "loading" } : current,
+      );
+      void searchMentionCandidates(query, { signal: controller.signal })
+        .then((result) => {
+          if (controller.signal.aborted) return;
+          const staticMatches = (mentionCandidates ?? []).filter(
+            (candidate) =>
+              (canMentionAgent || candidate.type !== "agent") &&
+              candidate.name.toLowerCase().includes(query.toLowerCase()),
+          );
+          const merged = [...staticMatches, ...result].filter(
+            (candidate, index, all) =>
+              all.findIndex((item) => item.id === candidate.id && item.type === candidate.type) === index,
+          ).slice(0, 20);
+          setMentionMenu((current) =>
+            current?.query.trim() === query
+              ? { ...current, candidates: merged, selectedIndex: 0, status: merged.length ? "ready" : "empty" }
+              : current,
+          );
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          const message = error instanceof Error ? error.message : String(error);
+          const rateLimited = Boolean(error && typeof error === "object" && "status" in error && (error as { status?: number }).status === 429);
+          setMentionMenu((current) =>
+            current?.query.trim() === query
+              ? { ...current, candidates: [], status: rateLimited || /429|限流|频繁/.test(message) ? "rate_limited" : "error" }
+              : current,
+          );
+        });
+    }, 180);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [canMentionAgent, mentionCandidates, mentionMenu?.query, searchMentionCandidates]);
 
   const reportUploadError = useCallback((error: unknown) => {
     window.alert(error instanceof Error ? error.message : "上传失败，请重试");
@@ -680,10 +732,11 @@ function DocumentEditorInstance({
     };
 
     const updateMentionMenu = () => {
-      const candidates = mentionCandidatesRef.current;
+      const candidates = mentionCandidatesRef.current ?? [];
+      const hasSearch = Boolean(searchMentionCandidatesRef.current);
       const view = getEditorView(crepe);
       if (
-        !candidates?.length ||
+        (!candidates.length && !hasSearch) ||
         readOnlyRef.current ||
         !view ||
         !view.state.selection.empty
@@ -728,6 +781,7 @@ function DocumentEditorInstance({
         candidates: visibleCandidates,
         selectedIndex: 0,
         anchor: getMenuAnchor(view),
+        status: visibleCandidates.length ? "ready" : hasSearch && query ? "loading" : "empty",
       });
     };
 
@@ -954,7 +1008,9 @@ function DocumentEditorInstance({
         onSubmitRef.current?.();
         return;
       }
-      const mentionEnabled = Boolean(mentionCandidatesRef.current?.length);
+      const mentionEnabled = Boolean(
+        mentionCandidatesRef.current?.length || searchMentionCandidatesRef.current,
+      );
       const mentionView = mentionEnabled ? getEditorView(crepe) : null;
       if (mentionView && !readOnlyRef.current) {
         if (event.key === "@" && mentionView.state.selection.empty) {
@@ -1330,7 +1386,7 @@ function DocumentEditorInstance({
               onRetry={() => retryReferenceMenuRef.current?.()}
             />
           )}
-          {mentionMenu && mentionMenu.candidates.length > 0 && (
+          {mentionMenu && (
             <div
               className="document-mention-menu absolute max-h-72 min-w-56 max-w-[min(90vw,22rem)] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
               style={{
@@ -1340,6 +1396,10 @@ function DocumentEditorInstance({
               role="listbox"
               aria-label="提及候选"
             >
+              {mentionMenu.status === "loading" && <div className="px-2 py-1.5 text-xs text-muted-foreground">正在搜索参与者…</div>}
+              {mentionMenu.status === "empty" && <div className="px-2 py-1.5 text-xs text-muted-foreground">无匹配参与者</div>}
+              {mentionMenu.status === "rate_limited" && <div className="px-2 py-1.5 text-xs text-destructive">搜索过于频繁，请稍后重试</div>}
+              {mentionMenu.status === "error" && <div className="px-2 py-1.5 text-xs text-destructive">参与者搜索失败</div>}
               {mentionMenu.candidates.map((candidate, index) => (
                 <button
                   key={`${candidate.type}:${candidate.id}`}

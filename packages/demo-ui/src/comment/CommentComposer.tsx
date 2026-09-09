@@ -5,7 +5,7 @@ import { AtSign, Image as ImageIcon, Loader2, Send, Smile } from "lucide-react";
 import type { CommentMention } from "@workbench/shared";
 import { cn } from "../utils";
 import { MentionTextarea, type MentionTextareaHandle } from "./MentionPicker";
-import type { CommentImageUploadHandler, MentionCandidate } from "./types";
+import type { CommentImageUploadHandler, MentionCandidate, MentionCandidateSearch } from "./types";
 import { COMMENT_VISUAL_TOKENS } from "./comment-theme";
 
 const EMOJIS = ["😀", "😄", "😂", "😍", "👍", "🙌", "🎉", "✅", "👀", "🔥", "❤️", "✨"];
@@ -16,6 +16,7 @@ export interface CommentComposerProps {
   mentions: CommentMention[];
   onMentionsChange: (mentions: CommentMention[]) => void;
   candidates: MentionCandidate[];
+  searchMentionCandidates?: MentionCandidateSearch;
   placeholder?: string;
   autoFocus?: boolean;
   rows?: number;
@@ -37,6 +38,7 @@ export function CommentComposer({
   mentions,
   onMentionsChange,
   candidates,
+  searchMentionCandidates,
   placeholder = "输入评论…",
   autoFocus,
   rows = 3,
@@ -117,6 +119,7 @@ export function CommentComposer({
         mentions={mentions}
         onMentionsChange={onMentionsChange}
         candidates={candidates}
+        searchMentionCandidates={searchMentionCandidates}
         rows={active ? rows : 1}
         autoFocus={autoFocus}
         placeholder={placeholder}

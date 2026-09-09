@@ -40,7 +40,7 @@ function healthWarnings(data: WorkspaceAuthorityHealthStatus): string[] {
   if (!data.stateExists) warnings.push("authority state missing");
   if (data.externalDrift) warnings.push("external drift detected");
   if (data.externalDrift && data.missingBackupCount > 0) {
-    warnings.push("external drift with missing committed backups: restore is blocked; explicit reconcile-adopt is required to establish a new baseline");
+    warnings.push("external drift with missing committed backups: restore is blocked; use explicit adopt only to accept disk state, otherwise rebuild from a trusted version");
   }
   if (data.activeLease) warnings.push("active or stale write lease exists");
   if (data.preparedCount > 0) warnings.push("prepared transactions need recovery");
@@ -153,6 +153,8 @@ export async function workspaceAuthorityStatus(
     console.log(chalk.gray("\n详细信息:"));
     console.log(chalk.gray(`  projectId: ${response.data.projectId ?? options.projectId}`));
     console.log(chalk.gray(`  workspaceId: ${response.data.workspaceId}`));
+    console.log(chalk.gray(`  condition: ${response.data.condition}`));
+    console.log(chalk.gray(`  recommendedAction: ${response.data.recommendedAction}`));
     console.log(chalk.gray(`  revision: ${response.data.revision ?? "n/a"}`));
     console.log(chalk.gray(`  rootHash: ${response.data.rootHash ?? "n/a"}`));
     console.log(chalk.gray(`  actualRootHash: ${response.data.actualRootHash ?? "n/a"}`));
@@ -166,6 +168,7 @@ export async function workspaceAuthorityStatus(
     console.log(chalk.gray(`  stagingCount: ${response.data.stagingCount}`));
     console.log(chalk.gray(`  backupCount: ${response.data.backupCount}`));
     console.log(chalk.gray(`  missingBackupCount: ${response.data.missingBackupCount}`));
+    console.log(chalk.gray(`  missingBackupHashCount: ${response.data.missingBackupHashCount}`));
     console.log(chalk.gray(`  receiptCount: ${response.data.receiptCount}`));
     console.log(chalk.gray(`  journalEntries: ${response.data.journalEntries}`));
     console.log(chalk.gray(`  projectionAckEntries: ${response.data.projectionAckEntries}`));

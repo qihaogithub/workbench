@@ -19,16 +19,25 @@ import { findUserById, type UserRole } from "@/lib/user";
 export async function resolveUser(
   request: NextRequest,
 ): Promise<UserPayload | null> {
+  return (await resolveUserWithSource(request))?.user ?? null;
+}
+
+export type CommentAuthSource = "cookie" | "header";
+
+/** 解析身份并保留来源，供只能由创作端 Cookie 执行的能力做边界判断。 */
+export async function resolveUserWithSource(
+  request: NextRequest,
+): Promise<{ user: UserPayload; source: CommentAuthSource } | null> {
   const cookieToken = await getAuthCookie();
   if (cookieToken) {
     const payload = await verifyToken(cookieToken);
-    if (payload) return payload;
+    if (payload) return { user: payload, source: "cookie" };
   }
 
   const headerToken = request.headers.get("x-auth-token");
   if (headerToken) {
     const payload = await verifyToken(headerToken);
-    if (payload) return payload;
+    if (payload) return { user: payload, source: "header" };
   }
 
   return null;
@@ -40,6 +49,8 @@ export interface CommentAuthorResult {
   userId?: string;
   /** 始终由数据库读取，不能信任 JWT 或请求体中的角色。 */
   role?: UserRole;
+  /** Cookie 表示创作端会话；header 是浏览端遗留跨域登录态。 */
+  authSource?: CommentAuthSource;
 }
 
 /**
@@ -52,9 +63,9 @@ export async function resolveCommentAuthor(
   request: NextRequest,
   body: { anonymousId?: string; displayName?: string },
 ): Promise<CommentAuthorResult | null> {
-  const user = await resolveUser(request);
-  if (user) {
-    const currentUser = findUserById(user.userId);
+  const resolved = await resolveUserWithSource(request);
+  if (resolved) {
+    const currentUser = findUserById(resolved.user.userId);
     if (!currentUser) return null;
     return {
       author: {
@@ -64,6 +75,7 @@ export async function resolveCommentAuthor(
       },
       userId: currentUser.id,
       role: currentUser.role,
+      authSource: resolved.source,
     };
   }
 

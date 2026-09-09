@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import React, {
   useState,
@@ -83,6 +83,10 @@ import type {
   PreviewStagePage,
 } from "@/components/demo";
 import {
+  buildPageDirectoryTree,
+  type PageDirectoryTreeItem,
+} from "@/lib/page-directory-tree";
+import {
   CommentUnreadDot,
   countUnresolvedCommentThreads,
   countUnresolvedCommentThreadsByPage,
@@ -92,7 +96,6 @@ import {
 } from "@workbench/demo-ui/comment";
 import {
   createCommentApi,
-  recordProjectVisit,
   getCommentWsUrl,
   getAnonymousId,
   getAnonymousDisplayName,
@@ -841,73 +844,7 @@ function ProjectListPage() {
   );
 }
 
-interface TreeItem {
-  type: "folder" | "page";
-  id: string;
-  name: string;
-  order: number;
-  parentId?: string | null;
-  page?: PublishedDemoPage;
-  children?: TreeItem[];
-}
-
-function buildTree(
-  demoPages: PublishedDemoPage[],
-  demoFolders: PublishedProject["demoFolders"],
-): TreeItem[] {
-  const folderMap = new Map<string, TreeItem>();
-  const rootItems: TreeItem[] = [];
-
-  for (const folder of demoFolders) {
-    folderMap.set(folder.id, {
-      type: "folder",
-      id: folder.id,
-      name: folder.name,
-      order: folder.order,
-      parentId: folder.parentId,
-      children: [],
-    });
-  }
-
-  for (const folder of demoFolders) {
-    const item = folderMap.get(folder.id)!;
-    if (folder.parentId && folderMap.has(folder.parentId)) {
-      folderMap.get(folder.parentId)!.children!.push(item);
-    } else {
-      rootItems.push(item);
-    }
-  }
-
-  for (const page of demoPages) {
-    const pageItem: TreeItem = {
-      type: "page",
-      id: page.id,
-      name: page.name,
-      order: page.order,
-      parentId: page.parentId,
-      page,
-    };
-    if (page.parentId && folderMap.has(page.parentId)) {
-      folderMap.get(page.parentId)!.children!.push(pageItem);
-    } else {
-      rootItems.push(pageItem);
-    }
-  }
-
-  const sortItems = (items: TreeItem[]) => {
-    items.sort((a, b) => a.order - b.order);
-    for (const item of items) {
-      if (item.children) {
-        sortItems(item.children);
-      }
-    }
-  };
-  sortItems(rootItems);
-
-  return rootItems;
-}
-
-function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string; requestedPageId?: string }) {
+function ProjectPreviewPage({ projectId, requestedPageId, commentThreadId, commentReplyId }: { projectId: string; requestedPageId?: string; commentThreadId?: string; commentReplyId?: string }) {
   const router = useRouter();
   const [project, setProject] = useState<PublishedProject | null>(null);
   const [designSpecEntries, setDesignSpecEntries] = useState<
@@ -1118,12 +1055,10 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
     }),
     [commentUser, commentsData.threads],
   );
-  // 已登录用户打开项目时记录访问（供 @候选人列表使用）
-  useEffect(() => {
-    if (isLoggedIn && project) {
-      void recordProjectVisit(projectId);
-    }
-  }, [isLoggedIn, project, projectId]);
+  const [commentDeepLinkNotice, setCommentDeepLinkNotice] = useState<string | null>(null);
+  const [commentDocumentResourceId, setCommentDocumentResourceId] = useState<string | undefined>();
+  const [commentConfigTarget, setCommentConfigTarget] = useState<Extract<CommentTarget, { kind: "config" }> | null>(null);
+  const handledCommentDeepLinkRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (previewMode !== "canvas") {
@@ -1218,9 +1153,11 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
           },
         );
 
-        if (data.demoFolders.length > 0) {
-          setExpandedFolders(new Set(data.demoFolders.map((f) => f.id)));
-        }
+        const initialExpandedDirectoryIds = [
+          ...data.demoFolders.map((folder) => folder.id),
+          ...Object.keys(data.canvasState?.sections ?? {}),
+        ];
+        setExpandedFolders(new Set(initialExpandedDirectoryIds));
 
         const initialConfigMap: Record<string, Record<string, unknown>> = {};
         const schemaMap: Record<string, string> = {};
@@ -1408,6 +1345,45 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
     [handlePageChange, project, projectId],
   );
 
+  // 评论数据异步加载后消费浏览端深链。目标解析完全基于发布版本中的线程，
+  // 不改变 URL，也不登记浏览端访问者为项目参与者。
+  useEffect(() => {
+    if (!project || !commentThreadId || commentsData.isLoading) return;
+    const key = `${commentThreadId}:${commentReplyId ?? ""}`;
+    if (handledCommentDeepLinkRef.current === key) return;
+    handledCommentDeepLinkRef.current = key;
+    const thread = commentsData.threads.find((item) => item.id === commentThreadId);
+    if (!thread) {
+      setCommentConfigTarget(null);
+      setCommentDeepLinkNotice("该评论在当前发布版本中不可用");
+      return;
+    }
+    setCommentDeepLinkNotice(null);
+    setActiveCommentThreadId(thread.id);
+    setCommentModeActive(false);
+    if (thread.target.kind === "page") {
+      setCommentConfigTarget(null);
+      setPreviewMode("single");
+      setRightPanelTab("comments");
+      handlePageChange(thread.target.pageId);
+      setConfigPanelDetailPageId(thread.target.pageId);
+    } else if (thread.target.kind === "config") {
+      setPreviewMode("single");
+      setRightPanelTab("config");
+      setCommentConfigTarget(thread.target);
+      if (thread.target.pageId) {
+        handlePageChange(thread.target.pageId);
+        setConfigPanelDetailPageId(thread.target.pageId);
+      }
+      setCommentDeepLinkNotice("已打开配置项只读批注");
+    } else if (thread.target.kind === "document") {
+      setCommentConfigTarget(null);
+      setPreviewMode("document");
+      setCommentDocumentResourceId(thread.target.resourceId);
+      setCommentDeepLinkNotice("已定位到文档评论");
+    }
+  }, [commentReplyId, commentThreadId, commentsData.isLoading, commentsData.threads, handlePageChange, project]);
+
   const handleConfigChange = useCallback(
     (newData: Record<string, unknown>) => {
       setConfigData((prev) => {
@@ -1533,8 +1509,6 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
         setLoginDialogOpen(false);
         setLoginUsername("");
         setLoginPassword("");
-        // 登录成功后记录访问（供 @候选人列表使用）
-        void recordProjectVisit(projectId);
       }
     } catch (err: any) {
       setLoginError(err.message || "登录失败");
@@ -1741,7 +1715,7 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
     );
   }
 
-  const tree = buildTree(visiblePages, project.demoFolders);
+  const tree = buildPageDirectoryTree(visiblePages, project.demoFolders, canvasState);
   const activePage = availablePages.find((p) => p.id === activePageId) ?? availablePages[0];
   const activePageSchema = activePage ? visiblePageSchemaMap[activePage.id] : "";
   const hasProjectConfig = !isSchemaEmpty(visibleProjectConfigSchema);
@@ -1790,6 +1764,7 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
       designSpecEntries={designSpecEntries}
       pageDesignSpecEntries={pageDesignSpecEntries}
       configComments={configCommentController}
+      configCommentDeepLinkTarget={commentConfigTarget}
     />
   );
 
@@ -1832,6 +1807,11 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
       {visibilityNotice && (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
           {visibilityNotice}
+        </div>
+      )}
+      {commentDeepLinkNotice && (
+        <div role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+          {commentDeepLinkNotice}
         </div>
       )}
       <ErrorBoundary>
@@ -1910,6 +1890,10 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
                 designSpecs={project.designSpecs ?? []}
                 references={project.markdownReferences}
                 onReferenceNavigate={handleReferenceNavigate}
+                commentThreadId={commentThreadId}
+                commentReplyId={commentReplyId}
+                commentDocumentResourceId={commentDocumentResourceId}
+                commentThread={commentThreadId ? commentsData.threads.find((thread) => thread.id === commentThreadId && thread.target.kind === "document") : undefined}
                 projectConfigSchema={project.projectConfigSchema}
                 pages={visiblePages.map((page) => ({
                   id: page.id,
@@ -2135,7 +2119,7 @@ function PageManagerList({
   demoPages,
   depth = 0,
 }: {
-  items: TreeItem[];
+  items: PageDirectoryTreeItem[];
   activePageId: string;
   expandedFolders: Set<string>;
   onPageClick: (pageId: string) => void;
@@ -2153,13 +2137,18 @@ function PageManagerList({
   return (
     <>
       {items.map((item, idx) => {
-        if (item.type === "folder") {
+        if (item.type === "folder" || item.type === "canvas-group") {
           const isExpanded = expandedFolders.has(item.id);
           return (
             <div key={item.id}>
               <button
                 onClick={() => onToggleFolder(item.id)}
-                className="flex items-center gap-1.5 w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors hover:bg-accent/50 text-foreground"
+                aria-expanded={isExpanded}
+                className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent/50 ${
+                  item.type === "canvas-group"
+                    ? "text-muted-foreground"
+                    : "text-foreground"
+                }`}
                 style={{ paddingLeft: `${depth * 16 + 8}px` }}
               >
                 <ChevronRight
@@ -2167,7 +2156,7 @@ function PageManagerList({
                     isExpanded ? "rotate-90" : ""
                   }`}
                 />
-                <span className="truncate font-medium text-xs">
+                <span className="truncate text-xs font-medium">
                   {item.name}
                 </span>
               </button>
@@ -2423,7 +2412,10 @@ function Header({
 
 export default function ViewerApp() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { view, projectId, pageId } = parsePath(pathname);
+  const commentThreadId = searchParams.get("comment") || undefined;
+  const commentReplyId = searchParams.get("reply") || undefined;
 
   if (pathname === "/feedback" || pathname === "/feedback/") {
     return <FeedbackPage />;
@@ -2433,6 +2425,6 @@ export default function ViewerApp() {
     case "list":
       return <ProjectListPage />;
     case "project":
-      return <ProjectPreviewPage projectId={projectId!} requestedPageId={pageId} />;
+      return <ProjectPreviewPage projectId={projectId!} requestedPageId={pageId} commentThreadId={commentThreadId} commentReplyId={commentReplyId} />;
   }
 }

@@ -151,7 +151,7 @@ describe("workspace-flush", () => {
     } satisfies Partial<WorkspaceFlushError>);
   });
 
-  it("normalizes collab resource conflicts to workspace stale errors", async () => {
+  it("preserves the Authority resource conflict code", async () => {
     jest.mocked(global.fetch).mockResolvedValue(
       mockJsonResponse(
         {
@@ -170,7 +170,7 @@ describe("workspace-flush", () => {
       }),
     ).rejects.toMatchObject({
       name: "WorkspaceFlushError",
-      code: "WORKSPACE_STALE",
+      code: "WORKSPACE_RESOURCE_CONFLICT",
       status: 409,
       message: "WORKSPACE_RESOURCE_CONFLICT",
     } satisfies Partial<WorkspaceFlushError>);
@@ -377,7 +377,7 @@ describe("workspace-flush", () => {
               message: "WORKSPACE_EXTERNAL_DRIFT",
             },
           },
-          { status: 403, ok: false },
+          { status: 409, ok: false },
         ),
       );
 
@@ -389,7 +389,7 @@ describe("workspace-flush", () => {
       }),
     ).rejects.toMatchObject({
       name: "WorkspaceFlushError",
-      code: "WORKSPACE_STALE",
+      code: "WORKSPACE_EXTERNAL_DRIFT",
       status: 409,
       message: "WORKSPACE_EXTERNAL_DRIFT",
     } satisfies Partial<WorkspaceFlushError>);

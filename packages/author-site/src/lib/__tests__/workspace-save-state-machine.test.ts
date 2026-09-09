@@ -16,6 +16,7 @@ function makeContext(
     isMutationInFlight: false,
     isConnected: true,
     hasConflict: false,
+    hasPersistenceBlock: false,
     isCanonicalStale: false,
     lastSaveError: null,
     ...overrides,
@@ -114,6 +115,7 @@ describe("workspace-save-state-machine", () => {
       expect(getSaveStatusLabel("saving")).toBe("保存中…");
       expect(getSaveStatusLabel("autosaved")).toBe("已自动保存");
       expect(getSaveStatusLabel("offline")).toBe("离线（本地草稿已保留）");
+      expect(getSaveStatusLabel("blocked")).toBe("保存被阻止（本地草稿已保留）");
       expect(getSaveStatusLabel("conflict")).toBe("存在冲突，需要处理");
       expect(getSaveStatusLabel("canonical-stale")).toBe(
         "已保存，项目同步异常",
@@ -227,6 +229,14 @@ describe("workspace-save-state-machine", () => {
       expect(computeSaveStateFromContext(ctx)).toBe("offline");
     });
 
+    it("Authority 持久化被阻止时保留 blocked 状态", () => {
+      expect(
+        computeSaveStateFromContext(
+          makeContext({ hasPersistenceBlock: true, hasDirtyResources: true }),
+        ),
+      ).toBe("blocked");
+    });
+
     it("lastSaveError 存在但 isMutationInFlight=false 时仍返回 autosaved（error 由 page 层覆盖）", () => {
       // 验证状态机不处理 lastSaveError — 错误标签覆盖在 page.tsx 层
       const ctx = makeContext({
@@ -240,14 +250,15 @@ describe("workspace-save-state-machine", () => {
   });
 
   describe("SAVE_STATES", () => {
-    it("应包含所有 6 个状态", () => {
-      expect(SAVE_STATES).toHaveLength(6);
+    it("应包含所有 7 个状态", () => {
+      expect(SAVE_STATES).toHaveLength(7);
       expect(SAVE_STATES).toContain("editing");
       expect(SAVE_STATES).toContain("saving");
       expect(SAVE_STATES).toContain("autosaved");
       expect(SAVE_STATES).toContain("offline");
       expect(SAVE_STATES).toContain("conflict");
       expect(SAVE_STATES).toContain("canonical-stale");
+      expect(SAVE_STATES).toContain("blocked");
     });
   });
 });

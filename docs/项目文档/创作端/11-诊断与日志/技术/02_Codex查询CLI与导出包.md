@@ -2,6 +2,7 @@
 covers:
   - OPS/CLI/src/commands/diagnostics.ts
   - OPS/CLI/src/commands/workspace-authority.ts
+  - OPS/CLI/src/commands/workspace-recovery.ts
   - OPS/CLI/src/index.ts
   - OPS/CLI/README.md
   - OPS/CLI/package.json
@@ -12,7 +13,7 @@ covers:
 
 # Codex 查询 CLI 与导出包
 
-> 更新日期：2026-07-10
+> 更新日期：2026-09-09
 
 本文描述创作端诊断事件的命令行查询入口、JSON 输出契约和导出包组成。事件采集和写入链路见 [创作端诊断事件系统](./01_创作端诊断事件系统.md)。
 
@@ -42,6 +43,7 @@ corepack pnpm workspace-authority:bootstrap -- <projectId> <workspaceId> --sessi
 corepack pnpm workspace-authority:reconcile-adopt -- <projectId> <workspaceId> --session <sessionId>
 corepack pnpm workspace-authority:reconcile-restore -- <projectId> <workspaceId> --session <sessionId>
 corepack pnpm workspace-authority:migrate -- --workspace <workspaceId> --json
+corepack pnpm workspace-recovery -- rebuild <projectId> <failedWorkspaceId> --from-version <versionId> --session <sessionId> --idempotency-key <key>
 ```
 
 正式环境查询仍使用同一组稳定别名，只是增加远程数据源参数。CLI 通过 SSH 在远端打包诊断文件快照，再回到本地解析 SQLite 和 JSONL，因此生产机不需要安装 OPS CLI 或 Node 依赖：
@@ -65,6 +67,7 @@ corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts workspace-auth
 corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts workspace-authority-bootstrap <projectId> <workspaceId> --session <sessionId>
 corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts workspace-authority-reconcile-adopt <projectId> <workspaceId> --session <sessionId>
 corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts workspace-authority-reconcile-restore <projectId> <workspaceId> --session <sessionId>
+corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts workspace-recovery rebuild <projectId> <failedWorkspaceId> --from-version <versionId> --session <sessionId> --idempotency-key <key>
 ```
 
 ## JSON 输出契约
@@ -114,13 +117,15 @@ JSON 输出必须包含查询元信息、诊断完整性状态、事件列表、
 
 `performance.metrics` 固定输出以下八项，单位均为毫秒：autosave debounce wait、queue wait、commit latency、remote update latency、draft preview latency、projection latency、reconnect convergence 和 canonical lag。每项包含 `count`、`min`、`p50`、`p95`、`p99`、`max` 和 `average`；无样本时 `count=0`，其余数值为 `null`。canonical lag 在事件未显式携带时，由同 Workspace、同 revision 的 mutation committed 到 canonical materialization succeeded 时间差派生。未产生某类埋点时必须保留空样本，不能用其他耗时伪装。
 
-`workspace-authority-status` 是只读 Workspace Authority 观测入口。命令通过 agent-service 的 health 接口读取 `ready`、revision/rootHash、实际 rootHash、external drift、queue depth、active lease、prepared/recovery pending 事务数、recovery state、持久 mutation 冲突数、当前 committed-event 订阅者数、staging 数、committed backup 数及缺失数、receipt 数、journal 条数和 projection ack 条数；它需要有效 Session 做访问校验，不触发 bootstrap、不获取写 lease，也不修改业务文件。冲突数从 journal 派生，订阅者数是当前 agent-service 进程内同一 `DATA_DIR` 的即时值。JSON 输出会额外给出 `warnings` 数组，供 Codex 或自动任务判断是否需要先处理漂移、遗留 lease、未恢复事务或备份缺口。agent-service 全局 `/health` 还会输出启动恢复扫描摘要，用于确认服务在监听前已收敛 prepared 事务。
+`workspace-authority-status` 是只读 Workspace Authority 观测入口。命令通过 agent-service 的 health 接口读取 `ready`、`condition`、`recommendedAction`、revision/rootHash、实际 rootHash、external drift、queue depth、active lease、prepared/recovery pending 事务数、recovery state、持久 mutation 冲突数、当前 committed-event 订阅者数、staging 数、committed backup 数、路径维度的 `missingBackupCount`、去重 blob 维度的 `missingBackupHashCount`、receipt 数、journal 条数和 projection ack 条数。`condition` 只取 `healthy | backup_repairable | drift_requires_decision | unrecoverable`。它需要有效 Session 做访问校验，不触发 bootstrap、不获取写 lease，也不修改业务文件。JSON 输出会额外给出 `warnings` 数组，供 Codex 或自动任务判断是否需要先处理漂移、遗留 lease、未恢复事务或备份缺口。
 
 `workspace-authority-preflight` 是只读 Workspace Authority 机器判定入口。命令同样只读取 health，不写业务文件；JSON 输出包含 `passed`、`issues`、`status` 和 `warnings`。默认阻断 Workspace 缺失、Authority state 缺失、external drift、active/stale write lease、prepared 事务和 committed backup 不完整；`--fail-on-queue` 与 `--fail-on-staging` 可把 mutation queue 积压和 staging 文件残留纳入失败条件。发布、导出、模板创建、canonical 物化和部署前检查应优先消费 `passed/issues`，而不是解析文本 warnings。
 
 `workspace-authority-bootstrap`、`workspace-authority-reconcile-adopt` 和 `workspace-authority-reconcile-restore` 是受控修复入口，默认 dry-run。bootstrap 在未发现 Authority state 时只返回 `would_bootstrap`，加 `--apply` 后才建立 Authority state 与首份 committed backup；该操作不修改业务文件。reconcile adopt 在检测到 external drift 时只返回 `would_adopt`，加 `--apply` 后才显式把当前磁盘受管内容接纳为新 revision，并更新 committed backup。reconcile restore 默认只返回 `would_restore`、`restore_blocked` 或 `noop`；加 `--apply` 后才在写 lease 下丢弃外部漂移并恢复最后 committed 内容。restore 使用 Authority 内部的内容寻址备份，备份缺失或损坏时保持 fail-closed，且恢复过程自身具有崩溃回滚记录。
 
 `workspace-authority:migrate` 是离线、幂等的历史 live Workspace 注册入口，支持 `--workspace`、`--project` 或 `--all` 三种互斥选择器。默认只输出 `would_bootstrap` / `would_repair_backups`；`--apply` 只写 Authority 内部 state 与 committed backup，不修改 Workspace 业务文件。发现漂移、lease 或 prepared 事务时返回 `blocked`，要求先显式收敛。
+
+`workspace-recovery rebuild` 是管理员专用的可审计重建入口，参数必须包含故障 Workspace、可信版本、Session 和幂等键。默认 dry-run 只返回 recovery ID、source root proof 和受管资源 diff；`--apply` 才会锁定项目、保存恢复包、从版本构造全新 live Workspace/Authority 并以 CAS 切换活动元数据。返回值包含新旧 Workspace ID、新 revision/rootHash、归档 Session 数和最终 health。不使用旧 Workspace ID，不删除旧 Authority 或恢复包。
 
 ## 导出包组成
 

@@ -323,12 +323,14 @@ export class WorkspaceFilePersistence {
   async reconcileAuthorityAdopt(input: { projectId: string; workspaceId: string; sessionId: string }) {
     const validation = this.validateWorkspaceSession(input);
     if (!validation.ok) throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    if (validation.role !== "admin") throw new Error("CONFIG_READONLY");
     return this.authority.reconcileAdopt(input.projectId, input.workspaceId);
   }
 
   async reconcileAuthorityRestore(input: { projectId: string; workspaceId: string; sessionId: string }) {
     const validation = this.validateWorkspaceSession(input);
     if (!validation.ok) throw new Error(validation.reason || "COLLAB_FORBIDDEN");
+    if (validation.role !== "admin") throw new Error("CONFIG_READONLY");
     return this.authority.reconcileRestore(input.projectId, input.workspaceId);
   }
 

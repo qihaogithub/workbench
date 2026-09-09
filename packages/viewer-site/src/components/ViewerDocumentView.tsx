@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronDown, ChevronRight, FileText, FolderOpen, Loader2 } from "lucide-react";
-import type { KnowledgeIndexItem } from "@workbench/shared";
+import type { CommentThread, KnowledgeIndexItem } from "@workbench/shared";
 import type { MarkdownReferenceTarget } from "@workbench/shared/markdown-reference";
 import { DocumentEditor, PageRequirements } from "@workbench/demo-ui";
 import { enumerateSchemaFields, type SchemaCatalogField } from "@workbench/shared/demo/config-schema-fields";
@@ -26,6 +26,11 @@ interface ViewerDocumentViewProps {
   pages: Array<{ id: string; name: string; schema?: string }>;
   references?: PublishedMarkdownReferenceSnapshot;
   onReferenceNavigate?: (target: MarkdownReferenceTarget) => void;
+  /** 浏览端评论深链定位；文档评论保持只读。 */
+  commentThreadId?: string;
+  commentReplyId?: string;
+  commentDocumentResourceId?: string;
+  commentThread?: CommentThread;
 }
 
 type ConfigPoolItemKind = "color" | "text" | "image" | "number" | "motion";
@@ -179,6 +184,10 @@ export function ViewerDocumentView({
   pages,
   references,
   onReferenceNavigate,
+  commentThreadId,
+  commentReplyId,
+  commentDocumentResourceId,
+  commentThread,
 }: ViewerDocumentViewProps) {
   const configPool = useMemo(() => buildConfigPool(projectConfigSchema, pages), [pages, projectConfigSchema]);
   const userItems = useMemo(
@@ -197,6 +206,7 @@ export function ViewerDocumentView({
   const [designSpec, setDesignSpec] = useState<PublishedDesignSpecDoc | null>(null);
   const [loading, setLoading] = useState(false);
   const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
+  const [commentNotice, setCommentNotice] = useState<string | null>(null);
 
   const referenceTargets = useMemo(
     () => new Map((references?.targets ?? []).map((entry) => [referenceTargetKey(entry.target), entry])),
@@ -232,6 +242,20 @@ export function ViewerDocumentView({
       cancelled = true;
     };
   }, [active, projectId]);
+
+  useEffect(() => {
+    if (!commentThreadId) return;
+    setCommentNotice(commentReplyId ? `已定位评论回复 ${commentReplyId}` : "已定位文档评论");
+    if (commentDocumentResourceId) {
+      const item = userItems.find((candidate) => candidate.id === commentDocumentResourceId || candidate.fileName === commentDocumentResourceId);
+      if (item) {
+        setActive({ kind: "knowledge", item });
+      } else {
+        const designSpecItem = designSpecs.find((candidate) => candidate.id === commentDocumentResourceId);
+        if (designSpecItem) setActive({ kind: "designSpec", item: designSpecItem });
+      }
+    }
+  }, [commentDocumentResourceId, commentReplyId, commentThreadId, designSpecs, userItems]);
 
   useEffect(() => {
     if (!active || active.kind !== "designSpec") {
@@ -369,6 +393,11 @@ export function ViewerDocumentView({
             {referenceNotice}
           </div>
         )}
+        {commentNotice && (
+          <div role="status" className="border-b bg-blue-50 px-4 py-1.5 text-xs text-blue-900">
+            {commentNotice}（只读）
+          </div>
+        )}
         {!referenceNotice && (references?.unresolvedCount ?? 0) > 0 && (
           <div role="status" className="border-b bg-muted/40 px-4 py-1.5 text-xs text-muted-foreground">
             当前发布版本中有 {references?.unresolvedCount} 个引用不可用
@@ -397,6 +426,23 @@ export function ViewerDocumentView({
           )}
         </div>
       </div>
+      {commentThread && (
+        <aside aria-label="文档评论线程" className="w-80 shrink-0 overflow-y-auto border-l bg-card p-3">
+          <h3 className="mb-3 text-sm font-semibold">评论（只读）</h3>
+          <article className="rounded-lg border p-3 text-sm">
+            <div className="mb-1 text-xs font-medium">{commentThread.author.name}</div>
+            <p className="whitespace-pre-wrap break-words">{commentThread.content}</p>
+          </article>
+          <div className="mt-2 space-y-2">
+            {commentThread.replies.map((reply) => (
+              <article key={reply.id} className={cn("rounded-lg border p-3 text-sm", reply.id === commentReplyId && "ring-2 ring-blue-500")}>
+                <div className="mb-1 text-xs font-medium">{reply.author.name}</div>
+                <p className="whitespace-pre-wrap break-words">{reply.content}</p>
+              </article>
+            ))}
+          </div>
+        </aside>
+      )}
     </div>
   );
 }

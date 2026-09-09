@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { CommentMention } from "@workbench/shared";
 import { RichTextEditor, type NoteUploadHandler } from "../RichTextEditor";
 import type { MarkdownMentionCandidate } from "../DocumentEditor";
+import type { MentionCandidateSearch } from "./types";
 import { cn } from "../utils";
 
 export interface CommentMarkdownEditorProps {
@@ -12,6 +13,7 @@ export interface CommentMarkdownEditorProps {
   mentions?: CommentMention[];
   onMentionsChange?: (mentions: CommentMention[]) => void;
   mentionCandidates?: MarkdownMentionCandidate[];
+  searchMentionCandidates?: MentionCandidateSearch;
   canMentionAgent?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
@@ -32,6 +34,7 @@ export function CommentMarkdownEditor({
   mentions = [],
   onMentionsChange,
   mentionCandidates,
+  searchMentionCandidates,
   canMentionAgent,
   placeholder = "添加批注…",
   autoFocus = false,
@@ -110,6 +113,7 @@ export function CommentMarkdownEditor({
         placeholder={placeholder}
         uploadHandler={uploadHandler}
         mentionCandidates={mentionCandidates}
+        searchMentionCandidates={searchMentionCandidates}
         mentions={mentions}
         onMentionsChange={onMentionsChange}
         canMentionAgent={canMentionAgent}

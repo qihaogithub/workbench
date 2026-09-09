@@ -8,15 +8,21 @@ import type {
   WorkspaceMutationRequest,
   WorkspaceProjectionAck,
   WorkspaceProjectionAcknowledgedEvent,
+  WorkspaceRecoveryRebuildApiRequest,
 } from "@workbench/shared/contracts";
 import { isWorkspaceAuthorityApiErrorCode } from "@workbench/shared/contracts";
 import { WorkspaceFilePersistence } from "../collab/workspace-file-persistence";
 import { WorkspaceMutationAuthorityError } from "../workspace/workspace-mutation-authority";
+import {
+  WorkspaceRecoveryCoordinator,
+  WorkspaceRecoveryError,
+} from "../workspace/workspace-recovery";
 
 interface WorkspaceParams { projectId: string; workspaceId: string; }
 interface SessionQuery { sessionId?: string; }
 interface EventsQuery extends SessionQuery { afterRevision?: string; }
 interface ResourceParams extends WorkspaceParams { "*": string; }
+type RecoveryBody = Partial<WorkspaceRecoveryRebuildApiRequest>;
 
 const ERROR_STATUS: Record<WorkspaceAuthorityApiErrorCode, number> = {
   INVALID_REQUEST: 400,
@@ -34,6 +40,7 @@ const ERROR_STATUS: Record<WorkspaceAuthorityApiErrorCode, number> = {
   WORKSPACE_INVALID_OPERATION: 400,
   WORKSPACE_EXTERNAL_DRIFT: 409,
   WORKSPACE_AUTHORITY_BACKUP_MISSING: 503,
+  WORKSPACE_RECOVERY_IN_PROGRESS: 503,
   WORKSPACE_WRITE_LEASE_UNAVAILABLE: 503,
   WORKSPACE_MUTATION_FAILED: 500,
 };
@@ -76,6 +83,53 @@ export async function registerWorkspaceAuthorityRoutes(
   persistence = new WorkspaceFilePersistence(),
 ): Promise<void> {
   fastify.addContentTypeParser("application/octet-stream", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
+
+  fastify.post<{ Params: WorkspaceParams; Body: RecoveryBody }>(
+    "/api/workspace-recovery/projects/:projectId/workspaces/:workspaceId/rebuild",
+    async (request, reply) => {
+      const body = request.body;
+      if (!body?.sessionId || !body.sourceVersionId || !body.idempotencyKey) {
+        return failure(reply, new Error("INVALID_REQUEST"));
+      }
+      const validation = persistence.validateWorkspaceSession({
+        ...request.params,
+        sessionId: body.sessionId,
+      });
+      if (!validation.ok) return failure(reply, new Error(validation.reason ?? "SESSION_NOT_FOUND"));
+      if (validation.role !== "admin" || !validation.userId) {
+        reply.code(403);
+        return { success: false, error: { code: "CONFIG_READONLY", message: "仅管理员可重建 Workspace" } };
+      }
+      try {
+        const coordinator = new WorkspaceRecoveryCoordinator(persistence.dataDir);
+        const data = await coordinator.rebuild({
+          projectId: request.params.projectId,
+          failedWorkspaceId: request.params.workspaceId,
+          sourceVersionId: body.sourceVersionId,
+          idempotencyKey: body.idempotencyKey,
+          apply: body.apply === true,
+          actor: {
+            userId: validation.userId,
+            username: validation.username ?? validation.userId,
+          },
+        });
+        return { success: true, data };
+      } catch (error) {
+        if (error instanceof WorkspaceRecoveryError) {
+          const status = error.code === "PROJECT_NOT_FOUND" || error.code === "VERSION_NOT_FOUND" || error.code === "WORKSPACE_NOT_FOUND"
+            ? 404
+            : error.code === "WORKSPACE_MISMATCH" || error.code.endsWith("LOCKED") || error.code.endsWith("IN_PROGRESS")
+              ? 409
+              : error.code === "INVALID_REQUEST"
+                ? 400
+                : 503;
+          reply.code(status);
+          return { success: false, error: { code: error.code, message: error.message, details: error.details } };
+        }
+        return failure(reply, error);
+      }
+    },
+  );
 
   fastify.get<{ Params: WorkspaceParams; Querystring: SessionQuery }>(
     "/api/workspace-authority/projects/:projectId/workspaces/:workspaceId/state",

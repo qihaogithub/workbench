@@ -15,12 +15,15 @@ import type {
   CommentImageUploadHandler,
   MentionCandidate,
   UpdateCommentContentInput,
+  MentionCandidateSearch,
+  CommentDeliverySummary,
 } from "./types";
 
 export interface CommentThreadPopoverProps {
   thread: CommentThread;
   currentUser: CommentAuthor | null;
   mentionCandidates: MentionCandidate[];
+  searchMentionCandidates?: MentionCandidateSearch;
   canMentionAgent?: boolean;
   left: number;
   top: number;
@@ -34,6 +37,16 @@ export interface CommentThreadPopoverProps {
   onDeleteThread: (threadId: string) => Promise<unknown>;
   onDeleteReply: (threadId: string, replyId: string) => Promise<unknown>;
   onRetryAiTask?: (threadId: string) => Promise<unknown>;
+  onRetryDingtalkNotifications?: (threadId: string, replyId?: string) => Promise<unknown>;
+}
+
+export function CommentDeliveryStatus({ summary, onRetry }: { summary?: CommentDeliverySummary; onRetry?: () => void }) {
+  if (!summary || summary.total <= 0) return null;
+  const failed = summary.failed ?? 0;
+  return <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-[#bdbdbd]" role="status">
+    钉钉通知：{failed > 0 ? `失败 ${failed}` : summary.pending ? `发送中 ${summary.pending}` : `已发送 ${summary.submitted ?? summary.total}`}
+    {failed > 0 && onRetry && <button type="button" className="underline" onClick={() => void onRetry()}>重试</button>}
+  </span>;
 }
 
 function formatTime(timestamp: number): string {
@@ -185,6 +198,7 @@ export function CommentThreadPopover({
   thread,
   currentUser,
   mentionCandidates,
+  searchMentionCandidates,
   canMentionAgent,
   left,
   top,
@@ -198,6 +212,7 @@ export function CommentThreadPopover({
   onDeleteThread,
   onDeleteReply,
   onRetryAiTask,
+  onRetryDingtalkNotifications,
 }: CommentThreadPopoverProps) {
   const [replyText, setReplyText] = useState("");
   const [replyMentions, setReplyMentions] = useState<CommentMention[]>([]);
@@ -216,6 +231,7 @@ export function CommentThreadPopover({
   const deleteReturnFocusRef = useRef<HTMLElement | null>(null);
   const candidates = canMentionAgent ? mentionCandidates : mentionCandidates.filter((candidate) => candidate.type !== "agent");
   const aiStatus = thread.aiTaskStatus ? AI_STATUS_LABEL[thread.aiTaskStatus] : null;
+  const threadDelivery = (thread as CommentThread & { dingtalkDelivery?: CommentDeliverySummary }).dingtalkDelivery;
   const canEditThread = currentUser?.id === thread.author.id;
   const replies = useMemo(
     () => [...thread.replies].sort((a, b) => a.createdAt - b.createdAt),
@@ -391,9 +407,10 @@ export function CommentThreadPopover({
             </div>
             {editingThread ? (
               <div className="mt-2">
-                <CommentComposer value={editingThreadText} onChange={setEditingThreadText} mentions={editingThreadMentions} onMentionsChange={setEditingThreadMentions} candidates={candidates} rows={2} autoFocus uploadCommentImage={uploadCommentImage} submitting={submitting} onCancel={() => setEditingThread(false)} onSubmit={() => void saveThreadEdit()} />
+                <CommentComposer value={editingThreadText} onChange={setEditingThreadText} mentions={editingThreadMentions} onMentionsChange={setEditingThreadMentions} candidates={candidates} searchMentionCandidates={searchMentionCandidates} rows={2} autoFocus uploadCommentImage={uploadCommentImage} submitting={submitting} onCancel={() => setEditingThread(false)} onSubmit={() => void saveThreadEdit()} />
               </div>
             ) : <MarkdownContent content={thread.content} mediaBaseUrl={mediaBaseUrl} className="mt-2 pl-8" />}
+            <CommentDeliveryStatus summary={threadDelivery} onRetry={onRetryDingtalkNotifications ? () => onRetryDingtalkNotifications(thread.id) : undefined} />
             {aiStatus && <span className={cn("mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px]", aiStatus.className)}>AI {aiStatus.text}{thread.aiTaskStatus === "failed" && onRetryAiTask && <button type="button" onClick={() => void onRetryAiTask(thread.id)} className="underline">重试</button>}</span>}
           </article>
 
@@ -406,15 +423,16 @@ export function CommentThreadPopover({
                   <MoreMenu open={menu === reply.id} onToggle={() => setMenu(menu === reply.id ? null : reply.id)} onEdit={canEditReply ? () => { setMenu(null); setEditingReplyId(reply.id); setEditingReplyText(reply.content); setEditingReplyMentions(reply.mentions ?? []); } : undefined} canDelete={canEditReply} onDelete={canEditReply ? () => { setMenu(null); requestDelete({ kind: "reply", replyId: reply.id }); } : undefined} />
                 </div>
                 {editingReplyId === reply.id ? (
-                  <div className="mt-2 pl-8"><CommentComposer value={editingReplyText} onChange={setEditingReplyText} mentions={editingReplyMentions} onMentionsChange={setEditingReplyMentions} candidates={candidates} rows={2} autoFocus uploadCommentImage={uploadCommentImage} submitting={submitting} onCancel={() => setEditingReplyId(null)} onSubmit={() => void saveReplyEdit()} /></div>
+                  <div className="mt-2 pl-8"><CommentComposer value={editingReplyText} onChange={setEditingReplyText} mentions={editingReplyMentions} onMentionsChange={setEditingReplyMentions} candidates={candidates} searchMentionCandidates={searchMentionCandidates} rows={2} autoFocus uploadCommentImage={uploadCommentImage} submitting={submitting} onCancel={() => setEditingReplyId(null)} onSubmit={() => void saveReplyEdit()} /></div>
                 ) : <MarkdownContent content={reply.content} mediaBaseUrl={mediaBaseUrl} className="mt-2 pl-8" />}
+                <CommentDeliveryStatus summary={(reply as typeof reply & { dingtalkDelivery?: CommentDeliverySummary }).dingtalkDelivery} onRetry={onRetryDingtalkNotifications ? () => onRetryDingtalkNotifications(thread.id, reply.id) : undefined} />
               </article>
             );
           })}
         </div>
 
         <footer className="p-3">
-          <CommentComposer value={replyText} onChange={setReplyText} mentions={replyMentions} onMentionsChange={setReplyMentions} candidates={candidates} placeholder="回复" uploadCommentImage={uploadCommentImage} submitting={submitting} onSubmit={() => void handleReply()} />
+          <CommentComposer value={replyText} onChange={setReplyText} mentions={replyMentions} onMentionsChange={setReplyMentions} candidates={candidates} searchMentionCandidates={searchMentionCandidates} placeholder="回复" uploadCommentImage={uploadCommentImage} submitting={submitting} onSubmit={() => void handleReply()} />
           {actionError && <div className="mt-2 text-[11px] text-[#ffaaa0]" role="alert">{actionError}</div>}
         </footer>
       </div>

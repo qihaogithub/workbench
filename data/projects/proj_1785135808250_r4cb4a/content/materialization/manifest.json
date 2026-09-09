@@ -1,18 +1,20 @@
 {
   "projectId": "proj_1785135808250_r4cb4a",
-  "commitId": "commit_1788677964014_5vvmme",
+  "commitId": "commit_1788963662868_h4p8j6",
   "materializerVersion": "project-core-content-graph-v1",
   "resources": [
     {
       "kind": "page",
-      "resourceId": "闯关活动页-进行中_ec853d",
-      "versionId": "prv_1788677964004_1c8n6r",
-      "contentHash": "0c3ed42aa8d8443ca9a8c855acfeb6734b2e08a42a4089226b31cf2a0aa27d35",
+      "resourceId": "page_xix9",
+      "versionId": "prv_1788963662864_fdu9l9",
+      "contentHash": "bce4f903f53af2765b99e692a6768e2fcabc8638b69784c89b9710ea57e4508c",
       "blobRefs": [
-        "8fe44b7e58bf4852353ac75ec9930e07a959fbfe0ac70e5334247ef6d74f1958",
-        "0b1f6af031d3375c617bec4a52a4f4edb80f106d57cb53997285e3ab96c5afb7"
+        "5b493640852310cc0056eec4906852ef08475872d6fe9c7f212d87c7e1967f83",
+        "6a5aaafea24449dba7fe6f2562aa25000f1097f33e105fad9ed1e95db69f566e",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "a7e3a38b24536dd450081bb9135e3106cd201a521f2fd04acd494c3c2608c0f1"
       ]
     }
   ],
-  "updatedAt": 1788677964015
+  "updatedAt": 1788963662869
 }

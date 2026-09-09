@@ -38,6 +38,26 @@ pnpm dev stream "test-session-1" "你好,请介绍一下自己"
 
 ## 命令参考
 
+### `workspace-recovery rebuild` - 从可信版本重建 live Workspace
+
+该命令默认只做 dry-run，输出受管资源差异和恢复标识；只有显式加上 `--apply` 才会建立恢复包、新 Workspace 和 Authority 基线。命令需要绑定故障 Workspace 的管理员 Session。
+
+```bash
+corepack pnpm workspace-recovery -- rebuild <projectId> <failedWorkspaceId> \
+  --from-version v41 \
+  --session <sessionId> \
+  --idempotency-key <key>
+
+# 确认 dry-run 结果后执行
+corepack pnpm workspace-recovery -- rebuild <projectId> <failedWorkspaceId> \
+  --from-version v41 \
+  --session <sessionId> \
+  --idempotency-key <same-key> \
+  --apply
+```
+
+恢复不会删除旧 Workspace；旧目录、Authority 和协同状态会进入恢复包，原 Workspace 仅被归档。
+
 ### `health` - 健康检查
 
 检查 Agent Service 是否运行正常。

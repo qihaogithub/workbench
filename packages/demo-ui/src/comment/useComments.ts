@@ -26,6 +26,14 @@ import type {
   UpdateCommentContentInput,
 } from "./types";
 
+type DingtalkStatusEvent = {
+  type: "comment:dingtalk-status";
+  threadId: string;
+  replyId?: string;
+  dingtalkDelivery?: unknown;
+  delivery?: unknown;
+};
+
 export interface UseCommentsOptions {
   projectId: string;
   /** 不传时查询并实时维护整个项目的线程。 */
@@ -58,12 +66,13 @@ export interface UseCommentsResult {
   deleteReply: (threadId: string, replyId: string) => Promise<void>;
   /** @AI 任务失败后重试（重新入队） */
   retryAiTask?: (threadId: string) => Promise<void>;
+  retryDingtalkNotifications?: (threadId: string, replyId?: string) => Promise<void>;
 }
 
 /** 将 WS 事件幂等地应用到线程列表 */
 function applyWsEvent(
   threads: CommentThread[],
-  event: CommentWsEvent,
+  event: CommentWsEvent | DingtalkStatusEvent,
 ): CommentThread[] {
   switch (event.type) {
     case "comment:created": {
@@ -97,6 +106,14 @@ function applyWsEvent(
           ? { ...t, aiTaskStatus: event.aiTaskStatus }
           : t,
       );
+    }
+    case "comment:dingtalk-status": {
+      const delivery = "delivery" in event ? event.delivery : event.dingtalkDelivery;
+      return threads.map((thread) => {
+        if (thread.id !== event.threadId) return thread;
+        if (!event.replyId) return { ...thread, dingtalkDelivery: delivery } as CommentThread;
+        return { ...thread, replies: thread.replies.map((reply) => reply.id === event.replyId ? { ...reply, dingtalkDelivery: delivery } as typeof reply : reply) };
+      });
     }
     case "comment:deleted": {
       return threads.filter((t) => t.id !== event.threadId);
@@ -157,7 +174,7 @@ export function useComments({
       };
       ws.onmessage = (messageEvent) => {
         try {
-          const data = JSON.parse(messageEvent.data) as CommentWsEvent;
+          const data = JSON.parse(messageEvent.data) as CommentWsEvent | DingtalkStatusEvent;
           if (!data || typeof data !== "object" || !("type" in data)) return;
           if (
             typeof data.type !== "string" ||
@@ -340,6 +357,14 @@ export function useComments({
     [threads],
   );
 
+  const retryDingtalkNotifications = useCallback(
+    async (threadId: string, replyId?: string): Promise<void> => {
+      if (!apiRef.current.retryDingtalkNotifications) return;
+      await apiRef.current.retryDingtalkNotifications(threadId, replyId);
+    },
+    [],
+  );
+
   return {
     threads,
     isLoading,
@@ -353,6 +378,7 @@ export function useComments({
     deleteThread,
     deleteReply,
     retryAiTask,
+    retryDingtalkNotifications,
   };
 }
 

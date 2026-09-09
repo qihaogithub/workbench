@@ -18,7 +18,7 @@ import { prepareSpineAsset } from "./spine-assets";
 import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
 import { isValidWorkspacePathSegment } from "@workbench/shared/workspace-path";
 import { isLiveWorkspacePath } from "@/lib/live-workspace-route-context";
-import { commitWorkspaceMutation, reconcileWorkspaceAuthority, stageWorkspaceBinary, WorkspaceAuthorityClientError } from "@/lib/workspace-authority-client";
+import { commitWorkspaceMutation, stageWorkspaceBinary, WorkspaceAuthorityClientError } from "@/lib/workspace-authority-client";
 
 const DEFAULT_MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -165,20 +165,22 @@ export async function POST(
       try {
         if (!isLiveWorkspacePath(workspacePath)) throw new Error("WORKSPACE_AUTHORITY_REQUIRED");
         const asset = await prepareSpineAsset(buffer, file.name);
-        let adoptedLegacyDrift = false;
-        const stage = async (content: Buffer) => {
-          try {
-            return await stageWorkspaceBinary({ projectId, workspaceId: meta.workspaceId!, sessionId, content });
-          } catch (error) {
-            if (!(error instanceof WorkspaceAuthorityClientError) || error.code !== "WORKSPACE_EXTERNAL_DRIFT" || adoptedLegacyDrift) throw error;
-            await reconcileWorkspaceAuthority({ projectId, workspaceId: meta.workspaceId!, sessionId, mode: "adopt" });
-            adoptedLegacyDrift = true;
-            return stageWorkspaceBinary({ projectId, workspaceId: meta.workspaceId!, sessionId, content });
-          }
-        };
-        const stagedFiles = await Promise.all(asset.files.map(async (fileEntry) => ({ fileEntry, staged: await stage(fileEntry.content) })));
+        const stagedFiles = await Promise.all(asset.files.map(async (fileEntry) => ({
+          fileEntry,
+          staged: await stageWorkspaceBinary({
+            projectId,
+            workspaceId: meta.workspaceId!,
+            sessionId,
+            content: fileEntry.content,
+          }),
+        })));
         const manifest = Buffer.from(JSON.stringify(asset.manifest, null, 2) + "\n", "utf8");
-        const stagedManifest = await stage(manifest);
+        const stagedManifest = await stageWorkspaceBinary({
+          projectId,
+          workspaceId: meta.workspaceId!,
+          sessionId,
+          content: manifest,
+        });
         const prefix = `assets/animations/${asset.ref.assetId}`;
         const operations: WorkspaceMutationOperation[] = [
           ...stagedFiles.map(({ fileEntry, staged }) => ({

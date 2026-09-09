@@ -355,9 +355,14 @@ export function getOrCreateProjectActiveWorkspace(
   const migrationPath = options.migrationWorkspaceId
     ? findWorkspacePath(options.migrationWorkspaceId)
     : null;
+  const migrationMeta = options.migrationWorkspaceId
+    ? getWorkspaceMetaFromFs(options.migrationWorkspaceId)
+    : null;
   const projectWorkspacePath = path.join(getProjectPath(projectId), "workspace");
   const sourcePath =
-    migrationPath && fs.existsSync(migrationPath)
+    migrationPath &&
+    fs.existsSync(migrationPath) &&
+    isWorkspaceBasedOnLatest(projectId, migrationMeta)
       ? migrationPath
       : projectWorkspacePath;
 
@@ -829,45 +834,4 @@ export function cleanupOrphanWorkspaces(
   }
 
   return cleaned;
-}
-
-/**
- * 将会话工作区替换为项目工作区的最新内容。
- * 用于版本恢复后同步会话工作区。
- */
-export function syncSessionFromProject(
-  userId: string,
-  projectId: string,
-  workspaceId: string,
-): string | null {
-  const wsPath = findWorkspacePath(workspaceId);
-  if (!wsPath) return null;
-
-  const projectPath = getProjectPath(projectId);
-  const projectWorkspacePath = path.join(projectPath, "workspace");
-  if (!fs.existsSync(projectWorkspacePath)) return null;
-
-  const existingMeta = getWorkspaceMetaFromFs(workspaceId);
-  fs.rmSync(wsPath, { recursive: true, force: true });
-  fs.cpSync(projectWorkspacePath, wsPath, { recursive: true });
-
-  const meta: WorkspaceMeta = {
-    ...(existingMeta ?? {
-      workspaceId,
-      demoId: projectId,
-      projectId,
-      userId,
-      createdAt: Date.now(),
-    }),
-    demoId: projectId,
-    projectId,
-    updatedAt: Date.now(),
-  };
-  fs.writeFileSync(
-    path.join(wsPath, ".workspace.json"),
-    JSON.stringify(meta, null, 2),
-    "utf-8",
-  );
-
-  return wsPath;
 }

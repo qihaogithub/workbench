@@ -296,6 +296,45 @@ describe("workspace manager diagnostics", () => {
     expect(project.canonicalSyncedAt).toBeUndefined();
   });
 
+  it("创建新 live workspace 时不从落后版本的 migration workspace 恢复", async () => {
+    const projectId = "project-ignore-stale-migration";
+    const staleWorkspaceId = "live-stale-migration";
+    writeProject(dataDir, projectId);
+    const canonicalPath = path.join(dataDir, "projects", projectId, "workspace");
+    fs.writeFileSync(
+      path.join(canonicalPath, "source.txt"),
+      "canonical-v2",
+      "utf-8",
+    );
+    writeWorkspace(dataDir, "user1", projectId, staleWorkspaceId, "v1");
+    fs.writeFileSync(
+      path.join(
+        dataDir,
+        "workspaces",
+        "user1",
+        projectId,
+        staleWorkspaceId,
+        "source.txt",
+      ),
+      "stale-v1",
+      "utf-8",
+    );
+    const { workspaceManager } = await importModules(dataDir);
+
+    const result = workspaceManager.getOrCreateProjectActiveWorkspace(projectId, {
+      migrationWorkspaceId: staleWorkspaceId,
+      includeFiles: false,
+    });
+
+    expect(fs.readFileSync(path.join(result.workspacePath, "source.txt"), "utf-8"))
+      .toBe("canonical-v2");
+    expect(
+      JSON.parse(
+        fs.readFileSync(path.join(result.workspacePath, ".workspace.json"), "utf-8"),
+      ).baseVersion,
+    ).toBe("v2");
+  });
+
   it("canonical 同步成功时记录 Authority revision 和 root hash", async () => {
     const projectId = "project-canonical-sync-revision";
     const workspaceId = "live-sync-revision";

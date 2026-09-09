@@ -6745,15 +6745,23 @@ export class ProjectAdminService {
 
     for (const page of pages) {
       pageIds.push(page.id);
-      const files = this.readPageFiles(workspacePath, page.id);
+      const validationWorkspacePath = page.reference
+        ? this.projectWorkspacePath(page.reference.sourceProjectId)
+        : workspacePath;
+      const validationPageId = page.reference?.sourcePageId ?? page.id;
+      const files = this.readPageFiles(validationWorkspacePath, validationPageId);
       if (!files) {
         issues.push({
           pageId: page.id,
           severity: "error",
           stage: "source_contract",
           code: "FILE_READ_ERROR",
-          message: `页面文件不存在: ${page.id}`,
-          instruction: "请确认页面目录存在 index.tsx 和 config.schema.json。",
+          message: page.reference
+            ? `引用页面源文件不存在: ${page.reference.sourceProjectId}/${validationPageId}`
+            : `页面文件不存在: ${page.id}`,
+          instruction: page.reference
+            ? "请确认引用源项目和源页面仍然存在。"
+            : "请确认页面目录存在 index.tsx 和 config.schema.json。",
         });
         continue;
       }
@@ -7116,13 +7124,23 @@ export class ProjectAdminService {
     const issues = [...treeValidation.issues];
     const projectSchema = this.readProjectConfig(workspacePath);
     for (const page of tree.pages) {
+      const validationWorkspacePath = page.reference
+        ? this.projectWorkspacePath(page.reference.sourceProjectId)
+        : workspacePath;
+      const validationPageId = page.reference?.sourcePageId ?? page.id;
       const pageValidation = this.validatePageFiles(
-        workspacePath,
-        page.id,
-        projectSchema,
+        validationWorkspacePath,
+        validationPageId,
+        page.reference
+          ? this.readProjectConfig(validationWorkspacePath)
+          : projectSchema,
         page.runtimeType,
       );
-      issues.push(...pageValidation.issues);
+      issues.push(...pageValidation.issues.map((issue) => ({
+        ...issue,
+        resourceId: page.id,
+        ...(issue.pageId ? { pageId: page.id } : {}),
+      })));
     }
     return {
       ok: issues.every((issue) => issue.severity !== "blocking"),

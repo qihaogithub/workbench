@@ -162,6 +162,8 @@ describe("selected image localize route", () => {
     expect(body).toMatchObject({
       success: true,
       data: {
+        assetStored: true,
+        workspaceCommitted: true,
         workspacePath: `/api/images/${mockImageId}`,
         relativePathFromPage: `/api/images/${mockImageId}`,
         sourceType: "browser_blob",
@@ -197,6 +199,51 @@ describe("selected image localize route", () => {
         url: `/api/images/${mockImageId}`,
       }),
     );
+  });
+
+  it("Authority 失败时返回非 2xx，并保留已入库资产信息", async () => {
+    const { uploadImage } = await import("@/lib/image-store");
+    const authority = await import("@/lib/workspace-authority-client");
+    const mockImageId = "img_authority_failure";
+    (uploadImage as jest.Mock).mockResolvedValue({
+      success: true,
+      imageId: mockImageId,
+      url: `/api/images/${mockImageId}`,
+      sha256: "b".repeat(64),
+      filename: "hero.png",
+      sizeBytes: 10,
+      mimeType: "image/png",
+      deduplicated: false,
+    });
+    (authority.commitWorkspaceMutation as jest.Mock).mockRejectedValue(
+      new MockWorkspaceAuthorityClientError(
+        "WORKSPACE_AUTHORITY_BACKUP_MISSING",
+        "Committed Workspace backup is missing or untrusted",
+        503,
+      ),
+    );
+    const { POST } = await import("./route");
+    const response = await POST(
+      jsonRequest({
+        source: { kind: "selected-image", src: "https://cdn.example.com/hero.png" },
+        browserBlob: { mimeType: "image/png", dataBase64: Buffer.from("image-bytes").toString("base64") },
+      }),
+      { params: Promise.resolve({ sessionId: "session-1" }) },
+    );
+    const body = await response.json();
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({
+      success: false,
+      error: {
+        code: "WORKSPACE_AUTHORITY_BACKUP_MISSING",
+        details: {
+          assetStored: true,
+          imageId: mockImageId,
+          workspaceCommitted: false,
+          authorityCode: "WORKSPACE_AUTHORITY_BACKUP_MISSING",
+        },
+      },
+    });
   });
 
   it("浏览器不可读且远程 URL 为本地地址时要求上传原图", async () => {

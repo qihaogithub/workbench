@@ -76,6 +76,7 @@
     "workspace-authority:bootstrap": "corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts workspace-authority-bootstrap",
     "workspace-authority:reconcile-adopt": "corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts workspace-authority-reconcile-adopt",
     "workspace-authority:reconcile-restore": "corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts workspace-authority-reconcile-restore",
+    "workspace-recovery": "corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts workspace-recovery",
     "workspace-authority:migrate": "corepack pnpm --filter @workbench/agent-service exec tsx src/scripts/workspace-authority-migrate.ts",
     "test:e2e": "playwright test --config test/创作端E2E回归测试/playwright.config.ts",
     "test:e2e:core-flow": "playwright test --config test/创作端E2E回归测试/playwright.config.ts author-core-flow-regression.spec.ts",

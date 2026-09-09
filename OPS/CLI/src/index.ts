@@ -8,6 +8,7 @@ import { getSessionInfo } from "./commands/session-info.js";
 import { listSessions } from "./commands/list-sessions.js";
 import { destroySession } from "./commands/destroy-session.js";
 import { healthCheck } from "./commands/health.js";
+import { workspaceRecoveryRebuild } from "./commands/workspace-recovery.js";
 import { diagnoseError } from "./commands/diagnose.js";
 import { systemCheck } from "./commands/system.js";
 import { collectLogs } from "./commands/logs.js";
@@ -341,6 +342,32 @@ program
         workspaceId,
         sessionId: options.session,
         apply: options.apply,
+      },
+      getJsonMode(),
+    );
+  });
+
+const workspaceRecovery = program
+  .command("workspace-recovery")
+  .description("Workspace 故障恢复与重建工具");
+
+workspaceRecovery
+  .command("rebuild <projectId> <failedWorkspaceId>")
+  .description("默认 dry-run；从可审计版本快照重建全新 live Workspace")
+  .requiredOption("--from-version <versionId>", "可信的项目版本 ID，例如 v41")
+  .requiredOption("--session <sessionId>", "管理员编辑 Session ID")
+  .requiredOption("--idempotency-key <key>", "恢复请求幂等键")
+  .option("--apply", "执行重建；默认只输出差异与前置检查", false)
+  .action(async (projectId, failedWorkspaceId, options) => {
+    await workspaceRecoveryRebuild(
+      program.opts().url,
+      {
+        projectId,
+        failedWorkspaceId,
+        sourceVersionId: options.fromVersion,
+        sessionId: options.session,
+        idempotencyKey: options.idempotencyKey,
+        apply: options.apply === true,
       },
       getJsonMode(),
     );

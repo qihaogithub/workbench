@@ -78,7 +78,7 @@ import {
 } from "@workbench/shared";
 import type { ConfigDefinitionDraft } from "@workbench/shared/demo/config-schema-definition";
 import { applyTextPatches, type TextPatch } from "@workbench/prototype-core";
-import { createAuthorCommentApi } from "@/lib/comment-api-client";
+import { createAuthorCommentApi, registerAuthorCommentParticipant } from "@/lib/comment-api-client";
 import {
   CommentUnreadDot,
   countUnresolvedCommentThreads,
@@ -145,7 +145,10 @@ import {
 import { PreviewProjectionTracker } from "@/lib/preview-projection-tracker";
 import { WorkspacePerformanceSampler } from "@/lib/workspace-performance-sampling";
 import { getPersistablePageContent } from "@/lib/page-content-state";
-import { readWorkspaceAuthoritySnapshotFromBrowser } from "@/lib/workspace-authority-browser-client";
+import {
+  readWorkspaceAuthorityHealthFromBrowser,
+  readWorkspaceAuthoritySnapshotFromBrowser,
+} from "@/lib/workspace-authority-browser-client";
 import { Button } from "@/components/ui/button";
 import { DesignSpecWorkspaceProvider } from "@/components/demo/DesignSpecWorkspace";
 import { HtmlFileDropZone } from "@/components/demo/HtmlFileDropZone";
@@ -257,7 +260,9 @@ import {
   resolveSinglePreviewResourceHistoryTarget,
   type SinglePreviewTarget,
 } from "./single-preview-history";
-import { buildSinglePreviewNavigableItems } from "./single-preview-navigation";
+import {
+  buildSinglePreviewNavigation,
+} from "./single-preview-navigation";
 import {
   getAnnotationsFromCanvasState,
   getCanvasDocumentEntries,
@@ -902,7 +907,19 @@ function getWorkspaceSyncErrorDetails(error: unknown): {
         : `保存失败：${phaseLabel}`,
     };
   }
-  return { message, label: "保存失败" };
+  const coded = error as { code?: unknown; status?: unknown };
+  return {
+    message,
+    errorCode: typeof coded?.code === "string" ? coded.code : undefined,
+    httpStatus: typeof coded?.status === "number" ? coded.status : undefined,
+    label: "保存失败",
+  };
+}
+
+function isFatalWorkspaceSyncError(details: ReturnType<typeof getWorkspaceSyncErrorDetails>): boolean {
+  return details.errorCode === "WORKSPACE_AUTHORITY_BACKUP_MISSING" ||
+    details.errorCode === "WORKSPACE_AUTHORITY_BACKUP_UNTRUSTED" ||
+    details.errorCode === "WORKSPACE_EXTERNAL_DRIFT";
 }
 
 function serializeCanvasLayout(projectId: string, state: CanvasState): string {
@@ -1306,6 +1323,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [workspaceFlushError, setWorkspaceFlushError] = useState<string | null>(
     null,
   );
+  const [workspaceFlushBlocked, setWorkspaceFlushBlocked] = useState(false);
+  const workspaceFlushBlockedRef = useRef(false);
   const workspaceFlushRevisionRef = useRef(0);
   const [currentThumbnail, setCurrentThumbnail] = useState<string | undefined>(
     undefined,
@@ -1319,6 +1338,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   // ── Workspace sync refs（Yjs-First: 替代 AutosaveScheduler）──────────
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncInFlightRef = useRef(false);
+  const activeWorkspaceCommitRef = useRef<Promise<void> | null>(null);
   const scheduleWorkspaceSyncRef = useRef<() => void>(() => {});
   const flushSyncWorkspaceRef = useRef<() => Promise<void>>(() =>
     Promise.resolve(),
@@ -1342,18 +1362,19 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const appliedAuthorityProjectionRevisionRef = useRef(0);
   const pendingAuthorityProjectionRevisionRef = useRef(0);
   const authorityProjectionChainRef = useRef<Promise<void>>(Promise.resolve());
+  const aiPreviewOverlayActiveRef = useRef(false);
 
   const markWorkspaceChanged = useCallback(() => {
     setHasUnsavedChanges(true);
     setHasPendingWorkspaceFlush(true);
-    setWorkspaceFlushError(null);
+    if (!workspaceFlushBlockedRef.current) setWorkspaceFlushError(null);
     setWorkspaceFlushRevision((current) => {
       const next = current + 1;
       workspaceFlushRevisionRef.current = next;
       return next;
     });
     // Yjs-First: 触发 debounced workspace sync（替代 AutosaveScheduler）
-    scheduleWorkspaceSyncRef.current();
+    if (!workspaceFlushBlockedRef.current) scheduleWorkspaceSyncRef.current();
   }, []);
 
   // 多页面状态
@@ -2478,6 +2499,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   });
   const [commentMentionCandidates, setCommentMentionCandidates] = useState<MentionCandidate[]>([]);
   useEffect(() => {
+    if (!activeDemoId || !currentUserId) return;
+    void registerAuthorCommentParticipant(demoId);
+  }, [activeDemoId, currentUserId, demoId]);
+  useEffect(() => {
     let cancelled = false;
     if (!activeDemoId) {
       setCommentMentionCandidates([]);
@@ -2485,7 +2510,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
         cancelled = true;
       };
     }
-    void commentApi.listMentionCandidates()
+    const listMentionCandidates = commentApi.listMentionCandidates;
+    if (!listMentionCandidates) return;
+    void listMentionCandidates()
       .then((candidates) => {
         if (!cancelled) setCommentMentionCandidates(candidates);
       })
@@ -2502,6 +2529,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       currentUser: commentUser,
       uploadCommentImage: commentApi.uploadCommentImage,
       mentionCandidates: commentMentionCandidates,
+      searchMentionCandidates: commentApi.searchMentionCandidates,
       canMentionAgent: false,
       readOnly: false,
       onCreateComment: commentsData.createComment,
@@ -2511,6 +2539,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       onSetResolved: commentsData.setResolved,
       onDeleteThread: commentsData.deleteThread,
       onDeleteReply: commentsData.deleteReply,
+      onRetryDingtalkNotifications: commentsData.retryDingtalkNotifications,
     }),
     [
       commentMentionCandidates,
@@ -2524,6 +2553,8 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       commentsData.updateComment,
       commentsData.updateReply,
       commentsData.deleteReply,
+      commentsData.retryDingtalkNotifications,
+      commentApi.searchMentionCandidates,
     ],
   );
   const canEditConfigRole =
@@ -3197,6 +3228,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       source:
         | "ai-realtime"
         | "ai-finish"
+        | "authority-committed"
         | "manual-load"
         | "page-switch"
         | "collab";
@@ -6682,6 +6714,18 @@ ${context.details}
         return isAiFileChangeRefreshTarget(normalizedPath);
       });
       if (!hasWorkspaceStructureChange || !sessionId) return;
+      if (workspaceId.startsWith("live-") && !authoritySnapshot) {
+        recordDiagnosticEvent({
+          category: "preview",
+          name: "preview.local_applied",
+          traceId,
+          details: {
+            source: "ai_uncommitted_file_event_ignored",
+            fileCount: files.length,
+          },
+        });
+        return;
+      }
 
       if (authoritySnapshot) {
         // Keep the live Yjs tree aligned with the exact Authority revision we
@@ -6896,7 +6940,9 @@ ${context.details}
                 target.configValues !== undefined
                   ? allDefaults[nextActiveId]
                   : undefined,
-              source: "ai-finish",
+              source: authoritySnapshot
+                ? "authority-committed"
+                : "ai-finish",
               syncCollab: false,
             });
           } else {
@@ -6984,6 +7030,7 @@ ${context.details}
       reconcileRuntimeConversionsAfterAiFiles,
       recordDiagnosticEvent,
       sessionId,
+      workspaceId,
       setFocusCanvasPageId,
       toast,
     ],
@@ -6995,6 +7042,17 @@ ${context.details}
         isAiFileChangeRefreshTarget(resource.path),
       );
       if (!affectsPageProjection || !sessionId || !workspaceId) return;
+
+      aiPreviewOverlayActiveRef.current = false;
+      recordDiagnosticEvent({
+        category: "autosave",
+        name: "persistence.committed",
+        details: {
+          revision: receipt.revision,
+          mutationId: receipt.mutationId,
+          resources: receipt.resources.map((resource) => resource.path),
+        },
+      });
 
       pendingAuthorityProjectionRevisionRef.current = Math.max(
         pendingAuthorityProjectionRevisionRef.current,
@@ -7031,6 +7089,14 @@ ${context.details}
           );
           appliedAuthorityProjectionRevisionRef.current =
             snapshot.state.revision;
+          recordDiagnosticEvent({
+            category: "preview",
+            name: "projection.applied",
+            details: {
+              receiptRevision: receipt.revision,
+              snapshotRevision: snapshot.state.revision,
+            },
+          });
           recordDiagnosticEvent({
             category: "ai",
             name: "ai.authority_snapshot_projected",
@@ -7234,9 +7300,50 @@ ${context.details}
     workspaceId,
   ]);
 
-  const flushPendingWorkspaceBeforeAiSend = useCallback(async () => {
-    if (!hasPendingWorkspaceFlush || !sessionId || !workspaceId) return;
+  // Single commit boundary for the current local draft.  A failed Authority
+  // preflight is durable for this editor session: keep the draft dirty and
+  // stop background callers from producing a mutation storm.
+  const commitLatestDraft = useCallback(async () => {
+    if (workspaceFlushBlockedRef.current) {
+      throw new Error("Workspace 暂存异常，等待健康恢复或用户重试");
+    }
+    if (activeWorkspaceCommitRef.current) {
+      await activeWorkspaceCommitRef.current;
+      return;
+    }
+    const commit = syncWorkspaceToProject();
+    activeWorkspaceCommitRef.current = commit;
+    try {
+      await commit;
+    } finally {
+      if (activeWorkspaceCommitRef.current === commit) {
+        activeWorkspaceCommitRef.current = null;
+      }
+    }
+  }, [syncWorkspaceToProject]);
 
+  const assertWorkspaceAuthorityWritable = useCallback(async () => {
+    const health = await readWorkspaceAuthorityHealthFromBrowser({
+      projectId: demoId,
+      workspaceId,
+      sessionId,
+    });
+    if (health.ready) return health;
+
+    const error = new Error(
+      `Workspace Authority 不可写（${health.condition}）`,
+    ) as Error & { code?: string; status?: number };
+    error.code = health.missingBackupCount > 0
+      ? "WORKSPACE_AUTHORITY_BACKUP_MISSING"
+      : health.externalDrift
+        ? "WORKSPACE_EXTERNAL_DRIFT"
+        : "WORKSPACE_AUTHORITY_NOT_READY";
+    error.status = 503;
+    throw error;
+  }, [demoId, sessionId, workspaceId]);
+
+  const flushPendingWorkspaceBeforeAiSend = useCallback(async () => {
+    if (!sessionId || !workspaceId) return;
     const revisionAtStart = workspaceFlushRevisionRef.current;
     const traceId = createDiagnosticTraceId("ai-send");
     recordDiagnosticEvent({
@@ -7251,8 +7358,17 @@ ${context.details}
 
     const startedAt = Date.now();
     try {
+      // State refresh drives projections; health is the actual write preflight.
+      await Promise.all([
+        authorityState.refresh(),
+        assertWorkspaceAuthorityWritable(),
+      ]);
+      if (workspaceFlushBlockedRef.current) {
+        throw new Error("Workspace 暂存异常，请先显式重试保存");
+      }
+      if (!hasPendingWorkspaceFlush) return;
       // Yjs-First: 直接执行完整同步流水线（scheduler 已移除）
-      await flushSyncWorkspaceRef.current();
+      await commitLatestDraft();
       if (workspaceFlushRevisionRef.current === revisionAtStart) {
         setHasPendingWorkspaceFlush(false);
         setWorkspaceFlushError(null);
@@ -7269,6 +7385,11 @@ ${context.details}
     } catch (error) {
       const errorDetails = getWorkspaceSyncErrorDetails(error);
       setWorkspaceFlushError(errorDetails.label);
+      setHasPendingWorkspaceFlush(true);
+      if (isFatalWorkspaceSyncError(errorDetails)) {
+        workspaceFlushBlockedRef.current = true;
+        setWorkspaceFlushBlocked(true);
+      }
       recordDiagnosticEvent({
         category: "autosave",
         name: "autosave.flush_before_ai_send_failed",
@@ -7287,12 +7408,15 @@ ${context.details}
     hasPendingWorkspaceFlush,
     recordDiagnosticEvent,
     sessionId,
-    syncWorkspaceToProject,
+    authorityState,
+    assertWorkspaceAuthorityWritable,
+    commitLatestDraft,
     workspaceId,
   ]);
 
   // ── Yjs-First: workspace sync debounce + flush（替代 AutosaveScheduler）────
   const scheduleWorkspaceSync = useCallback(() => {
+    if (workspaceFlushBlockedRef.current) return;
     if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
     syncDebounceRef.current = setTimeout(() => {
       syncDebounceRef.current = null;
@@ -7316,7 +7440,7 @@ ${context.details}
           },
         });
         try {
-          await syncWorkspaceToProject();
+          await commitLatestDraft();
           if (workspaceFlushRevisionRef.current === revisionAtStart) {
             pendingPageSchemaOverridesRef.current = {};
           }
@@ -7352,7 +7476,13 @@ ${context.details}
         } catch (error) {
           const errorDetails = getWorkspaceSyncErrorDetails(error);
           setWorkspaceFlushError(errorDetails.label);
-          setHasPendingWorkspaceFlush(false);
+          // Failed commits remain dirty. Fatal Authority errors additionally
+          // trip the session breaker until an explicit retry succeeds.
+          setHasPendingWorkspaceFlush(true);
+          if (isFatalWorkspaceSyncError(errorDetails)) {
+            workspaceFlushBlockedRef.current = true;
+            setWorkspaceFlushBlocked(true);
+          }
           recordDiagnosticEvent({
             category: "autosave",
             name: "autosave.sync_failed",
@@ -7370,19 +7500,25 @@ ${context.details}
         }
       })();
     }, 800);
-  }, [syncWorkspaceToProject, createDiagnosticTraceId, recordDiagnosticEvent]);
+  }, [commitLatestDraft, createDiagnosticTraceId, recordDiagnosticEvent]);
   scheduleWorkspaceSyncRef.current = scheduleWorkspaceSync;
 
   const flushSyncWorkspace = useCallback(async () => {
+    if (workspaceFlushBlockedRef.current) {
+      throw new Error("Workspace 暂存异常，请先显式重试保存");
+    }
     if (syncDebounceRef.current) {
       clearTimeout(syncDebounceRef.current);
       syncDebounceRef.current = null;
     }
     if (pageSwitchInFlightRef.current) {
       pageSwitchDeferredSyncRef.current = true;
+      throw new Error("页面切换尚未完成，Workspace 未提交");
+    }
+    if (syncInFlightRef.current && activeWorkspaceCommitRef.current) {
+      await activeWorkspaceCommitRef.current;
       return;
     }
-    if (syncInFlightRef.current) return;
     syncInFlightRef.current = true;
     const traceId = createDiagnosticTraceId("autosave-flush");
     const startedAt = Date.now();
@@ -7398,7 +7534,7 @@ ${context.details}
       },
     });
     try {
-      await syncWorkspaceToProject();
+      await commitLatestDraft();
       if (workspaceFlushRevisionRef.current === revisionAtStart) {
         pendingPageSchemaOverridesRef.current = {};
       }
@@ -7419,7 +7555,11 @@ ${context.details}
     } catch (error) {
       const errorDetails = getWorkspaceSyncErrorDetails(error);
       setWorkspaceFlushError(errorDetails.label);
-      setHasPendingWorkspaceFlush(false);
+      setHasPendingWorkspaceFlush(true);
+      if (isFatalWorkspaceSyncError(errorDetails)) {
+        workspaceFlushBlockedRef.current = true;
+        setWorkspaceFlushBlocked(true);
+      }
       recordDiagnosticEvent({
         category: "autosave",
         name: "autosave.sync_failed",
@@ -7432,11 +7572,43 @@ ${context.details}
           ...errorDetails,
         },
       });
+      throw error;
     } finally {
       syncInFlightRef.current = false;
     }
-  }, [syncWorkspaceToProject, createDiagnosticTraceId, recordDiagnosticEvent]);
+  }, [commitLatestDraft, createDiagnosticTraceId, recordDiagnosticEvent]);
   flushSyncWorkspaceRef.current = flushSyncWorkspace;
+
+  const handleRetryWorkspaceSave = useCallback(async () => {
+    if (syncDebounceRef.current) {
+      clearTimeout(syncDebounceRef.current);
+      syncDebounceRef.current = null;
+    }
+    workspaceFlushBlockedRef.current = false;
+    setWorkspaceFlushBlocked(false);
+    try {
+      await assertWorkspaceAuthorityWritable();
+      const revisionAtStart = workspaceFlushRevisionRef.current;
+      await commitLatestDraft();
+      if (workspaceFlushRevisionRef.current === revisionAtStart) {
+        pendingPageSchemaOverridesRef.current = {};
+        setHasPendingWorkspaceFlush(false);
+      }
+      setWorkspaceFlushError(null);
+      toast({ title: "Workspace 已恢复，最新草稿已保存" });
+    } catch (error) {
+      const errorDetails = getWorkspaceSyncErrorDetails(error);
+      workspaceFlushBlockedRef.current = true;
+      setWorkspaceFlushBlocked(true);
+      setHasPendingWorkspaceFlush(true);
+      setWorkspaceFlushError(errorDetails.label);
+      toast({
+        title: "Workspace 仍不可写",
+        description: errorDetails.message,
+        variant: "destructive",
+      });
+    }
+  }, [assertWorkspaceAuthorityWritable, commitLatestDraft, toast]);
 
   // Cleanup delayed work on unmount so old sessions cannot receive stale writes.
   useEffect(() => {
@@ -7667,9 +7839,23 @@ ${context.details}
           codeLength: newCode.length,
         },
       });
+      if (workspaceId.startsWith("live-")) {
+        aiPreviewOverlayActiveRef.current = true;
+        setCode(newCode);
+        recordDiagnosticEvent({
+          category: "preview",
+          name: "preview.local_applied",
+          details: {
+            source,
+            pageId: activeDemoIdRef.current,
+            codeLength: newCode.length,
+          },
+        });
+        return;
+      }
       applyDemoSnapshot({ code: newCode, source });
     },
-    [applyDemoSnapshot, recordDiagnosticEvent],
+    [applyDemoSnapshot, recordDiagnosticEvent, workspaceId],
   );
 
   // 处理 AI Schema 更新 — 通过 applyDemoSnapshot 统一应用
@@ -7687,10 +7873,44 @@ ${context.details}
           schemaLength: newSchema.length,
         },
       });
+      if (workspaceId.startsWith("live-")) {
+        aiPreviewOverlayActiveRef.current = true;
+        setSchema(newSchema);
+        setPreviewSize(getPreviewSize(newSchema));
+        recordDiagnosticEvent({
+          category: "preview",
+          name: "preview.local_applied",
+          details: {
+            source,
+            pageId: activeDemoIdRef.current,
+            schemaLength: newSchema.length,
+          },
+        });
+        return;
+      }
       applyDemoSnapshot({ schema: newSchema, source });
     },
-    [applyDemoSnapshot, recordDiagnosticEvent],
+    [applyDemoSnapshot, recordDiagnosticEvent, workspaceId],
   );
+
+  const discardAiPreviewOverlay = useCallback(() => {
+    if (!aiPreviewOverlayActiveRef.current) return;
+    aiPreviewOverlayActiveRef.current = false;
+    setCode(codeRef.current);
+    setSchema(schemaRef.current);
+    setPreviewSize(getPreviewSize(schemaRef.current));
+    recordDiagnosticEvent({
+      category: "preview",
+      name: "preview.local_discarded",
+      level: "warn",
+      details: { reason: "ai_run_failed_before_authority_commit" },
+    });
+    toast({
+      title: "临时预览未保存",
+      description: "AI 未产生 Authority 提交回执，已恢复到最后一个已保存版本。",
+      variant: "destructive",
+    });
+  }, [recordDiagnosticEvent, toast]);
 
   // Visual edit handlers (initializeVisualConfigDialog, handleVisualConfigCandidateChange,
   // handleVisualSelect, handleStartVisualConfig, handleApplyVisualConfig,
@@ -8157,9 +8377,11 @@ ${context.details}
     [handleSinglePreviewDocumentSelect, handleSinglePreviewPageSelect],
   );
 
-  const singlePreviewNavigableItems = useMemo(() => {
-    return buildSinglePreviewNavigableItems(demoPages);
-  }, [demoPages]);
+  const singlePreviewNavigation = useMemo(
+    () => buildSinglePreviewNavigation(demoPages, canvasState),
+    [canvasState, demoPages],
+  );
+  const singlePreviewNavigableItems = singlePreviewNavigation.items;
   const singlePreviewCurrentIndex = singlePreviewNavigableItems.findIndex(
     (item) => item.value === singlePreviewSelectValue,
   );
@@ -8838,6 +9060,7 @@ ${context.details}
       browserOnline &&
       (authorityState.isConnected || authorityState.committedRevision === 0),
     hasConflict: authorityState.conflict !== null,
+    hasPersistenceBlock: workspaceFlushBlocked,
     isCanonicalStale:
       authorityState.canonicalStatus === "error" ||
       authorityState.canonicalStatus === "lagging",
@@ -8890,24 +9113,27 @@ ${context.details}
         >
           <SelectTrigger
             aria-label="选择预览页面"
-            className="h-7 w-auto flex-[0_1_auto] justify-start gap-0 rounded-md border-transparent bg-transparent px-2 text-xs font-medium text-foreground shadow-none data-[placeholder]:text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:ring-0"
+            className="h-7 w-auto max-w-[18rem] flex-[0_1_auto] justify-start gap-0 rounded-md border-transparent bg-transparent px-2 text-xs font-medium text-foreground shadow-none data-[placeholder]:text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-0"
           >
             <SelectValue placeholder="选择页面" />
           </SelectTrigger>
-          <SelectContent>
-            {singlePreviewNavigableItems.filter((item) => item.group === "页面")
-              .length > 0 && (
-              <SelectGroup>
-                <SelectLabel>页面</SelectLabel>
-                {singlePreviewNavigableItems
-                  .filter((item) => item.group === "页面")
-                  .map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
+          <SelectContent className="max-h-[min(70vh,24rem)] min-w-[14rem] border-0 bg-popover/95 p-1 shadow-xl shadow-black/25 backdrop-blur-sm">
+            {singlePreviewNavigation.groups.map((group) => (
+              <SelectGroup key={group.id}>
+                <SelectLabel className="px-2 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground/75">
+                  {group.label}
+                </SelectLabel>
+                {group.items.map((item) => (
+                  <SelectItem
+                    key={item.value}
+                    value={item.value}
+                    className="max-w-[16rem] rounded-md py-1.5 pl-8 pr-2 text-xs data-[state=checked]:bg-accent/80 data-[state=checked]:text-accent-foreground focus:bg-accent/80 focus:text-accent-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60 [&>span:last-child]:truncate"
+                  >
+                    {item.label}
+                  </SelectItem>
+                ))}
               </SelectGroup>
-            )}
+            ))}
           </SelectContent>
         </Select>
         <Button
@@ -9007,6 +9233,17 @@ ${context.details}
               </div>
             )}
           </div>
+          {workspaceFlushBlocked && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 border-destructive/50 text-destructive"
+              title={workspaceFlushError ?? "Workspace 保存已阻断"}
+              onClick={() => void handleRetryWorkspaceSave()}
+            >
+              重试保存
+            </Button>
+          )}
           <Button
             variant="outline"
             className="gap-2"
@@ -9209,6 +9446,13 @@ ${context.details}
                           level: event.level,
                           details: event.details,
                         });
+                        if (
+                          event.name === "ai.stream_error" ||
+                          event.name === "ai.before_send_failed" ||
+                          event.name === "ai.stream_finish_finalization_failed"
+                        ) {
+                          discardAiPreviewOverlay();
+                        }
                       }}
                       beforeSend={flushPendingWorkspaceBeforeAiSend}
                       onMemoryUpdate={async (filePath) => {
@@ -10528,6 +10772,7 @@ ${context.details}
                         currentUserId={currentUserId || undefined}
                         currentUser={commentUser}
                         mentionCandidates={commentMentionCandidates}
+                        searchMentionCandidates={commentApi.searchMentionCandidates}
                         canMentionAgent={true}
                         activeThreadId={activeCommentThreadId}
                         onSelectThread={(id) => {

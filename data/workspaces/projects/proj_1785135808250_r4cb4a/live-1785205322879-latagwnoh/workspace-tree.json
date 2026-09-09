@@ -73,14 +73,6 @@
       "runtimeType": "high-fidelity-react"
     },
     {
-      "id": "page_g5ky",
-      "name": "挑战成功",
-      "routeKey": "page-3",
-      "order": 1,
-      "parentId": null,
-      "runtimeType": "prototype-html-css"
-    },
-    {
       "id": "page_kisa",
       "name": "答对",
       "order": 8,

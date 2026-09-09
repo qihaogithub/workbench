@@ -11,6 +11,7 @@ import {
 
 import type {
   WorkspaceMutationCommittedEvent,
+  WorkspaceAuthorityHealth,
   WorkspaceMutationReceipt,
   WorkspaceMutationRequest,
   WorkspaceProjectionAck,
@@ -45,32 +46,6 @@ export interface WorkspaceAuthorityState {
 export interface WorkspaceAuthoritySnapshot {
   state: WorkspaceAuthorityState;
   resources: Record<string, string>;
-}
-
-export interface WorkspaceAuthorityHealth {
-  workspaceId: string;
-  projectId?: string;
-  ready: boolean;
-  stateExists: boolean;
-  workspaceExists: boolean;
-  revision?: number;
-  rootHash?: string;
-  actualRootHash?: string;
-  externalDrift: boolean;
-  queueDepth: number;
-  activeLease: boolean;
-  preparedCount: number;
-  recoveryState: "ready" | "pending";
-  recoveryPendingCount: number;
-  conflictCount: number;
-  eventSubscriberCount: number;
-  stagingCount: number;
-  backupCount: number;
-  missingBackupCount: number;
-  receiptCount: number;
-  journalEntries: number;
-  projectionAckEntries: number;
-  checkedAt: number;
 }
 
 export interface WorkspaceAuthorityRecoveryResult {
@@ -321,7 +296,33 @@ export class WorkspaceMutationAuthority {
     const preparedCount =
       this.countFiles(path.join(this.authorityDir(workspaceId), "prepared"), ".json") +
       this.countFiles(path.join(this.authorityDir(workspaceId), "reconcile-prepared"), ".json");
-    const missingBackupCount = state ? this.missingCommittedBackupCount(workspaceId, state.resourceHashes) : 0;
+    const missingBackups = state ? this.missingCommittedBackups(workspaceId, state.resourceHashes) : [];
+    const missingBackupCount = missingBackups.length;
+    const missingBackupHashCount = new Set(missingBackups.map((item) => item.hash)).size;
+    let condition: WorkspaceAuthorityHealth["condition"];
+    let recommendedAction: WorkspaceAuthorityHealth["recommendedAction"];
+    if (!workspaceExists) {
+      condition = "unrecoverable";
+      recommendedAction = "none";
+    } else if (!state) {
+      condition = "unrecoverable";
+      recommendedAction = "bootstrap";
+    } else if (preparedCount > 0 || activeLease) {
+      condition = "unrecoverable";
+      recommendedAction = preparedCount > 0 ? "recover" : "none";
+    } else if (externalDrift && missingBackupCount > 0) {
+      condition = "unrecoverable";
+      recommendedAction = "rebuild";
+    } else if (missingBackupCount > 0) {
+      condition = "backup_repairable";
+      recommendedAction = "repair_backups";
+    } else if (externalDrift) {
+      condition = "drift_requires_decision";
+      recommendedAction = "decide_restore_or_adopt";
+    } else {
+      condition = "healthy";
+      recommendedAction = "none";
+    }
     return {
       workspaceId,
       projectId: state?.projectId ?? projectId,
@@ -333,6 +334,8 @@ export class WorkspaceMutationAuthority {
         preparedCount === 0 &&
         missingBackupCount === 0,
       ),
+      condition,
+      recommendedAction,
       stateExists: Boolean(state),
       workspaceExists,
       revision: state?.revision,
@@ -349,6 +352,7 @@ export class WorkspaceMutationAuthority {
       stagingCount: this.countFiles(path.join(this.authorityDir(workspaceId), "staging"), ".bin"),
       backupCount: this.countFiles(path.join(this.authorityDir(workspaceId), "backups"), ".bin"),
       missingBackupCount,
+      missingBackupHashCount,
       receiptCount: this.countFiles(path.join(this.authorityDir(workspaceId), "receipts"), ".json"),
       journalEntries: this.countJsonl(path.join(this.authorityDir(workspaceId), "journal.jsonl")),
       projectionAckEntries: this.countJsonl(path.join(this.authorityDir(workspaceId), "projection-acks.jsonl")),
@@ -537,7 +541,9 @@ export class WorkspaceMutationAuthority {
     if (content.length === 0 || content.length > 64 * 1024 * 1024) {
       throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
     }
+    this.assertProjectNotRecovering(projectId);
     return this.serial(workspaceId, async () => this.withLease(workspaceId, async () => {
+      this.assertProjectNotRecovering(projectId);
       const state = this.ensureBootstrap(projectId, workspaceId);
       if (state.projectId !== projectId) throw new WorkspaceMutationAuthorityError("WORKSPACE_NOT_FOUND");
       const stagingId = crypto.randomUUID();
@@ -558,6 +564,7 @@ export class WorkspaceMutationAuthority {
       operationCount: request.operations.length,
     });
     try {
+      this.assertProjectNotRecovering(request.projectId);
       // Approved document proposals must flush their affected collaborative
       // drafts only after acquiring the Authority critical section; otherwise
       // a draft can change between an outside-the-lock flush and CAS.
@@ -566,11 +573,12 @@ export class WorkspaceMutationAuthority {
       }
       const queuedAt = Date.now();
       return await this.serial(request.workspaceId, async () => this.withLease(request.workspaceId, async () => {
+        this.assertProjectNotRecovering(request.projectId);
         if (request.reason === "document_proposal_apply") {
           await this.flushDraftsForMutation(request);
         }
         const queueWaitMs = Date.now() - queuedAt;
-        let state = this.ensureBootstrap(request.projectId, request.workspaceId);
+        const state = this.ensureBootstrap(request.projectId, request.workspaceId);
         if (state.projectId !== request.projectId) throw new WorkspaceMutationAuthorityError("WORKSPACE_NOT_FOUND");
         const payloadHash = hashWorkspaceContent(JSON.stringify(request));
         const receiptPath = this.receiptPath(request.workspaceId, request.mutationId);
@@ -601,15 +609,10 @@ export class WorkspaceMutationAuthority {
         request = this.expandConfigValuesPatchCommands(request, workspacePath);
         const actual = this.readResourceHashes(workspacePath);
         if (this.rootHash(actual) !== state.rootHash) {
-          // Yjs-First: auto-adopt filesystem reality instead of rejecting with
-          // WORKSPACE_EXTERNAL_DRIFT. The Yjs room is the single content authority;
-          // any drift means the filesystem was modified outside the normal path
-          // (e.g. crash recovery) and should be adopted as the new baseline.
-          logger.warn(
-            { workspaceId: request.workspaceId, mutationId: request.mutationId },
-            "mutate: EXTERNAL_DRIFT detected, auto-adopting filesystem state",
+          throw new WorkspaceMutationAuthorityError(
+            "WORKSPACE_EXTERNAL_DRIFT",
+            "Workspace files do not match the committed Authority root",
           );
-          state = this.reconcileAdoptInline(state, workspacePath, request.workspaceId);
         }
         const prepared = this.prepare(request, payloadHash, state, workspacePath);
         this.appendJournal(request.workspaceId, this.preparedJournalRecord(prepared));
@@ -1832,6 +1835,21 @@ export class WorkspaceMutationAuthority {
       result.recoveredCount += 1;
     }
     return result;
+  }
+
+  private assertProjectNotRecovering(projectId: string): void {
+    const lockFile = path.join(
+      this.options.dataDir,
+      "workspace-recovery",
+      "locks",
+      `${projectId}.lock`,
+    );
+    if (fs.existsSync(lockFile)) {
+      throw new WorkspaceMutationAuthorityError(
+        "WORKSPACE_RECOVERY_IN_PROGRESS",
+        "Workspace recovery is in progress",
+      );
+    }
   }
 
   private recoverPreparedReconciles(workspaceId: string, workspacePath: string): Omit<WorkspaceAuthorityRecoveryResult, "workspaceId" | "projectId"> {

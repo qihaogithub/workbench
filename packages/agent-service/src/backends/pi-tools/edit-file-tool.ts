@@ -442,37 +442,12 @@ export function createEditFileTool(
         const liveWorkspace = config.workingDir
           ? resolveLiveWorkspaceMutationContext(config.workingDir)
           : null;
-        let snapshotDriftRetry = 0;
-        for (;;) {
-          try {
-            snapshot = liveWorkspace
-              ? await liveWorkspace.authority.getSnapshot(
-                  liveWorkspace.projectId,
-                  liveWorkspace.workspaceId,
-                )
-              : null;
-            break;
-          } catch (err) {
-            if (
-              err instanceof WorkspaceMutationAuthorityError &&
-              err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
-              liveWorkspace &&
-              snapshotDriftRetry === 0
-            ) {
-              snapshotDriftRetry++;
-              logger.info(
-                { path: args.path },
-                "editFile getSnapshot: EXTERNAL_DRIFT, reconciling",
-              );
-              await liveWorkspace.authority.reconcileAdopt(
-                liveWorkspace.projectId,
-                liveWorkspace.workspaceId,
-              );
-              continue;
-            }
-            throw err;
-          }
-        }
+        snapshot = liveWorkspace
+          ? await liveWorkspace.authority.getSnapshot(
+              liveWorkspace.projectId,
+              liveWorkspace.workspaceId,
+            )
+          : null;
         const rawContent = snapshot
           ? snapshot.resources[args.path]
           : await fs.promises.readFile(filePath, "utf-8");
@@ -587,10 +562,7 @@ export function createEditFileTool(
           }
           if (!collabWriteSucceeded) {
             // Authority path (non-collab resource or collab room unavailable)
-            let mutateDriftRetry = 0;
-            for (;;) {
-              try {
-                receipt = await liveWorkspace.authority.mutate({
+            receipt = await liveWorkspace.authority.mutate({
                   mutationId: crypto.randomUUID(),
                   projectId: liveWorkspace.projectId,
                   workspaceId: liveWorkspace.workspaceId,
@@ -610,31 +582,6 @@ export function createEditFileTool(
                     },
                   ],
                 });
-                break;
-              } catch (err) {
-                if (
-                  err instanceof WorkspaceMutationAuthorityError &&
-                  err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
-                  mutateDriftRetry === 0
-                ) {
-                  mutateDriftRetry++;
-                  logger.info(
-                    { path: args.path },
-                    "editFile mutate: EXTERNAL_DRIFT, reconciling",
-                  );
-                  await liveWorkspace.authority.reconcileAdopt(
-                    liveWorkspace.projectId,
-                    liveWorkspace.workspaceId,
-                  );
-                  snapshot = await liveWorkspace.authority.getSnapshot(
-                    liveWorkspace.projectId,
-                    liveWorkspace.workspaceId,
-                  );
-                  continue;
-                }
-                throw err;
-              }
-            }
           }
         } else {
           await fs.promises.writeFile(filePath, newContent, "utf-8");

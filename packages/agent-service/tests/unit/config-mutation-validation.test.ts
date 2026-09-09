@@ -62,4 +62,33 @@ describe("config mutation validation", () => {
       resourcePaths: ["assets/known.png"],
     })).toBeUndefined();
   });
+
+  it("accepts persisted values for the Workbench position field type", () => {
+    const resources = {
+      ...baseResources,
+      "demos/home/config.schema.json": JSON.stringify({
+        type: "object",
+        properties: {
+          modules: {
+            type: "array",
+            items: {
+              oneOf: [{
+                properties: {
+                  type: { const: "level" },
+                  position: { type: "position" },
+                },
+                required: ["type", "position"],
+              }],
+            },
+          },
+        },
+      }),
+    };
+
+    expect(validateConfigResourceMutation({
+      path: "demos/home/config.values.json",
+      content: JSON.stringify({ modules: [{ type: "level", position: { x: 14, y: 1 } }] }),
+      resources,
+    })).toBeUndefined();
+  });
 });

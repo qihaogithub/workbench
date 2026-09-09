@@ -391,6 +391,8 @@ export async function POST(
       }
     }
 
+    let workspaceCommitted = false;
+
     // Live Workspace: write through Authority (stage binary + commit mutation)
     if (meta.workspaceId) {
       const wsPath = findWorkspacePath(meta.workspaceId);
@@ -419,9 +421,19 @@ export async function POST(
               expectedAbsent: true,
             }],
           });
+          workspaceCommitted = true;
         } catch (authorityError) {
           if (authorityError instanceof WorkspaceAuthorityClientError) {
             console.error("Workspace Authority failed for asset localize:", authorityError);
+            return NextResponse.json(
+              createApiError(authorityError.code, authorityError.message, {
+                assetStored: true,
+                imageId: uploadResult.imageId,
+                workspaceCommitted: false,
+                authorityCode: authorityError.code,
+              }),
+              { status: authorityError.status || 503 },
+            );
           } else {
             throw authorityError;
           }
@@ -431,6 +443,8 @@ export async function POST(
 
     return NextResponse.json(
       createApiSuccess({
+        assetStored: true,
+        workspaceCommitted,
         assetId: `asset_${hashPrefix}`,
         imageId: uploadResult.imageId,
         contentHash: hash,

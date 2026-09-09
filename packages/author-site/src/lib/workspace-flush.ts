@@ -1,5 +1,3 @@
-import type { ErrorCodeType } from "@workbench/shared";
-
 import {
   materializeCanonicalWorkspace,
   type CanonicalRevisionMetadata,
@@ -87,7 +85,7 @@ export class WorkspaceFlushError extends Error {
 }
 
 export function getWorkspaceFlushErrorResponse(error: unknown): {
-  code: ErrorCodeType;
+  code: string;
   message: string;
   status: number;
 } {
@@ -124,15 +122,18 @@ function isFlushStatus(
   );
 }
 
-function toApiErrorCode(code: string): ErrorCodeType {
+function toApiErrorCode(code: string): string {
   if (code === "SESSION_NOT_FOUND") return "SESSION_NOT_FOUND";
   if (code === "SESSION_EXPIRED") return "SESSION_EXPIRED";
   if (code === "INVALID_REQUEST") return "INVALID_REQUEST";
   if (code === "FORBIDDEN") return "FORBIDDEN";
   if (code === "FILE_WRITE_ERROR") return "FILE_WRITE_ERROR";
   if (code === "WORKSPACE_STALE") return "WORKSPACE_STALE";
-  if (code === "WORKSPACE_EXTERNAL_DRIFT") return "WORKSPACE_STALE";
-  if (code === "WORKSPACE_RESOURCE_CONFLICT") return "WORKSPACE_STALE";
+  if (code === "WORKSPACE_EXTERNAL_DRIFT") return code;
+  if (code === "WORKSPACE_RESOURCE_CONFLICT") return code;
+  // Preserve Authority diagnostics verbatim so callers can distinguish an
+  // unhealthy Authority from a generic collab failure and choose recovery.
+  if (code.startsWith("WORKSPACE_AUTHORITY_")) return code;
   return "AGENT_SERVICE_ERROR";
 }
 
@@ -140,11 +141,11 @@ function normalizeAgentFlushErrorCode(
   code?: string,
   message?: string,
 ): string | undefined {
-  if (code === "WORKSPACE_RESOURCE_CONFLICT") return "WORKSPACE_STALE";
-  if (code === "WORKSPACE_EXTERNAL_DRIFT") return "WORKSPACE_STALE";
+  if (code === "WORKSPACE_RESOURCE_CONFLICT") return code;
+  if (code === "WORKSPACE_EXTERNAL_DRIFT") return code;
   if (code !== "COLLAB_FLUSH_FAILED") return code;
-  if (message === "WORKSPACE_RESOURCE_CONFLICT") return "WORKSPACE_STALE";
-  if (message === "WORKSPACE_EXTERNAL_DRIFT") return "WORKSPACE_STALE";
+  if (message === "WORKSPACE_RESOURCE_CONFLICT") return message;
+  if (message === "WORKSPACE_EXTERNAL_DRIFT") return message;
   if (message === "SESSION_NOT_FOUND" || message === "SESSION_EXPIRED") {
     return message;
   }

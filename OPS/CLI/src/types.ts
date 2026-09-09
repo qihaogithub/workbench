@@ -69,6 +69,18 @@ export interface WorkspaceAuthorityHealthStatus {
   workspaceId: string;
   projectId?: string;
   ready: boolean;
+  condition:
+    | "healthy"
+    | "backup_repairable"
+    | "drift_requires_decision"
+    | "unrecoverable";
+  recommendedAction:
+    | "none"
+    | "bootstrap"
+    | "recover"
+    | "repair_backups"
+    | "decide_restore_or_adopt"
+    | "rebuild";
   stateExists: boolean;
   workspaceExists: boolean;
   revision?: number;
@@ -85,6 +97,7 @@ export interface WorkspaceAuthorityHealthStatus {
   stagingCount: number;
   backupCount: number;
   missingBackupCount: number;
+  missingBackupHashCount: number;
   receiptCount: number;
   journalEntries: number;
   projectionAckEntries: number;

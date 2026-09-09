@@ -1,15 +1,13 @@
 import { SpinePlayer } from "@preview/sdk";
 
 interface DemoProps {
-  /** 弹窗 Spine 动画：上传单个 Spine ZIP 后由受管资产加载完整素材。 */
+  /** 弹窗 Spine 动画：上传单个 Spine ZIP 后由受管资产加载完整素材。动画固定循环播放素材第一条动画。 */
   spineAsset?: { kind: "spine"; version: 1; assetId: string };
-  spineAnimation?: string;
-  spineLoop?: boolean;
 }
 
 const FALLBACK_IMAGE = "/api/images/img_5dVk-_aTCmGiCQ";
 
-export default function Demo({ spineAsset, spineAnimation = "", spineLoop = true }: DemoProps) {
+export default function Demo({ spineAsset }: DemoProps) {
   const hasSpine = Boolean(spineAsset);
 
   return (
@@ -40,15 +38,16 @@ export default function Demo({ spineAsset, spineAnimation = "", spineLoop = true
       {hasSpine ? (
         <SpinePlayer
           src={spineAsset}
-          animation={spineAnimation}
-          loop={spineLoop}
+          loop
+          fit="contain"
+          alignment="center"
           className="absolute"
-          style={{ width: 375, height: 375, left: 0, top: 218 }}
+          style={{ width: 375, height: 812, left: 0, top: 0 }}
           fallback={
             <img
               src={FALLBACK_IMAGE}
               alt="弹窗"
-              style={{ width: 375, height: 375 }}
+              style={{ position: "absolute", width: 375, height: 375, left: 0, top: 218 }}
             />
           }
         />

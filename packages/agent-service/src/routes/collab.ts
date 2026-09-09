@@ -64,7 +64,14 @@ function collabFailure(reply: { status: (statusCode: number) => unknown }, error
     : error instanceof Error
       ? error.message
       : "COLLAB_FLUSH_FAILED";
-  const status = code === "WORKSPACE_RESOURCE_CONFLICT" ? 409 : 403;
+  const status = code === "WORKSPACE_RESOURCE_CONFLICT" || code === "WORKSPACE_EXTERNAL_DRIFT"
+    ? 409
+    : code === "WORKSPACE_AUTHORITY_BACKUP_MISSING" ||
+        code === "WORKSPACE_AUTHORITY_NOT_READY" ||
+        code === "WORKSPACE_RECOVERY_IN_PROGRESS" ||
+        code === "WORKSPACE_WRITE_LEASE_UNAVAILABLE"
+      ? 503
+      : 403;
   reply.status(status);
   return {
     success: false,

@@ -1,5 +1,7 @@
 import type {
   WorkspaceAuthorityApiErrorCode,
+  WorkspaceAuthorityHealthCondition,
+  WorkspaceAuthorityRecommendedAction,
   WorkspaceRevision,
 } from "@workbench/shared/contracts";
 
@@ -62,6 +64,8 @@ export interface WorkspaceAuthorityHealthView {
   workspaceId: string;
   projectId?: string;
   ready: boolean;
+  condition: WorkspaceAuthorityHealthCondition;
+  recommendedAction: WorkspaceAuthorityRecommendedAction;
   revision?: WorkspaceRevision;
   rootHash?: string;
   actualRootHash?: string;
@@ -72,4 +76,5 @@ export interface WorkspaceAuthorityHealthView {
   recoveryState: "ready" | "pending";
   backupCount: number;
   missingBackupCount: number;
+  missingBackupHashCount: number;
 }

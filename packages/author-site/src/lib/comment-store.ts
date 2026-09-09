@@ -17,6 +17,7 @@ import type {
 } from "@workbench/shared";
 import { getProjectPath } from "./paths";
 import { getServerAgentServiceUrl, getInternalApiToken } from "./runtime-config";
+import { enqueueCommentNotifications, cancelCommentNotifications, attachDelivery, reconcileCommentNotificationOutbox } from "./dingtalk-comment-notifications";
 
 const COMMENTS_FILENAME = "comments.json";
 
@@ -54,6 +55,13 @@ function writeCommentStore(projectId: string, data: CommentStoreData): void {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
 }
 
+/** 通知意图只用于本地持久化与 Outbox 补建，不进入 API/WS。 */
+function stripNotificationIntents(thread: CommentThread): CommentThread {
+  delete thread.notificationIntents;
+  thread.replies.forEach((reply) => delete reply.notificationIntents);
+  return thread;
+}
+
 /**
  * 通知 agent-service 广播 WS 事件（尽力而为，失败不阻塞写入）
  */
@@ -89,6 +97,9 @@ export function listComments(
   options: ListCommentsOptions = {},
 ): CommentThread[] {
   const { threads } = readCommentStore(projectId);
+  threads.forEach((thread) => {
+    try { reconcileCommentNotificationOutbox(thread); } catch { /* 列表读取不受 Outbox 故障影响。 */ }
+  });
   let result = threads;
   if (options.configScope) {
     result = result.filter((t) =>
@@ -111,7 +122,12 @@ export function listComments(
   if (options.resolved !== undefined) {
     result = result.filter((t) => t.resolved === options.resolved);
   }
-  return result.sort((a, b) => b.createdAt - a.createdAt);
+  return result
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((thread) => stripNotificationIntents(attachDelivery({
+      ...thread,
+      replies: thread.replies.map((reply) => attachDelivery({ ...reply }, projectId, thread.id, reply.id)),
+    }, projectId, thread.id)));
 }
 
 export function getCommentThread(
@@ -153,6 +169,7 @@ export interface CreateCommentInput {
   author: CommentThread["author"];
   mentions?: CommentThread["mentions"];
   aiTaskAuthorization?: CommentAiTaskAuthorization;
+  anonymousIpDigest?: string | null;
 }
 
 export async function createCommentThread(
@@ -161,6 +178,9 @@ export async function createCommentThread(
   const data = readCommentStore(input.projectId);
   const now = Date.now();
   const hasAgentMention = input.mentions?.some((m) => m.type === "agent");
+  const notificationIntents = input.mentions
+    ?.filter((mention) => mention.type === "user")
+    .map((mention) => ({ id: generateId("notify"), participantId: mention.id }));
 
   const thread: CommentThread = {
     id: generateId("cmt"),
@@ -172,6 +192,7 @@ export async function createCommentThread(
     content: input.content,
     author: input.author,
     mentions: input.mentions,
+    notificationIntents: notificationIntents?.length ? notificationIntents : undefined,
     aiTaskStatus: hasAgentMention ? "pending" : undefined,
     createdAt: now,
     updatedAt: now,
@@ -185,6 +206,11 @@ export async function createCommentThread(
     data.aiTaskAuthorizations[thread.id] = input.aiTaskAuthorization;
   }
   writeCommentStore(input.projectId, data);
+  try {
+    enqueueCommentNotifications(input.projectId, thread.id, thread.mentions, thread.author.name, thread.content, thread.author.isAnonymous, thread.target, undefined, thread.author.isAnonymous ? thread.author.id : undefined, input.anonymousIpDigest, notificationIntents?.map((intent) => intent.id));
+  } catch { /* 评论已持久化，Outbox 故障不回滚主写入。 */ }
+  attachDelivery(thread, input.projectId, thread.id);
+  stripNotificationIntents(thread);
   await notifyWsEvent(input.projectId, {
     type: "comment:created",
     thread,
@@ -204,6 +230,7 @@ export interface UpdateCommentInput {
   mentions?: CommentMention[];
   aiTaskStatus?: CommentAiTaskStatus;
   aiTaskAuthorization?: CommentAiTaskAuthorization;
+  anonymousIpDigest?: string | null;
 }
 
 export async function updateCommentThread(
@@ -221,10 +248,12 @@ export async function updateCommentThread(
   if (updates.content !== undefined) {
     thread.content = updates.content;
   }
+  const previousUserMentions = thread.mentions ?? [];
   const hadAgentMention = thread.mentions?.some((mention) => mention.type === "agent") ?? false;
   if (updates.mentions !== undefined) {
     thread.mentions = updates.mentions;
   }
+
   if (updates.aiTaskStatus !== undefined) {
     thread.aiTaskStatus = updates.aiTaskStatus;
   }
@@ -240,6 +269,15 @@ export async function updateCommentThread(
   thread.updatedAt = Date.now();
 
   writeCommentStore(projectId, data);
+  if (updates.mentions !== undefined) {
+    const added = (thread.mentions ?? []).filter((m) => m.type === "user" && !previousUserMentions.some((p) => p.type === "user" && p.id === m.id));
+    const intents = added.map((mention) => ({ id: generateId("notify"), participantId: mention.id }));
+    if (intents.length) thread.notificationIntents = [...(thread.notificationIntents ?? []), ...intents];
+    writeCommentStore(projectId, data);
+    try {
+      enqueueCommentNotifications(projectId, thread.id, added, thread.author.name, thread.content, thread.author.isAnonymous, thread.target, undefined, thread.author.isAnonymous ? thread.author.id : undefined, updates.anonymousIpDigest, intents.map((intent) => intent.id));
+    } catch { /* 不回滚已保存的评论编辑。 */ }
+  }
 
   if (updates.resolved !== undefined) {
     await notifyWsEvent(projectId, {
@@ -255,6 +293,8 @@ export async function updateCommentThread(
       aiTaskStatus: updates.aiTaskStatus,
     });
   }
+  attachDelivery(thread, projectId, thread.id);
+  stripNotificationIntents(thread);
   await notifyWsEvent(projectId, { type: "comment:updated", thread });
 
   if (shouldEnqueueAgent) {
@@ -274,6 +314,7 @@ export async function deleteCommentThread(
   if (index === -1) return false;
 
   data.threads.splice(index, 1);
+  cancelCommentNotifications(projectId, threadId);
   if (data.aiTaskAuthorizations) delete data.aiTaskAuthorizations[threadId];
   writeCommentStore(projectId, data);
   await notifyWsEvent(projectId, { type: "comment:deleted", threadId });
@@ -287,6 +328,7 @@ export interface CreateReplyInput {
   author: CommentReply["author"];
   mentions?: CommentReply["mentions"];
   aiTaskAuthorization?: CommentAiTaskAuthorization;
+  anonymousIpDigest?: string | null;
 }
 
 export async function createReply(
@@ -301,6 +343,7 @@ export async function createReply(
     content: input.content,
     author: input.author,
     mentions: input.mentions,
+    notificationIntents: input.mentions?.filter((mention) => mention.type === "user").map((mention) => ({ id: generateId("notify"), participantId: mention.id })),
     createdAt: Date.now(),
   };
 
@@ -318,6 +361,11 @@ export async function createReply(
   }
 
   writeCommentStore(input.projectId, data);
+  try {
+    enqueueCommentNotifications(input.projectId, thread.id, reply.mentions, reply.author.name, reply.content, reply.author.isAnonymous, thread.target, reply.id, reply.author.isAnonymous ? reply.author.id : undefined, input.anonymousIpDigest, reply.notificationIntents?.map((intent) => intent.id));
+  } catch { /* 不回滚已保存的回复。 */ }
+  attachDelivery(reply, input.projectId, thread.id, reply.id);
+  stripNotificationIntents(thread);
   await notifyWsEvent(input.projectId, {
     type: "comment:replied",
     threadId: thread.id,
@@ -349,8 +397,10 @@ export async function deleteReply(
   if (index === -1) return false;
 
   thread.replies.splice(index, 1);
+  cancelCommentNotifications(projectId, threadId, replyId);
   thread.updatedAt = Date.now();
   writeCommentStore(projectId, data);
+  stripNotificationIntents(thread);
   // Reply deletion changes the complete thread shape. Broadcast the updated
   // thread so other author/viewer clients remove it without waiting for a
   // full refresh (the event type is already part of the comment protocol).
@@ -362,13 +412,14 @@ export async function updateReply(
   projectId: string,
   threadId: string,
   replyId: string,
-  updates: { content: string; mentions?: CommentMention[]; aiTaskAuthorization?: CommentAiTaskAuthorization },
+  updates: { content: string; mentions?: CommentMention[]; aiTaskAuthorization?: CommentAiTaskAuthorization; anonymousIpDigest?: string | null },
 ): Promise<{ thread: CommentThread; reply: CommentReply } | null> {
   const data = readCommentStore(projectId);
   const thread = data.threads.find((candidate) => candidate.id === threadId);
   const reply = thread?.replies.find((candidate) => candidate.id === replyId);
   if (!thread || !reply) return null;
 
+  const previousReplyMentions = reply.mentions ?? [];
   const hadAgentMention = reply.mentions?.some((mention) => mention.type === "agent") ?? false;
   reply.content = updates.content;
   reply.mentions = updates.mentions;
@@ -382,6 +433,17 @@ export async function updateReply(
     }
   }
   writeCommentStore(projectId, data);
+  const addedMentions = (reply.mentions ?? []).filter((m) => m.type === "user" && !previousReplyMentions.some((p) => p.type === "user" && p.id === m.id));
+  const replyIntents = addedMentions.map((mention) => ({ id: generateId("notify"), participantId: mention.id }));
+  if (replyIntents.length) {
+    reply.notificationIntents = [...(reply.notificationIntents ?? []), ...replyIntents];
+    writeCommentStore(projectId, data);
+  }
+  try {
+    enqueueCommentNotifications(projectId, thread.id, addedMentions, reply.author.name, reply.content, reply.author.isAnonymous, thread.target, reply.id, reply.author.isAnonymous ? reply.author.id : undefined, updates.anonymousIpDigest, replyIntents.map((intent) => intent.id));
+  } catch { /* 不回滚已保存的回复编辑。 */ }
+  attachDelivery(reply, projectId, thread.id, reply.id);
+  stripNotificationIntents(thread);
   await notifyWsEvent(projectId, { type: "comment:updated", thread });
   if (hasAgentMention && !hadAgentMention) {
     await notifyWsEvent(projectId, { type: "comment:ai-status", threadId, aiTaskStatus: "pending" });

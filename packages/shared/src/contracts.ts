@@ -26,6 +26,7 @@ export type WorkspaceMutationErrorCode =
   | "WORKSPACE_INVALID_OPERATION"
   | "WORKSPACE_EXTERNAL_DRIFT"
   | "WORKSPACE_AUTHORITY_BACKUP_MISSING"
+  | "WORKSPACE_RECOVERY_IN_PROGRESS"
   | "WORKSPACE_WRITE_LEASE_UNAVAILABLE";
 
 export type WorkspaceAuthorityApiErrorCode =
@@ -56,9 +57,96 @@ export const WORKSPACE_AUTHORITY_API_ERROR_CODES = [
   "WORKSPACE_INVALID_OPERATION",
   "WORKSPACE_EXTERNAL_DRIFT",
   "WORKSPACE_AUTHORITY_BACKUP_MISSING",
+  "WORKSPACE_RECOVERY_IN_PROGRESS",
   "WORKSPACE_WRITE_LEASE_UNAVAILABLE",
   "WORKSPACE_MUTATION_FAILED",
 ] as const satisfies readonly WorkspaceAuthorityApiErrorCode[];
+
+/** Stable health classification for the live Workspace Authority. */
+export type WorkspaceAuthorityHealthCondition =
+  | "healthy"
+  | "backup_repairable"
+  | "drift_requires_decision"
+  | "unrecoverable";
+
+/** Safe next step suggested by the Authority health check. */
+export type WorkspaceAuthorityRecommendedAction =
+  | "none"
+  | "bootstrap"
+  | "recover"
+  | "repair_backups"
+  | "decide_restore_or_adopt"
+  | "rebuild";
+
+export interface WorkspaceAuthorityHealth {
+  workspaceId: string;
+  projectId?: string;
+  ready: boolean;
+  condition: WorkspaceAuthorityHealthCondition;
+  recommendedAction: WorkspaceAuthorityRecommendedAction;
+  stateExists: boolean;
+  workspaceExists: boolean;
+  revision?: number;
+  rootHash?: string;
+  actualRootHash?: string;
+  externalDrift: boolean;
+  queueDepth: number;
+  activeLease: boolean;
+  preparedCount: number;
+  recoveryState: "ready" | "pending";
+  recoveryPendingCount: number;
+  conflictCount: number;
+  eventSubscriberCount: number;
+  stagingCount: number;
+  backupCount: number;
+  /** Number of resource paths without a valid committed backup. */
+  missingBackupCount: number;
+  /** Number of distinct hashes without a valid committed backup. */
+  missingBackupHashCount: number;
+  receiptCount: number;
+  journalEntries: number;
+  projectionAckEntries: number;
+  checkedAt: number;
+}
+
+/** Public body accepted by the administrator-only Workspace rebuild API. */
+export interface WorkspaceRecoveryRebuildApiRequest {
+  sessionId: string;
+  sourceVersionId: string;
+  idempotencyKey: string;
+  /** Omit or false for the default dry-run. */
+  apply?: boolean;
+}
+
+/** Stable result returned by both recovery dry-run and apply. */
+export interface WorkspaceRecoveryRebuildResult {
+  applied: boolean;
+  recoveryId: string;
+  projectId: string;
+  sourceVersionId: string;
+  failedWorkspaceId: string;
+  newWorkspaceId?: string;
+  recoveryBundlePath?: string;
+  sourceRootHash: string;
+  sourceResourceCount: number;
+  diffSummary: {
+    currentResourceCount: number;
+    sourceResourceCount: number;
+    added: string[];
+    removed: string[];
+    changed: string[];
+  };
+  archivedSessionCount: number;
+  warnings?: string[];
+  authority?: {
+    revision: number;
+    rootHash: string;
+    ready: boolean;
+    missingBackupCount: number;
+    stagingCount: number;
+  };
+  finalHealth?: WorkspaceAuthorityHealth;
+}
 
 export function isWorkspaceAuthorityApiErrorCode(value: unknown): value is WorkspaceAuthorityApiErrorCode {
   return typeof value === "string" && (WORKSPACE_AUTHORITY_API_ERROR_CODES as readonly string[]).includes(value);

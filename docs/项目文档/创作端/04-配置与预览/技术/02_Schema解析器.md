@@ -4,15 +4,17 @@ covers:
   - packages/demo-ui/src/schema-parser.test.ts
   - packages/demo-ui/src/ConfigForm.tsx
   - packages/agent-service/src/backends/pi-tools/schema-contract-validation.ts
+  - packages/agent-service/src/backends/pi-tools/config-mutation-validation.ts
   - packages/agent-service/src/backends/pi-tools/schema-tool.ts
   - packages/agent-service/tests/unit/schema-contract-validation.test.ts
+  - packages/agent-service/tests/unit/config-mutation-validation.test.ts
 ---
 
 # 配置系统 - Schema 解析器
 
-> 版本：v1.2
+> 版本：v1.3
 > 创建日期：2026-04-06
-> 更新日期：2026-09-06
+> 更新日期：2026-09-09
 
 ---
 
@@ -123,6 +125,8 @@ Agent 写入前的 `schemaValidate` 会递归检查 `properties`、`items`、`on
 解析器不读取或推断历史 `colorMode`。字段目录、表单生成器和配置池应保留上述 `format`、nullable 类型以及 `colorPresets` 元数据，使 Agent 只读取 Schema 就能判断值格式和编辑行为。
 
 关卡图坐标单位约定：`position.x/y` 使用 1 倍像素值，`w/h` 继续使用 2 倍值，渲染时仅对 `w/h` 除以 2。
+
+Agent 提交 `config.values.json` 前的运行值校验与表单解析共享 `position` 契约：值必须是包含有限数值 `x` / `y` 的对象。`position` 是 Schema UI 自定义类型，不能与 JavaScript `typeof` 结果直接比较；否则会将可渲染、可保存的坐标误判为类型错误。
 
 ### 3.4 isValidFigmaFormat
 
