@@ -21,7 +21,6 @@ import {
   ArrowRight,
   Bold,
   ChevronDown,
-  ChevronRight,
   Circle,
   ClipboardPaste,
   Command,
@@ -4766,9 +4765,9 @@ export function SketchEditorToolbar({ scene: _scene, controller, configData: _co
                 toolButtonClass,
                 item.tool !== "image" && controller.tool === item.tool && "bg-violet-600 text-white shadow-sm hover:bg-violet-600 hover:text-white",
               )}
-              onClick={() => {
+              onClick={(event) => {
                 if (item.tool === "image") {
-                  if (onImageMenu) onImageMenu();
+                  if (onImageMenu) onImageMenu(event.currentTarget);
                   else onImageUpload();
                   return;
                 }
@@ -11228,13 +11227,45 @@ export function SketchEditorSurface({
   const parsedScene = parsedSceneState.scene;
   const controller = useSketchEditorState(parsedScene, onSceneChange, onSelectionChange, configData, resolvedCreationTools);
   const canvasRef = React.useRef<SketchEditorCanvasHandle>(null);
-  const [imageMenuOpen, setImageMenuOpen] = React.useState(false);
+  const [imageMenuAnchor, setImageMenuAnchor] = React.useState<HTMLElement | null>(null);
+  const [imageMenuPosition, setImageMenuPosition] = React.useState<{
+    left: number;
+    top: number;
+    placement: "above" | "below";
+  } | null>(null);
+  const imageMenuRef = React.useRef<HTMLDivElement>(null);
   const [imagePanelOpen, setImagePanelOpen] = React.useState(false);
   const [transientImageNodes, setTransientImageNodes] = React.useState<readonly SketchSceneNode[]>([]);
   const openImageFilePicker = React.useCallback(() => {
-    setImageMenuOpen(false);
+    setImageMenuAnchor(null);
     canvasRef.current?.openImageFilePicker();
   }, []);
+  const toggleImageMenu = React.useCallback((anchor: HTMLElement) => {
+    setImageMenuAnchor((current) => (current === anchor ? null : anchor));
+  }, []);
+  const updateImageMenuPosition = React.useCallback(() => {
+    const anchor = imageMenuAnchor;
+    if (!anchor || typeof window === "undefined") return;
+    const anchorRect = anchor.getBoundingClientRect();
+    const menuRect = imageMenuRef.current?.getBoundingClientRect();
+    const menuWidth = menuRect?.width || 176;
+    const menuHeight = menuRect?.height || 96;
+    const viewportPadding = 8;
+    const left = Math.max(
+      viewportPadding + menuWidth / 2,
+      Math.min(window.innerWidth - viewportPadding - menuWidth / 2, anchorRect.left + anchorRect.width / 2),
+    );
+    const aboveTop = anchorRect.top - 8;
+    const belowTop = anchorRect.bottom + 8;
+    const fitsAbove = aboveTop - menuHeight >= viewportPadding;
+    const fitsBelow = belowTop + menuHeight <= window.innerHeight - viewportPadding;
+    const placement = fitsAbove || !fitsBelow ? "above" : "below";
+    setImageMenuPosition({
+      left,
+      top: placement === "above" ? aboveTop : belowTop,
+      placement,
+    });
+  }, [imageMenuAnchor]);
   const closeImagePanel = React.useCallback(() => {
     setTransientImageNodes([]);
     setImagePanelOpen(false);
@@ -11248,13 +11279,33 @@ export function SketchEditorSurface({
   );
 
   React.useEffect(() => {
-    if (!imageMenuOpen) return undefined;
+    if (!imageMenuAnchor) {
+      setImageMenuPosition(null);
+      return undefined;
+    }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setImageMenuOpen(false);
+      if (event.key === "Escape") setImageMenuAnchor(null);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [imageMenuOpen]);
+  }, [imageMenuAnchor]);
+
+  React.useEffect(() => {
+    if (!imageMenuAnchor) return undefined;
+    updateImageMenuPosition();
+    const handleViewportChange = () => updateImageMenuPosition();
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    const resizeObserver = typeof ResizeObserver === "undefined" || !imageMenuRef.current
+      ? null
+      : new ResizeObserver(handleViewportChange);
+    resizeObserver?.observe(imageMenuRef.current as HTMLDivElement);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      resizeObserver?.disconnect();
+    };
+  }, [imageMenuAnchor, updateImageMenuPosition]);
 
   if (parsedSceneState.error) {
     return (
@@ -11278,12 +11329,12 @@ export function SketchEditorSurface({
         transientNodes={transientImageNodes}
         onViewportChange={onViewportChange}
       />
-      {imageMenuOpen ? (
+      {imageMenuAnchor ? (
         <button
           type="button"
           aria-label="关闭图片工具菜单"
           className="absolute inset-0 z-10 cursor-default"
-          onClick={() => setImageMenuOpen(false)}
+          onClick={() => setImageMenuAnchor(null)}
         />
       ) : null}
       <div className="pointer-events-none absolute inset-x-0 bottom-5 z-20 flex justify-center px-4">
@@ -11294,40 +11345,51 @@ export function SketchEditorSurface({
           allowedTools={resolvedVisibleTools}
           brushToolbarMode={resolvedBrushToolbarMode}
           onImageUpload={openImageFilePicker}
-          onImageMenu={() => setImageMenuOpen((value) => !value)}
+          onImageMenu={toggleImageMenu}
           className="pointer-events-auto"
         />
-        {imageMenuOpen ? (
-          <div
-            role="menu"
-            aria-label="图片工具菜单"
-            className="pointer-events-auto absolute bottom-14 left-1/2 w-44 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
-          >
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-              onClick={openImageFilePicker}
-            >
-              <Upload className="h-4 w-4" />
-              上传图片
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              disabled={!imageGeneration}
-              title={!imageGeneration ? "宿主未提供 AI 绘图能力" : undefined}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-40"
-              onClick={() => {
-                setImageMenuOpen(false);
-                setImagePanelOpen(true);
-              }}
-            >
-              <Sparkles className="h-4 w-4" />
-              AI 绘图
-            </button>
-          </div>
-        ) : null}
+        {imageMenuAnchor && typeof document !== "undefined"
+          ? createPortal(
+              <div
+                ref={imageMenuRef}
+                role="menu"
+                aria-label="图片工具菜单"
+                className="pointer-events-auto fixed z-[10000] w-44 rounded-xl border border-slate-200 bg-white p-1.5 text-slate-900 shadow-xl"
+                style={{
+                  left: imageMenuPosition?.left ?? 0,
+                  top: imageMenuPosition?.top ?? 0,
+                  transform: imageMenuPosition?.placement === "below" ? "translateX(-50%)" : "translate(-50%, -100%)",
+                  visibility: imageMenuPosition ? "visible" : "hidden",
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-violet-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                  onClick={openImageFilePicker}
+                >
+                  <Upload className="h-4 w-4 text-slate-500" />
+                  上传图片
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!imageGeneration}
+                  title={!imageGeneration ? "宿主未提供 AI 绘图能力" : undefined}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-violet-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-40"
+                  onClick={() => {
+                    setImageMenuAnchor(null);
+                    setImagePanelOpen(true);
+                  }}
+                >
+                  <Sparkles className="h-4 w-4 text-slate-500" />
+                  AI 绘图
+                </button>
+              </div>,
+              document.body,
+            )
+          : null}
         {imagePanelOpen && imageGeneration ? (
           <SketchImageGenerationPanel
             scene={parsedScene}

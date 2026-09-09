@@ -1,34 +1,35 @@
 "use client";
 
-/**
- * CommentCreatePopover：创建评论输入框。
- * - 在评论模式下点击页面后弹出，定位在点击位置。
- * - 支持 @提及（创作端可 @用户/AI，浏览端仅 @用户）。
- * - 提交后调用 createComment，携带捕获的锚点元素与 pin 坐标。
- */
 import { useCallback, useState } from "react";
 import { X } from "lucide-react";
 import type { CommentMention } from "@workbench/shared";
-import { MentionTextarea } from "./MentionPicker";
-import type { CreateCommentInput, MentionCandidate } from "./types";
+import { cn } from "../utils";
+import { CommentComposer } from "./CommentComposer";
+import { COMMENT_VISUAL_TOKENS } from "./comment-theme";
+import { usePopoverDrag } from "./usePopoverDrag";
+import type {
+  CommentImageUploadHandler,
+  CreateCommentInput,
+  MentionCandidate,
+} from "./types";
 
 export interface CommentCreatePopoverProps {
-  /** 创建评论的输入（不含 content/mentions），由点击捕获 */
   draft: Omit<CreateCommentInput, "content" | "mentions">;
   mentionCandidates: MentionCandidate[];
   canMentionAgent?: boolean;
   left: number;
   top: number;
+  uploadCommentImage?: CommentImageUploadHandler;
   onCancel: () => void;
   onSubmit: (input: CreateCommentInput) => Promise<unknown>;
 }
-
 export function CommentCreatePopover({
   draft,
   mentionCandidates,
   canMentionAgent,
   left,
   top,
+  uploadCommentImage,
   onCancel,
   onSubmit,
 }: CommentCreatePopoverProps) {
@@ -36,10 +37,20 @@ export function CommentCreatePopover({
   const [mentions, setMentions] = useState<CommentMention[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const candidates = canMentionAgent
     ? mentionCandidates
-    : mentionCandidates.filter((c) => c.type !== "agent");
+    : mentionCandidates.filter((candidate) => candidate.type !== "agent");
+  const viewport = typeof window === "undefined" ? { width: 1200, height: 800 } : { width: window.innerWidth, height: window.innerHeight };
+  const popoverWidth = 360;
+  const minLeft = popoverWidth / 2 + 8;
+  const maxLeft = Math.max(minLeft, viewport.width - popoverWidth / 2 - 8);
+  const { position, dragging, dragHandleProps } = usePopoverDrag(left, top, {
+    resetKey: draft.anchor?.domPath ?? `${draft.target.kind}:${draft.target.kind === "page" ? draft.target.pageId : "document"}`,
+    minLeft,
+    maxLeft,
+    minTop: 8,
+    maxTop: Math.max(8, viewport.height - 220),
+  });
 
   const handleSubmit = useCallback(async () => {
     const text = content.trim();
@@ -48,67 +59,52 @@ export function CommentCreatePopover({
     setError(null);
     try {
       await onSubmit({ ...draft, content: text, mentions });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "评论提交失败");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "评论提交失败");
       setSubmitting(false);
     }
   }, [content, mentions, submitting, onSubmit, draft]);
 
   return (
     <div
-      className="absolute z-50 w-72 -translate-x-1/2 rounded-lg border border-border bg-popover p-2.5 shadow-lg"
-      style={{ left, top }}
-      onMouseDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
+      className={cn("absolute z-50 w-[min(360px,calc(100vw-24px))] -translate-x-1/2 rounded-2xl p-3", COMMENT_VISUAL_TOKENS.card)}
+      style={{ left: position.left, top: position.top }}
+      onMouseDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
     >
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[11px] font-medium text-muted-foreground">
+      <div className="mb-2 flex items-center justify-between border-b border-[#4e4e4e] pb-2">
+        <span
+          {...dragHandleProps}
+          className={cn("flex-1 cursor-move touch-none select-none text-[13px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6fc2ff]", dragging && "cursor-grabbing")}
+        >
           添加评论
           {draft.anchor && (
-            <span className="ml-1 font-mono text-[10px]">&lt;{draft.anchor.tagName}&gt;</span>
+            <span className="ml-1.5 text-[10px] font-normal text-[#a9a9a9]">&lt;{draft.anchor.tagName}&gt;</span>
           )}
         </span>
         <button
           type="button"
           onClick={onCancel}
-          title="取消"
-          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="关闭评论输入"
+          title="关闭"
+          className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-[#d4d4d4] transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6fc2ff]"
         >
-          <X className="h-3.5 w-3.5" />
+          <X className="h-4 w-4" />
         </button>
       </div>
-
-      <MentionTextarea
+      <CommentComposer
         value={content}
         onChange={setContent}
         mentions={mentions}
         onMentionsChange={setMentions}
         candidates={candidates}
-        rows={3}
         autoFocus
-        placeholder="输入评论…（@ 可提及，⌘/Ctrl+Enter 提交）"
+        placeholder="输入评论…"
+        uploadCommentImage={uploadCommentImage}
+        submitting={submitting}
         onSubmit={() => void handleSubmit()}
       />
-
-      {error && <div className="mt-1 text-[11px] text-red-500">{error}</div>}
-
-      <div className="mt-2 flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md border border-input bg-background px-2.5 py-1 text-xs text-foreground transition-colors hover:bg-muted"
-        >
-          取消
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleSubmit()}
-          disabled={!content.trim() || submitting}
-          className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-        >
-          {submitting ? "提交中…" : "评论"}
-        </button>
-      </div>
+      {error && <div className={cn("mt-2 text-[11px] text-[#ffaaa0]")} role="alert">{error}</div>}
     </div>
   );
 }

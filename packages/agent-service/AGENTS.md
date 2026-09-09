@@ -119,7 +119,7 @@ tests/
 | `listPages` | 查询工作空间页面清单 |
 | `inspectConfigVisibility` / `validateConfigVisibility` | 读取稳定页面/区域和配置上下文，严格校验候选 v1 联动规则 |
 | `explainConfigVisibility` / `repairConfigVisibility` / `migrateConfigVisibility` | 只读解释、规范化修复和 legacy 规则迁移；均不直接写入工作区 |
-| `prepareConfigVisibilityDraft` / `commitConfigVisibilityDraft` | 以基线 revision/rootHash 准备多文件配置联动草稿，并在已批准计划和 Authority receipt 下原子提交 |
+| `prepareConfigVisibilityDraft` / `commitConfigVisibilityDraft` | 以基线 revision/rootHash 准备多文件配置联动草稿，并在用户批准实际草稿后通过 Authority receipt 原子提交 |
 | `deletePage` | 删除单个页面（需要权限确认） |
 | `deletePages` | 批量删除页面（需要权限确认） |
 | `delegateTask` | 将独立任务委派给短生命周期子 Agent，子 Agent 可读写允许范围内文件，结果和文件变更回传主 Agent；live Workspace 下禁用，避免绕过 Workspace Mutation Authority。`subagentType: "image"` 时启动定向图片子 Agent（仅图像工具 + vision 模型），用于前置批量生成/抠图 |
@@ -132,7 +132,7 @@ tests/
 
 `schemaValidate` 不只检查 JSON 语法，还递归检查 Workbench 配置契约；`visibleWhen` 必须使用 `{ field, equals }`，只能引用当前对象作用域内的兄弟字段，并覆盖 `items.oneOf` / `variants`。新 Schema 推荐直接在字段上声明 `visibleWhen`，但运行时同样支持 `ui:options.visibleWhen`；不要重复或冲突声明，也不得把两种位置之间的移动当作功能修复。工具结果固定返回 `validationScope=schema_contract` 和 `uiBehaviorVerified=false`：Schema 合法不等于当前配置面板行为已验证。用户要求实际 UI 效果时，必须完成真实界面验收；否则只报告“修改已写入、效果待验证”。
 
-配置驱动页面状态统一使用共享 v1 `visibility-rules` 协议；支持 `oneOf`、`all`/`any`、不可用/备用页/替代区域策略和服务端非特权 role 只读上下文，公开规则禁止 user ID。组合条件只在 predicate 内声明来源；备用页不得成环，替代区域仅限目标页内的专用区域。Schema、配置值或规则的 Agent 写入必须有当前会话的配置联动计划证明，并通过 `visibility-draft` workflow；prepare 失败时保留按 workspace 隔离的短期诊断草稿。页面代码已变更但没有规则提交 receipt 时，完成报告会被 `tool-hook-manager` 标记为未完成。
+配置驱动页面状态统一使用共享 v1 `visibility-rules` 协议；支持 `oneOf`、`all`/`any`、不可用/备用页/替代区域策略和服务端非特权 role 只读上下文，公开规则禁止 user ID。组合条件只在 predicate 内声明来源；备用页不得成环，替代区域仅限目标页内的专用区域。普通 Schema/配置值写入不依赖计划审批，但 Authority 会校验 JSON、Schema/值契约、资源引用和现有 visibility 引用完整性；`project.visibility-rules.json` 只能通过 `visibility-draft` workflow，并在用户批准实际草稿后原子提交。prepare 失败时保留按 workspace 隔离的短期诊断草稿。页面代码已变更但没有规则提交 receipt 时，完成报告会被 `tool-hook-manager` 标记为未完成。
 
 如果当前 `workingDir` 是 `scope=live` Workspace，`delegateTask` 会直接返回 `WORKSPACE_AUTHORITY_REQUIRED`，不启动子 Agent runner。子 Agent 重新开放前必须先接入受管写工具、actor identity 和 receipt 汇总，不能让短生命周期 Agent 获得裸 Workspace 写权限。
 

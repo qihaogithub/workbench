@@ -1,11 +1,12 @@
 interface DemoProps {
+  topImage?: string;
   heroVideo?: {
     url: string;
     poster?: string;
   };
 }
 
-export default function Demo({ heroVideo }: DemoProps) {
+export default function Demo({ topImage, heroVideo }: DemoProps) {
   const videoUrl = heroVideo?.url || "";
 
   return (
@@ -15,8 +16,16 @@ export default function Demo({ heroVideo }: DemoProps) {
           视频展示页
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-blue-500">
-          这是一个简单的示例页面，包含一个视频配置项。你可以在右侧配置面板上传或填写视频地址与封面。
+          这是一个简单的示例页面，包含一个视频配置项和一个图片配置项。你可以在右侧配置面板上传或填写视频地址与封面。
         </p>
+
+        {topImage && (
+          <img
+            src={topImage}
+            alt="顶部展示图片"
+            className="mt-6 aspect-video w-full rounded-2xl object-cover shadow-sm"
+          />
+        )}
 
         <div className="mt-6 overflow-hidden rounded-2xl bg-slate-900 shadow-sm">
           {videoUrl ? (

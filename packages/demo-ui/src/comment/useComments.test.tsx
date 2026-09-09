@@ -46,6 +46,7 @@ function createApi(threads: CommentThread[]): CommentApiAdapter {
     deleteReply: async () => {
       throw new Error("not used in this test");
     },
+    uploadCommentImage: async () => ({ url: "/api/images/test", kind: "image" as const }),
     listMentionCandidates: async () => [],
   };
 }

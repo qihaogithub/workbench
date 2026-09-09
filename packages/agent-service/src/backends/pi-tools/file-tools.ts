@@ -21,6 +21,7 @@ import { resolveCollabResourceKind } from "../../collab/workspace-file-persisten
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 import { createManagedDocumentProposalResult } from "./document-proposal-tool";
 import { formatAuthorityCommitSummary } from "./authority-result-summary";
+import { validateConfigResourceMutation } from "./config-mutation-validation";
 
 /**
  * 知识库文档路径正则：匹配 knowledge/ 下的 .md/.markdown/.mdown 文件
@@ -412,6 +413,19 @@ export function createWriteFileTool(
             isError: true,
           };
         }
+        const configValidation = validateConfigResourceMutation({
+          path: args.path,
+          content: args.content,
+          resources: snapshot?.resources,
+          resourcePaths: snapshot ? Object.keys(snapshot.state.resourceHashes ?? {}) : undefined,
+        });
+        if (configValidation) {
+          return {
+            content: [{ type: "text", text: `Error: ${configValidation.message}` }],
+            details: { path: args.path, error: configValidation.code, category: configValidation.category, issues: configValidation.details },
+            isError: true,
+          };
+        }
 
         if (liveWorkspace && snapshot) {
           const proposalResult = createManagedDocumentProposalResult({
@@ -439,29 +453,12 @@ export function createWriteFileTool(
                   kind: resourceKind,
                 },
                 args.content,
+                existing === null
+                  ? { expectedAbsent: true }
+                  : { expectedHash: crypto.createHash("sha256").update(existing).digest("hex") },
               );
-              receipt = {
-                committed: true as const,
-                mutationId: crypto.randomUUID(),
-                projectId: liveWorkspace.projectId,
-                workspaceId: liveWorkspace.workspaceId,
-                baseRevision: snapshot!.state.revision,
-                revision: writeResult.revision,
-                rootHash: "",
-                actor: "ai" as const,
-                resources: [
-                  {
-                    path: args.path,
-                    action: existing === null ? ("created" as const) : ("modified" as const),
-                    beforeHash: existing
-                      ? crypto.createHash("sha256").update(existing).digest("hex")
-                      : null,
-                    afterHash: writeResult.hash,
-                  },
-                ],
-                committedAt: Date.now(),
-              };
-              collabWriteSucceeded = true;
+              receipt = writeResult.receipt;
+              collabWriteSucceeded = Boolean(receipt);
             } catch (collabErr) {
               logger.warn(
                 { path: args.path, err: String(collabErr) },
@@ -596,7 +593,11 @@ export function createWriteFileTool(
         );
         return {
           content: [{ type: "text", text: `Error writing file: ${message}` }],
-          details: { path: args.path, error: message },
+          details: {
+            path: args.path,
+            error: message,
+            ...(error instanceof WorkspaceMutationAuthorityError ? (error.details ?? {}) : {}),
+          },
           isError: true,
         };
       }

@@ -18,7 +18,6 @@ import type {
 } from "../../../../components/demo";
 import { mergeConfigToProps } from "@/lib/runtime-props";
 import { resolveVisibility } from "@workbench/shared";
-import { stripConfigSchemaByType } from "@workbench/demo-ui";
 import { getDefaultValues } from "../../../../lib/validator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -177,13 +176,13 @@ export default function ViewerProjectPage() {
     );
   }, [data, visibilityResolution]);
   const visibleProjectConfigSchema = useMemo(
-    () => stripConfigSchemaByType(data?.projectConfigSchema, "business"),
+    () => data?.projectConfigSchema,
     [data?.projectConfigSchema],
   );
   const visiblePageSchemas = useMemo(() => {
     const next: Record<string, string | undefined> = {};
     for (const page of visiblePages) {
-      next[page.id] = stripConfigSchemaByType(page.schema, "business");
+      next[page.id] = page.schema;
     }
     return next;
   }, [visiblePages]);
@@ -258,25 +257,26 @@ export default function ViewerProjectPage() {
           if (activePage?.schema) {
             const defaults = initialConfigDataMap[initialPageId] || {};
             const urlConfig = urlConfigDataRef.current;
-            const safeUrlConfig = urlConfig
-              ? filterConfigValuesByType(
-                  result.data.projectConfigSchema,
-                  filterConfigValuesByType(activePage.schema, urlConfig, "business"),
-                  "business",
-                )
-              : undefined;
-            const merged = safeUrlConfig ? { ...defaults, ...safeUrlConfig } : defaults;
+            const sessionUrlConfig = urlConfig ? { ...urlConfig } : undefined;
+            const merged = sessionUrlConfig ? { ...defaults, ...sessionUrlConfig } : defaults;
             setConfigData(merged);
             initialConfigDataMap[initialPageId] = merged;
-            setVisibilitySessionOverrides(safeUrlConfig ?? {});
-          } else if (urlConfigDataRef.current) {
-            const safeUrlConfig = filterConfigValuesByType(
-              result.data.projectConfigSchema,
-              urlConfigDataRef.current,
-              "business",
+            setVisibilitySessionOverrides(
+              filterConfigValuesByType(
+                result.data.projectConfigSchema,
+                filterConfigValuesByType(activePage.schema, sessionUrlConfig ?? {}, "business"),
+                "business",
+              ),
             );
-            setConfigData(safeUrlConfig);
-            setVisibilitySessionOverrides(safeUrlConfig);
+          } else if (urlConfigDataRef.current) {
+            setConfigData({ ...urlConfigDataRef.current });
+            setVisibilitySessionOverrides(
+              filterConfigValuesByType(
+                result.data.projectConfigSchema,
+                urlConfigDataRef.current,
+                "business",
+              ),
+            );
           }
         }
 
@@ -355,24 +355,25 @@ export default function ViewerProjectPage() {
       switch (msg.type) {
         case "VIEWER_SET_CONFIG":
           if (msg.configData && typeof msg.configData === "object") {
-            const pageSafeConfigData = (data?.demoPages ?? []).reduce(
+            const sessionConfigData = { ...msg.configData };
+            const visibilityConfigData = (data?.demoPages ?? []).reduce(
               (values, page) => filterConfigValuesByType(page.schema, values, "business"),
-              { ...msg.configData },
+              sessionConfigData,
             );
-            const safeConfigData = filterConfigValuesByType(
+            const visibilityValues = filterConfigValuesByType(
               data?.projectConfigSchema,
-              pageSafeConfigData,
+              visibilityConfigData,
               "business",
             );
-            setConfigData((prev) => ({ ...prev, ...safeConfigData }));
+            setConfigData((prev) => ({ ...prev, ...sessionConfigData }));
             setConfigDataMap((prev) => {
               const next = { ...prev };
               for (const pageId of Object.keys(next)) {
-                next[pageId] = { ...next[pageId], ...safeConfigData };
+                next[pageId] = { ...next[pageId], ...sessionConfigData };
               }
               return next;
             });
-            setVisibilitySessionOverrides((prev) => ({ ...prev, ...safeConfigData }));
+            setVisibilitySessionOverrides((prev) => ({ ...prev, ...visibilityValues }));
           }
           break;
         case "VIEWER_SET_MODE":
@@ -677,7 +678,6 @@ export default function ViewerProjectPage() {
               onProjectConfigChange={handleProjectConfigChange}
               onPageConfigChange={handlePageConfigChange}
               requirements={visiblePages.find((page) => page.id === (previewMode === "single" ? activeDemoId : configPanelDetailPageId))?.requirements}
-              readonly
               hideDetailHeader={previewMode === "single"}
               requirementsPosition="beforeConfig"
             />

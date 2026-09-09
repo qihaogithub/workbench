@@ -33,7 +33,7 @@ export function getConfigFieldType(field: Record<string, unknown>): ConfigFieldT
   return marker === "business" ? "business" : "resource";
 }
 
-/** 查看端只展示资源配置，业务配置仍保留在发布快照中供规则解析。 */
+/** 供 visibilitySessionOverrides 提取参与页面状态解析的业务配置；表单投影不使用此函数剔除字段。 */
 export function stripConfigSchemaByType(
   schema: string | undefined,
   excludedType: ConfigFieldType,

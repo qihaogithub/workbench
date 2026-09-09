@@ -15,6 +15,8 @@
 - **不要声称预览已更新，除非你收到了对应 revision 的 projection ack（status=applied）**。文件提交成功不等于预览已渲染
 - **区分"文件已提交"（收到 receipt）和"预览已验证"（收到 projection ack applied）**。向用户汇报时明确说明当前状态：是"文件已提交，预览待刷新"还是"预览已确认更新"
 - 如果 mutation receipt 状态为 conflicted 或 rolled_back，必须告诉用户修改失败，不得声称修改成功
+- 计划审批只表示用户允许当前 run 按最终计划继续，不授予任何文件写入权限；普通 Schema、配置值和已注册页面资源仍按 Workspace Authority 的硬边界直接受管写入
+- 配置联动草稿必须在 `prepareConfigVisibilityDraft` 后，由用户确认实际草稿摘要，再调用 `commitConfigVisibilityDraft`；不要把计划审批或 `confirm: true` 当作用户授权凭证
 
 ## 用户审批计划与待办
 
@@ -44,6 +46,12 @@
 - 用户可能会编辑计划；工具返回的 `details.planMarkdown` 是最终批准版本，后续执行必须以它为准
 - 如果用户取消审批，停止当前任务并说明未执行
 - 计划获批后，再用 `updatePlan` 维护你自己的执行待办
+
+配置联动确认规则：
+
+- 普通页面/项目 `config.schema.json` 和 `config.values.json` 修改不需要计划审批；仍需通过 JSON、Schema、资源引用和现有 visibility 引用完整性校验
+- 只有会改动 `project.visibility-rules.json` 的跨文件行为变更才使用 `prepareConfigVisibilityDraft` / `commitConfigVisibilityDraft`
+- `commitConfigVisibilityDraft` 返回的 `permission_request`（`approvalKind: "config_visibility"`）展示的是实际草稿摘要；用户拒绝、草稿过期或 Workspace 基线变化时停止并重新准备，不得改走普通写入
 
 使用方式：
 
@@ -463,7 +471,7 @@ blocks.map(block => {
 - **页面删除**（`page-deletion`）：单体删除、批量删除流程。触发词：删除页面、移除页面、批量删除。
 - **高保真 React 页规范**（`react-high-fidelity`）：DemoProps 声明、@preview/sdk 导入、单一文件约束。触发词：高保真、React 页面、index.tsx。仅适用于新建/重写，不适用于运行时类型转换。
 - **页面运行时转换**（`page-runtime-conversion`）：prototype ↔ React 转换规范。触发词：转换页面运行时、切换为 React 页、切换为原型页，或原型页必须承载复合配置类型（例如 `format: "video"`）。后者是实现既有配置约束的必要步骤，无需另行请求计划审批。
-- **配置驱动行为**（`config-driven-behavior`）：配置字段与页面/区域状态联动。触发词：业务开关、配置联动、按条件隐藏、禁用或不可用页面/区域、一个配置影响多个页面。先读取该 skill，再用 `inspectConfigVisibility` 获取稳定 page/region ID；规则用 `validateConfigVisibility` 校验，需要时用 `explainConfigVisibility`、`repairConfigVisibility`、`migrateConfigVisibility` 诊断；跨文件修改必须先取得计划审批，再用 `prepareConfigVisibilityDraft` + `commitConfigVisibilityDraft` 一次性提交。普通生成、样式、组件、素材任务不得隐式新增/删除配置字段或规则；未取得规则提交 receipt 不得声称跨页面联动完成。
+- **配置驱动行为**（`config-driven-behavior`）：配置字段与页面/区域状态联动。触发词：业务开关、配置联动、按条件隐藏、禁用或不可用页面/区域、一个配置影响多个页面。先读取该 skill，再用 `inspectConfigVisibility` 获取稳定 page/region ID；规则用 `validateConfigVisibility` 校验，需要时用 `explainConfigVisibility`、`repairConfigVisibility`、`migrateConfigVisibility` 诊断；跨文件修改可先请求计划，但必须用 `prepareConfigVisibilityDraft` + `commitConfigVisibilityDraft` 一次性提交，并等待 `approvalKind: "config_visibility"` 的实际草稿确认。普通生成、样式、组件、素材任务不得隐式新增/删除配置字段或规则；未取得规则提交 receipt 不得声称跨页面联动完成。
 - **图片资源处理**（`image-handling`）：saveImage 用法、路径规则。触发词：保存图片、上传图片、图片引用。
 - **预览调试与画布管理**（`preview-tools`）：getConsoleLogs、可选 captureScreenshot、arrangeCanvasPages。触发词：调试预览、控制台日志、截图、整理画布；截图能力以当前工具目录和健康状态为准。
 - **项目记忆维护**（`memory-maintenance`）：memory.md 读取和更新规则。触发词：记住、偏好、以后都这样、memory.md。

@@ -15,6 +15,7 @@ import type {
   CommentTarget,
   DocumentCommentAnchor,
 } from "@workbench/shared";
+import type { CanvasViewportState } from "../types";
 
 /** @提及候选人 */
 export interface MentionCandidate {
@@ -52,10 +53,25 @@ export interface UpdateCommentContentInput {
   mentions?: CommentMention[];
 }
 
+/** 评论图片上传结果。正文中只保存返回的 canonical URL。 */
+export interface CommentImageUploadResult {
+  url: string;
+  kind: "image";
+  filename?: string;
+}
+
+export type CommentImageUploadHandler = (
+  file: File,
+) => Promise<CommentImageUploadResult>;
+
 /** 配置项批注浮窗的数据与写入能力；浏览端只提供 threads 并将 readOnly 设为 true。 */
 export interface ConfigCommentController {
   threads: CommentThread[];
   currentUser?: CommentAuthor | null;
+  /** 评论图片上传能力；浏览端只读时可省略。 */
+  uploadCommentImage?: CommentImageUploadHandler;
+  /** 将 canonical /api/images 地址解析到数据源 origin。 */
+  mediaBaseUrl?: string;
   mentionCandidates?: MentionCandidate[];
   canMentionAgent?: boolean;
   readOnly?: boolean;
@@ -96,6 +112,8 @@ export interface CommentApiAdapter {
   deleteThread(threadId: string): Promise<void>;
   /** 删除回复 */
   deleteReply(threadId: string, replyId: string): Promise<void>;
+  /** 上传评论图片并返回 canonical 图片地址。 */
+  uploadCommentImage: CommentImageUploadHandler;
   /** @AI 任务失败后重试（重新入队） */
   retryAiTask?(threadId: string): Promise<void>;
   /** @候选人列表（浏览端为访问者；创作端可含 AI） */
@@ -162,9 +180,15 @@ export interface CommentLayerProps {
   onRetryAiTask?: (threadId: string) => Promise<void>;
   /** 是否显示预览区评论标记，默认 true。 */
   showPins?: boolean;
+  /** 外部数据模式下覆盖 API 适配器的图片上传实现。 */
+  uploadCommentImage?: CommentImageUploadHandler;
+  /** 评论媒体地址前缀（viewer 跨 origin 时使用）。 */
+  mediaBaseUrl?: string;
   /** 由画布页面点击发起的创建草稿；输入框仍由本层在点击位置显示。 */
   canvasCreateDraft?: CanvasCommentDraft | null;
   onCanvasCreateDraftChange?: (draft: CanvasCommentDraft | null) => void;
+  /** 画布当前视口；传入后评论标记与浮窗按变换后的页面矩形重新定位。 */
+  canvasViewport?: CanvasViewportState;
 }
 
 /** 评论创建/定位所需的 iframe 视图状态 */

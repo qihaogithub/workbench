@@ -178,7 +178,7 @@ export function FieldRenderer({
   projectSharedSourceHint?: boolean;
 }) {
   const canEditValue = !readonly && (configItemCapabilities?.canEditValue ?? true);
-  const canEditDefinition = !readonly && !field.isConst && (!schemaFieldPath || schemaFieldPath === field.key)
+  const canEditDefinition = !readonly && !field.isConst
     && (configItemCapabilities?.canEditDefinition ?? Boolean(onEditConfigDefinition));
   // A read-only host still needs the entry point to inspect existing threads;
   // the popover controller owns whether write controls are available.

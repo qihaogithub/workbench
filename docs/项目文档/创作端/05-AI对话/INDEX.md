@@ -1,6 +1,6 @@
 # AI 对话模块 - 索引
 
-> 更新日期：2026-09-07
+> 更新日期：2026-09-09
 >
 > 组件位置说明：2026-07-21 起，AI 对话 UI 组件（原 `packages/author-site/src/components/ai-elements/`）整体迁移至共享包 `packages/ai-chat-shared/`（`@workbench/ai-chat-shared`），供创作端与使用端共用；author-site 保留 `ai-elements/index.ts` re-export 壳并在加载时注入创作端集成（AgentClient、静态 system prompt、L3/L4 上下文拉取，见 `src/lib/ai-chat-setup.ts`）。本模块技术文档中出现的 `ai-elements/` 源码路径按共享包内对应路径理解。
 >
@@ -20,7 +20,7 @@
 | :-------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
 | [01\_对话组件设计.md](./技术/01_对话组件设计.md)    | AIChat/HistoryDialog 组件设计、共享加号附件菜单、用户/对话级附件授权与账本关联、图片预览去重展示、DotMatrix 等待态、首轮自动标题、模型偏好、消息队列、会话 busy 防线、审批等待态与历史工具卡终态、可视化图层列表元素引用入口 |
 | [02_AIChat分层架构.md](./技术/02_AIChat分层架构.md) | AIChat 四层架构（Hooks/Service/Utils/UI）、WebSocket 事件、Conversation Command ACK/IndexedDB outbox 数据流、finish 文件快照、onSnapshotReady 回调与基于账本 revision 的编辑重发 |
-| [03_AI行为约束机制.md](./技术/03_AI行为约束机制.md) | AI 行为的**五层**约束机制、不可覆盖的服务端提示词安全骨架、受管 Markdown 的提案/Diff/审批与严格提交边界、服务端角色绑定、模板页/公约/设计规范写入防线、评论任务授权隔离、Agent 自主按需工具/Skill 加载与短能力目录、HTML/CSS 原型页优先、发送前协同草稿刷新、文件修改成功回流、写入后 preview validation、live Workspace bash 只读防线与子 Agent 委派防线、原型页配置绑定、知识库、Skills、子 Agent 与安全策略 |
+| [03_AI行为约束机制.md](./技术/03_AI行为约束机制.md) | AI 行为的**五层**约束机制、不可覆盖的服务端提示词安全骨架、受管 Markdown 的提案/Diff/审批与严格提交边界、服务端角色绑定、模板页/公约/设计规范写入防线、普通 Schema/配置值直写与契约校验、visibility 草稿专用确认、评论任务授权隔离、Agent 自主按需工具/Skill 加载与短能力目录、HTML/CSS 原型页优先、发送前协同草稿刷新、文件修改成功回流、写入后 preview validation、live Workspace bash 只读防线与子 Agent 委派防线、原型页配置绑定、知识库、Skills、子 Agent 与安全策略 |
 | [04_用户模型配置.md](./技术/04_用户模型配置.md)     | 用户自定义 OpenAI 兼容 API、API Key 加密存储、个人 provider 优先级、会话级配置同步                                                             |
 | [05_图片内容预描述.md](./技术/05_图片内容预描述.md) | 非多模态模型的图片转文本预处理、视觉模型配置、缓存与失败边界 |
 | [06_AI页面删除工具.md](./技术/06_AI页面删除工具.md) | AI 页面删除的确定性工具、用户确认、失败规则和编辑页同步                                                                                         |

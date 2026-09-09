@@ -35,6 +35,8 @@ export interface CommentPanelProps {
   commentPages?: CommentPageMeta[];
   /** 当前画布焦点页面，用于自动定位分组。 */
   focusedPageId?: string | null;
+  /** 评论正文中的 canonical 图片地址前缀（跨 origin viewer 使用）。 */
+  mediaBaseUrl?: string;
   className?: string;
 }
 
@@ -50,6 +52,7 @@ export function CommentPanel({
   groupByPage = false,
   commentPages = EMPTY_COMMENT_PAGES,
   focusedPageId = null,
+  mediaBaseUrl,
   className,
 }: CommentPanelProps) {
   return (
@@ -63,10 +66,11 @@ export function CommentPanel({
         groupByPage={groupByPage}
         commentPages={commentPages}
         focusedPageId={focusedPageId}
+        mediaBaseUrl={mediaBaseUrl}
         className="min-h-0 flex-1"
       />
       {canCreateComment && (
-        <div className="shrink-0 border-t border-border p-3">
+        <div className="shrink-0 border-t border-[#454545] bg-[#242424] p-3">
           <div className="flex items-center justify-center">
             <button
               type="button"
@@ -74,8 +78,8 @@ export function CommentPanel({
               className={cn(
                 "inline-flex h-7 shrink-0 items-center justify-center gap-1.5 rounded-md px-4 text-xs font-medium transition-colors",
                 commentMode
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "border border-border bg-background text-foreground hover:bg-muted",
+                  ? "bg-[#70bfff] text-[#13202d] hover:bg-[#8dceff]"
+                  : "border border-[#606060] bg-transparent text-[#f3f3f3] hover:bg-white/10",
               )}
             >
               <MessageSquarePlus className="h-3.5 w-3.5" />
@@ -83,7 +87,7 @@ export function CommentPanel({
             </button>
           </div>
           {commentMode && (
-            <p className="mt-2 text-center text-[10px] text-muted-foreground">
+            <p className="mt-2 text-center text-[10px] text-[#a8a8a8]">
               {createHint}
             </p>
           )}

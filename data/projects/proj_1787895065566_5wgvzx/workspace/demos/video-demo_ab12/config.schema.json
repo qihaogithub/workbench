@@ -11,6 +11,12 @@
   },
   "type": "object",
   "properties": {
+    "topImage": {
+      "type": "string",
+      "title": "顶部图片",
+      "format": "image",
+      "description": "显示在视频上方的展示图片，可选"
+    },
     "heroVideo": {
       "type": "object",
       "title": "主视频",

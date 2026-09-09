@@ -559,6 +559,30 @@ describe("ConfigForm configuration-definition entry", () => {
     expect(screen.getByPlaceholderText("请输入页面标题")).toBeDisabled();
   });
 
+  it("引用页禁止修改定义但允许编辑配置值", () => {
+    const onChange = vi.fn();
+    render(
+      <ConfigForm
+        schema={schema}
+        initialData={{ title: "原值" }}
+        onChange={onChange}
+        configItemCapabilities={{
+          canEditDefinition: false,
+          canEditValue: true,
+          canAddComment: true,
+          reason: "reference",
+        }}
+        onEditConfigDefinition={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText("请输入页面标题") as HTMLInputElement;
+    expect(input).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "编辑配置项：页面标题" })).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "会话值" } });
+    expect(onChange).toHaveBeenCalledWith({ title: "会话值" }, undefined);
+  });
+
   it("有批注时高亮批注标签且不显示数量", () => {
     render(
       <ConfigForm

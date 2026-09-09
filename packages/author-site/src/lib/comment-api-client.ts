@@ -45,6 +45,22 @@ async function commentRequest<T>(path: string, options: RequestInit = {}): Promi
   return body.data;
 }
 
+async function uploadCommentImage(path: string, file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(path, {
+    method: "POST",
+    body: form,
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  const body = (await res.json().catch(() => ({}))) as ApiEnvelope<{ url: string; imageId: string; filename?: string; kind: "image" }>;
+  if (!res.ok || body.success === false || !body.data?.url) {
+    throw new Error(body.error?.message || `图片上传失败 (${res.status})`);
+  }
+  return body.data;
+}
+
 /** 创建指定项目的评论 API 适配器（创作端，cookie 鉴权） */
 export function createAuthorCommentApi(projectId: string): CommentApiAdapter {
   const enc = encodeURIComponent(projectId);
@@ -112,6 +128,10 @@ export function createAuthorCommentApi(projectId: string): CommentApiAdapter {
         `${base}/${encodeURIComponent(threadId)}/replies/${encodeURIComponent(replyId)}`,
         { method: "DELETE" },
       );
+    },
+
+    async uploadCommentImage(file: File) {
+      return uploadCommentImage(`${base}/assets`, file);
     },
 
     async retryAiTask(threadId: string): Promise<void> {

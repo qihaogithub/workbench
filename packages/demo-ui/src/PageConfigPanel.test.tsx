@@ -638,6 +638,46 @@ describe("PageConfigPanel design-spec bubble", () => {
   });
 });
 
+describe("PageConfigPanel 引用页配置能力", () => {
+  it("允许编辑值并恢复默认，但隐藏定义编辑与保存为默认", () => {
+    const onPageConfigChange = vi.fn();
+    const onRestoreDefaults = vi.fn();
+    const onSaveAsDefaults = vi.fn();
+    const onPageDefinitionChange = vi.fn();
+
+    render(
+      <PageConfigPanel
+        pages={[{
+          id: "reference-page",
+          name: "引用页",
+          reference: { sourceProjectId: "source-project", sourcePageId: "source-page" },
+          schema: pageSchema,
+          configData: { cover: "/cover.png" },
+          configItemCapabilities: {
+            page: { canEditDefinition: false, canEditValue: true, canAddComment: true, reason: "reference" },
+          },
+        }]}
+        detailPageId="reference-page"
+        onPageConfigChange={onPageConfigChange}
+        onPageDefinitionChange={onPageDefinitionChange}
+        onRestoreDefaults={onRestoreDefaults}
+        onSaveAsDefaults={onSaveAsDefaults}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "更多配置操作" }));
+    expect(screen.getByText("恢复默认")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保存为默认" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "添加配置项" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "编辑配置项：封面" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("恢复默认"));
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
+    expect(onRestoreDefaults).toHaveBeenCalled();
+    expect(onPageDefinitionChange).not.toHaveBeenCalled();
+  });
+});
+
 describe("PageConfigPanel 配置语义分区", () => {
   it("按语义合并作用域，并为共享字段提供按需来源提示", () => {
     render(

@@ -76,7 +76,6 @@ import {
   CommentPanel,
   useComments,
   filterConfigValuesByType,
-  stripConfigSchemaByType,
 } from "@/components/demo";
 import type {
   PreviewMode,
@@ -995,15 +994,14 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
   }, [project, visibilityResolution]);
 
   const visibleProjectConfigSchema = useMemo(
-    () => stripConfigSchemaByType(project?.projectConfigSchema, "business"),
+    () => project?.projectConfigSchema,
     [project?.projectConfigSchema],
   );
   const visiblePageSchemaMap = useMemo(() => {
     const next: Record<string, string> = {};
     for (const page of visiblePages) {
       const schema = pageSchemaMap[page.id];
-      const sanitized = stripConfigSchemaByType(schema, "business");
-      if (sanitized) next[page.id] = sanitized;
+      if (schema) next[page.id] = schema;
     }
     return next;
   }, [pageSchemaMap, visiblePages]);
@@ -1115,6 +1113,7 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
     () => ({
       threads: commentsData.threads,
       currentUser: commentUser,
+      mediaBaseUrl: DATA_BASE,
       readOnly: true,
     }),
     [commentUser, commentsData.threads],
@@ -1814,6 +1813,7 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
           ? "点击画布页面后，直接添加页面级评论"
           : undefined
       }
+      mediaBaseUrl={DATA_BASE}
     />
   );
 
@@ -1924,6 +1924,7 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
                 api={commentApi}
                 wsUrl={commentWsUrl}
                 currentUser={commentUser}
+                mediaBaseUrl={DATA_BASE}
                 canMentionAgent={false}
                 disabled={false}
                 showToggle={false}
@@ -1942,6 +1943,7 @@ function ProjectPreviewPage({ projectId, requestedPageId }: { projectId: string;
                 showPins={!hasSchema || rightPanelTab === "comments"}
                 canvasCreateDraft={canvasCommentDraft}
                 onCanvasCreateDraftChange={setCanvasCommentDraft}
+                canvasViewport={previewMode === "canvas" ? canvasState.viewport : undefined}
               >
                 <PreviewStage
                   className="h-full bg-background"

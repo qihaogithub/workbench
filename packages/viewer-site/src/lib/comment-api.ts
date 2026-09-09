@@ -89,6 +89,20 @@ async function commentRequest<T>(path: string, options: RequestInit = {}): Promi
   return body.data;
 }
 
+async function uploadCommentImage(path: string, file: File): Promise<{ url: string; imageId: string; filename?: string; kind: "image" }> {
+  const form = new FormData();
+  form.append("file", file);
+  const identity = anonymousFields();
+  if (identity.anonymousId) form.append("anonymousId", identity.anonymousId);
+  if (identity.displayName) form.append("displayName", identity.displayName);
+  const token = getAuthToken();
+  const headers: Record<string, string> = token ? { "X-Auth-Token": token } : {};
+  const res = await fetch(`${DATA_BASE}${path}`, { method: "POST", body: form, headers, cache: "no-store" });
+  const body = (await res.json().catch(() => ({}))) as ApiEnvelope<{ url: string; imageId: string; filename?: string; kind: "image" }>;
+  if (!res.ok || body.success === false || !body.data?.url) throw new Error(body.error?.message || `图片上传失败 (${res.status})`);
+  return body.data;
+}
+
 /**
  * 未登录时附加匿名身份字段；已登录则返回空对象（服务端从 token 解析身份）。
  */
@@ -179,6 +193,10 @@ export function createCommentApi(projectId: string): CommentApiAdapter {
           body: JSON.stringify({ ...anonymousFields() }),
         },
       );
+    },
+
+    async uploadCommentImage(file: File) {
+      return uploadCommentImage(`${base}/assets`, file);
     },
 
     async listMentionCandidates(): Promise<MentionCandidate[]> {

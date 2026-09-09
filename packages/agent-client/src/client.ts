@@ -533,7 +533,7 @@ export interface StreamEvent {
       kind?: string;
       summary?: string;
       planId?: string;
-      approvalKind?: "delete" | "plan_approval";
+      approvalKind?: "delete" | "plan_approval" | "config_visibility";
       editable?: boolean;
       initialContent?: string;
     };

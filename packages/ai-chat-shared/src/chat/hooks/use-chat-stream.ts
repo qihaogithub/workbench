@@ -1220,7 +1220,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onPermission: (request) => {
-            if (request.toolCall.approvalKind === "plan_approval") {
+            if (request.toolCall.approvalKind === "plan_approval" || request.toolCall.approvalKind === "config_visibility") {
               // 计划审批会有意隐藏流式状态；先写 ref，避免宿主状态同步 effect
               // 把仍在等待用户选择的运行误判为终态。
               pendingPermissionRef.current = request;
@@ -1877,7 +1877,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       if (
         source === "user" &&
-        pendingPermissionRequest?.toolCall.approvalKind === "plan_approval"
+        (pendingPermissionRequest?.toolCall.approvalKind === "plan_approval" || pendingPermissionRequest?.toolCall.approvalKind === "config_visibility")
       ) {
         streamServiceRef.current?.sendPermissionResponse(
           pendingPermissionRequest.toolCall.toolCallId,
@@ -2000,7 +2000,7 @@ export function useChatStream(options: UseChatStreamOptions) {
           responseContent,
         );
         if (
-          pendingPermissionRequest.toolCall.approvalKind === "plan_approval"
+          pendingPermissionRequest.toolCall.approvalKind === "plan_approval" || pendingPermissionRequest.toolCall.approvalKind === "config_visibility"
         ) {
           activeRunRef.current = true;
           setIsStreaming(true);

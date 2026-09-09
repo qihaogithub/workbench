@@ -3204,6 +3204,40 @@ describe("sketch-react", () => {
     });
   });
 
+  it("anchors the image bubble to the image button and keeps its labels readable", async () => {
+    const emptyScene: SketchSceneDocument = {
+      version: 1,
+      pageSize: { width: 400, height: 300 },
+      nodes: [],
+    };
+    render(<ControlledSurfaceEditor initialScene={emptyScene} />);
+
+    const imageButton = screen.getByLabelText("图片");
+    imageButton.getBoundingClientRect = () =>
+      ({
+        left: 240,
+        top: 200,
+        width: 40,
+        height: 40,
+        right: 280,
+        bottom: 240,
+        x: 240,
+        y: 200,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    fireEvent.click(imageButton);
+
+    const imageMenu = await screen.findByRole("menu", { name: "图片工具菜单" });
+    await waitFor(() => {
+      expect(imageMenu.style.left).toBe("260px");
+      expect(imageMenu.style.top).toBe("192px");
+      expect(imageMenu.style.transform).toBe("translate(-50%, -100%)");
+    });
+    expect(imageMenu.className).toContain("text-slate-900");
+    expect(within(imageMenu).getByRole("menuitem", { name: "上传图片" }).className).toContain("text-slate-700");
+  });
+
   it("keeps AI placeholders out of scene data and commits a generated batch as one undo step", async () => {
     const emptyScene: SketchSceneDocument = {
       version: 1,

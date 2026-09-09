@@ -34,4 +34,12 @@ describe("viewer config panel contract", () => {
     expect(viewerAppSource).toContain("configComments={configCommentController}");
     expect(viewerAppSource).toContain("readOnly: true");
   });
+
+  it("浏览端投影完整普通 Schema，值变更只把业务子集送入可见性覆盖", () => {
+    expect(viewerAppSource).not.toContain("stripConfigSchemaByType");
+    expect(viewerAppSource).toContain("() => project?.projectConfigSchema");
+    expect(viewerAppSource).toContain("if (schema) next[page.id] = schema;");
+    expect(viewerAppSource).toContain("filterConfigValuesByType(");
+    expect(viewerAppSource).toContain("setVisibilitySessionOverrides");
+  });
 });

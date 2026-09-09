@@ -18,6 +18,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -35,6 +36,7 @@ import { CommentPin } from "./CommentPin";
 import { CommentSidebar } from "./CommentSidebar";
 import { CommentThreadPopover } from "./CommentThreadPopover";
 import {
+  computeCanvasPinPosition,
   computePrototypePinPosition,
   computePrototypePinRatio,
 } from "./pin-layout";
@@ -82,6 +84,21 @@ function findPrototypeRoot(container: HTMLElement): HTMLElement | null {
   const host = container.querySelector<HTMLElement>("[data-prototype-preview]");
   if (!host?.shadowRoot) return null;
   return host.shadowRoot.querySelector<HTMLElement>(".prototype-root");
+}
+
+/** 查找当前画布中的页面元素；页面 ID 作为属性值比较，避免拼接 CSS 选择器。 */
+function findCanvasPage(
+  container: HTMLElement,
+  pageId: string,
+): HTMLElement | null {
+  const canvasRoot = container.querySelector<HTMLElement>("[data-canvas-root]");
+  if (!canvasRoot) return null;
+  if (canvasRoot.getAttribute("data-page-id") === pageId) return canvasRoot;
+  const pages = canvasRoot.querySelectorAll<HTMLElement>("[data-page-id]");
+  for (const page of pages) {
+    if (page.getAttribute("data-page-id") === pageId) return page;
+  }
+  return null;
 }
 
 /** 计算元素相对原型根节点的 CSS 选择器路径 */
@@ -193,6 +210,9 @@ export function CommentLayer({
   showPins = true,
   canvasCreateDraft,
   onCanvasCreateDraftChange,
+  canvasViewport,
+  uploadCommentImage,
+  mediaBaseUrl,
 }: CommentLayerProps) {
   const areaRef = useRef<HTMLDivElement>(null);
   const [iframeEl, setIframeEl] = useState<HTMLIFrameElement | null>(null);
@@ -314,6 +334,19 @@ export function CommentLayer({
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [disabled]);
+
+  /* ---------------- 画布视口变化 → 变换提交后重算 pin 位置 ---------------- */
+  useLayoutEffect(() => {
+    if (disabled || !canvasViewport) return;
+    // CanvasViewport 在子树中先提交 transform，随后本层在 layout effect 触发一次
+    // 重渲染，从而读取包含最新平移/缩放的页面 getBoundingClientRect()。
+    setLayoutVersion((version) => version + 1);
+  }, [
+    canvasViewport?.x,
+    canvasViewport?.y,
+    canvasViewport?.zoom,
+    disabled,
+  ]);
 
   /* ---------------- iframe 消息监听 ---------------- */
   const handleCommentClick = useCallback(
@@ -583,6 +616,28 @@ export function CommentLayer({
     const container = areaRef.current;
     if (!container) return new Map<string, { left: number; top: number }>();
 
+    // 画布页的 DOM 位于 CanvasViewport 变换层内。页面元素的矩形已经包含
+    // 当前 viewport，因此必须优先走该分支，不能把画布里的嵌套原型页当作
+    // 单页 prototype-root 处理。
+    if (canvasViewport) {
+      const containerRect = container.getBoundingClientRect();
+      const map = new Map<string, { left: number; top: number }>();
+      for (const thread of threads) {
+        if (!thread.pin || thread.target.kind !== "page") continue;
+        const page = findCanvasPage(container, thread.target.pageId);
+        if (!page) continue;
+        map.set(
+          thread.id,
+          computeCanvasPinPosition({
+            containerRect,
+            pageRect: page.getBoundingClientRect(),
+            pin: thread.pin,
+          }),
+        );
+      }
+      return map;
+    }
+
     // 原型页（无 iframe）：用 root 的滚动内容定位，自动跟随滚动/缩放
     const protoRoot = findPrototypeRoot(container);
     if (protoRoot) {
@@ -634,7 +689,15 @@ export function CommentLayer({
       });
     }
     return map;
-  }, [threads, viewState, iframeEl, protoHostEl, layoutVersion]);
+  }, [
+    threads,
+    viewState,
+    iframeEl,
+    protoHostEl,
+    canvasViewport,
+    pageId,
+    layoutVersion,
+  ]);
 
   /* ---------------- 提交创建评论 ---------------- */
   const handleSubmitCreate = useCallback(
@@ -650,12 +713,32 @@ export function CommentLayer({
     [threads, activeThreadId],
   );
   const activeThreadPos = activeThread ? pinPositions.get(activeThread.id) : undefined;
-  const canvasPopoverPosition = canvasCreateDraft && areaRef.current
-    ? {
-        left: canvasCreateDraft.clientX - areaRef.current.getBoundingClientRect().left,
-        top: canvasCreateDraft.clientY - areaRef.current.getBoundingClientRect().top + 14,
+  const canvasPopoverPosition = useMemo(() => {
+    const container = areaRef.current;
+    if (!canvasCreateDraft || !container) return null;
+
+    if (canvasViewport && canvasCreateDraft.input.pin) {
+      const target = canvasCreateDraft.input.target;
+      const targetPageId = target.kind === "page" ? target.pageId : pageId;
+      const page = findCanvasPage(container, targetPageId);
+      if (page) {
+        const position = computeCanvasPinPosition({
+          containerRect: container.getBoundingClientRect(),
+          pageRect: page.getBoundingClientRect(),
+          pin: canvasCreateDraft.input.pin,
+        });
+        return { left: position.left, top: position.top + 14 };
       }
-    : null;
+    }
+
+    // 仅作为页面尚未挂载或旧数据缺少 pin 时的降级；正常画布定位始终
+    // 使用页面归一化坐标，以便视口平移/缩放后重新计算。
+    const containerRect = container.getBoundingClientRect();
+    return {
+      left: canvasCreateDraft.clientX - containerRect.left,
+      top: canvasCreateDraft.clientY - containerRect.top + 14,
+    };
+  }, [canvasCreateDraft, canvasViewport, pageId, layoutVersion]);
 
   const unresolvedCount = threads.filter((t) => !t.resolved).length;
 
@@ -675,6 +758,7 @@ export function CommentLayer({
             canMentionAgent={canMentionAgent}
             left={canvasPopoverPosition.left}
             top={canvasPopoverPosition.top}
+            uploadCommentImage={uploadCommentImage ?? api.uploadCommentImage}
             onCancel={() => onCanvasCreateDraftChange?.(null)}
             onSubmit={async (input) => {
               await handleSubmitCreate(input);
@@ -716,6 +800,7 @@ export function CommentLayer({
             canMentionAgent={canMentionAgent}
             left={createDraft.left}
             top={createDraft.top}
+            uploadCommentImage={uploadCommentImage ?? api.uploadCommentImage}
             onCancel={() => setCreateDraft(null)}
             onSubmit={handleSubmitCreate}
           />
@@ -729,6 +814,8 @@ export function CommentLayer({
             canMentionAgent={canMentionAgent}
             left={activeThreadPos.left}
             top={activeThreadPos.top + 20}
+            uploadCommentImage={uploadCommentImage ?? api.uploadCommentImage}
+            mediaBaseUrl={mediaBaseUrl}
             onClose={() => updateActiveThreadId(null)}
             onAddReply={addReply}
             onUpdateComment={updateComment}
@@ -797,6 +884,7 @@ export function CommentLayer({
             updateCommentMode(false);
           }}
           onClose={() => setSidebarOpen(false)}
+          mediaBaseUrl={mediaBaseUrl}
           className="w-72 shrink-0 border-l border-border"
         />
       )}

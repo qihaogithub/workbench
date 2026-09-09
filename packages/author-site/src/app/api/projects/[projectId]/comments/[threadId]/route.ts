@@ -6,7 +6,7 @@ import {
   updateCommentThread,
   deleteCommentThread,
 } from "@/lib/comment-store";
-import { resolveCommentAuthor, canModify } from "@/lib/comment-auth";
+import { resolveCommentAuthor, canModify, canEditOrDeleteComment } from "@/lib/comment-auth";
 
 type RouteParams = { params: Promise<{ projectId: string; threadId: string }> };
 
@@ -43,7 +43,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    if (!canModify(authorResult, thread.author.id)) {
+    const contentMutation = typeof body.content === "string" || body.mentions !== undefined;
+    const canChange = contentMutation
+      ? canEditOrDeleteComment(authorResult, thread.author.id)
+      : canModify(authorResult, thread.author.id);
+    if (!canChange) {
       return NextResponse.json(createApiError("FORBIDDEN", "无权修改此评论"), {
         status: 403,
       });
@@ -100,7 +104,7 @@ interface DeleteBody {
 
 /**
  * DELETE /api/projects/[projectId]/comments/[threadId]
- * 删除评论线程（作者本人或管理员）
+ * 删除评论线程（仅评论发送者本人）
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const { projectId, threadId } = await params;
@@ -128,7 +132,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    if (!canModify(authorResult, thread.author.id)) {
+    if (!canEditOrDeleteComment(authorResult, thread.author.id)) {
       return NextResponse.json(createApiError("FORBIDDEN", "无权删除此评论"), {
         status: 403,
       });

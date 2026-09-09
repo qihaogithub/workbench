@@ -1,7 +1,12 @@
 {
   "version": 1,
-  "entry": "",
-  "pages": {},
+  "entry": "page",
+  "pages": {
+    "page": {
+      "pageId": "video-demo_ab12",
+      "title": "视频展示页面"
+    }
+  },
   "actions": [],
   "state": {}
 }

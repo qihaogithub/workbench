@@ -63,7 +63,7 @@ export function createDeleteFileTool(
         };
       }
 
-      const mutationDecision = assertAiMutationAllowed(config, relativePath);
+      const mutationDecision = assertAiMutationAllowed(config, relativePath, { operation: "delete" });
       if (!mutationDecision.allowed) return aiMutationDeniedResult(mutationDecision, relativePath);
 
       if (isProtectedPath(relativePath)) {
