@@ -26,7 +26,7 @@ import {
   WorkspaceMutationAuthorityError,
   type WorkspaceAuthoritySnapshot,
 } from "../../workspace/workspace-mutation-authority";
-import { aiMutationDeniedResult, assertAiMutationAllowed, hasApprovedVisibilityPlan } from "./ai-mutation-policy";
+import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 import { formatAuthorityCommitSummary } from "./authority-result-summary";
 import { validatePreviewFileWrite } from "./preview-validation";
 import {
@@ -154,12 +154,64 @@ export interface VisibilityDraftImpact {
   validationIssues: VisibilityValidationIssue[];
 }
 
-const drafts = new Map<string, DraftRecord>();
+const drafts = new Map<string, DraftRecordWithApproval>();
+
+export interface ConfigVisibilityApprovalRequest {
+  draftId: string;
+  title?: string;
+  summary: string;
+  impact: VisibilityDraftImpact;
+}
+
+export type ConfigVisibilityApprovalHandler = (
+  toolCallId: string,
+  request: ConfigVisibilityApprovalRequest,
+  signal?: AbortSignal,
+) => Promise<boolean>;
+
+interface ConfigVisibilityApprovalRecord {
+  approvalId: string;
+  approvalKind: "config_visibility";
+  draftId: string;
+  payloadHash: string;
+  sessionId: string;
+  projectId: string;
+  workspaceId: string;
+  approverUserId: string;
+  approverRole: "admin" | "editor";
+  authorizationSource: string;
+  baseRevision: number;
+  baseRootHash: string;
+  createdAt: number;
+  expiresAt: number;
+  consumedAt?: number;
+}
+
+interface DraftRecordWithApproval extends DraftRecord {
+  approval?: ConfigVisibilityApprovalRecord;
+}
 
 function failedDraftDirectory(workspaceId: string): string {
   const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
   const workspaceKey = crypto.createHash("sha256").update(workspaceId).digest("hex").slice(0, 32);
   return path.join(dataDir, "agent-visibility-drafts", workspaceKey, "failed");
+}
+
+function approvalDirectory(workspaceId: string): string {
+  const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
+  const workspaceKey = crypto.createHash("sha256").update(workspaceId).digest("hex").slice(0, 32);
+  return path.join(dataDir, "agent-visibility-drafts", workspaceKey, "approvals");
+}
+
+function persistApprovalRecord(record: ConfigVisibilityApprovalRecord): boolean {
+  try {
+    const directory = approvalDirectory(record.workspaceId);
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, `${record.approvalId}.json`), `${JSON.stringify(record, null, 2)}\n`, "utf8");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function persistFailedDraft(
@@ -759,7 +811,7 @@ export function createPrepareConfigVisibilityDraftTool(config: AgentConfig): Age
           impact,
           expiresAt: Date.now() + DRAFT_TTL_MS,
         });
-        return success(`已准备配置联动草稿 ${id}。Workspace 尚未改变；请在用户确认计划后调用 commitConfigVisibilityDraft。`, {
+        return success(`已准备配置联动草稿 ${id}。Workspace 尚未改变；提交前需要用户确认这份具体草稿。`, {
           success: true,
           status: "awaiting_approval",
           draftId: id,
@@ -777,13 +829,16 @@ export function createPrepareConfigVisibilityDraftTool(config: AgentConfig): Age
   };
 }
 
-export function createCommitConfigVisibilityDraftTool(config: AgentConfig): AgentTool<typeof CommitVisibilityDraftParams> {
+export function createCommitConfigVisibilityDraftTool(
+  config: AgentConfig,
+  approvalHandler?: ConfigVisibilityApprovalHandler,
+): AgentTool<typeof CommitVisibilityDraftParams> {
   return {
     name: "commitConfigVisibilityDraft",
     label: "Commit Config Visibility Draft",
-    description: "Commit a previously prepared configuration behavior draft as one Workspace Mutation Authority transaction. Requires confirm=true after the user approved the plan.",
+    description: "Commit a previously prepared configuration behavior draft as one Workspace Mutation Authority transaction. Requires confirm=true and explicit approval of this exact draft.",
     parameters: CommitVisibilityDraftParams,
-    execute: async (_toolCallId: string, args: CommitVisibilityDraftParams) => {
+    execute: async (toolCallId: string, args: CommitVisibilityDraftParams, signal?: AbortSignal) => {
       if (!args.confirm) return failure("提交配置联动草稿前必须提供 confirm=true", { error: "confirmation_required" });
       pruneDrafts();
       const draft = drafts.get(args.draftId);
@@ -799,9 +854,10 @@ export function createCommitConfigVisibilityDraftTool(config: AgentConfig): Agen
             error: "draft_base_conflict",
             expectedRevision: draft.baseRevision,
             actualRevision: snapshot.state.revision,
+            expectedRootHash: draft.baseRootHash,
+            actualRootHash: snapshot.state.rootHash,
           });
         }
-        if (!hasApprovedVisibilityPlan(config)) return failure("配置联动草稿缺少当前会话的已批准计划，请重新请求计划审批", { error: "visibility_plan_approval_required" });
         for (const operation of draft.operations) {
           if (operation.type !== "put_text") continue;
           const pageMatch = /^demos\/([^/]+)\//.exec(operation.path);
@@ -812,19 +868,79 @@ export function createCommitConfigVisibilityDraftTool(config: AgentConfig): Agen
           });
           if (!decision.allowed) return aiMutationDeniedResult(decision, operation.path);
         }
+        const auth = config.authorAuthorization;
+        if (!auth || !auth.userId || !auth.role || auth.expiresAt <= Date.now() || auth.projectId !== draft.projectId) {
+          return failure("配置联动草稿需要有效的 author 会话确认", { error: "unverified" });
+        }
+        const payloadHash = hashWorkspaceContent(JSON.stringify(draft.operations));
+        let approval = draft.approval;
+        if (approval && (
+          approval.expiresAt <= Date.now()
+          || approval.payloadHash !== payloadHash
+          || approval.sessionId !== config.sessionId
+          || approval.projectId !== draft.projectId
+          || approval.workspaceId !== draft.workspaceId
+          || approval.baseRevision !== draft.baseRevision
+          || approval.baseRootHash !== draft.baseRootHash
+          || approval.approverUserId !== auth.userId
+          || approval.approverRole !== auth.role
+          || approval.authorizationSource !== auth.source
+        )) {
+          approval = undefined;
+          draft.approval = undefined;
+        }
+        if (!approval) {
+          if (!approvalHandler) return failure("配置联动草稿确认不可用，请重新打开创作端会话", { error: "approval_unavailable" });
+          const approved = await approvalHandler(toolCallId, {
+            draftId: draft.id,
+            title: "确认配置联动草稿",
+            summary: JSON.stringify({ draftId: draft.id, changedPaths: draft.changedPaths, impact: draft.impact }, null, 2),
+            impact: draft.impact,
+          }, signal);
+          if (!approved) return failure("用户未批准这份配置联动草稿", { error: "config_visibility_approval_rejected", draftId: draft.id });
+          const approvedBy = config.authorAuthorization;
+          if (!approvedBy || !approvedBy.userId || !approvedBy.role || approvedBy.expiresAt <= Date.now()
+            || approvedBy.userId !== auth.userId || approvedBy.role !== auth.role
+            || approvedBy.projectId !== draft.projectId || approvedBy.source !== auth.source) {
+            return failure("配置联动草稿确认期间 author 会话已变化或过期，请重新准备", { error: "approval_authorization_changed", draftId: draft.id });
+          }
+          approval = {
+            approvalId: `config_visibility_approval_${crypto.randomBytes(8).toString("hex")}`,
+            approvalKind: "config_visibility",
+            draftId: draft.id,
+            payloadHash,
+            sessionId: config.sessionId,
+            projectId: draft.projectId,
+            workspaceId: draft.workspaceId,
+            approverUserId: approvedBy.userId,
+            approverRole: approvedBy.role,
+            authorizationSource: approvedBy.source,
+            baseRevision: draft.baseRevision,
+            baseRootHash: draft.baseRootHash,
+            createdAt: Date.now(),
+            expiresAt: Date.now() + DRAFT_TTL_MS,
+          };
+          draft.approval = approval;
+          if (!persistApprovalRecord(approval)) {
+            draft.approval = undefined;
+            return failure("无法持久化配置联动确认记录，未提交 Workspace", { error: "approval_persist_failed", draftId: draft.id });
+          }
+        }
         const request: WorkspaceMutationRequest = {
           mutationId: crypto.randomUUID(),
           projectId: draft.projectId,
           workspaceId: draft.workspaceId,
           sessionId: config.sessionId,
           baseRevision: draft.baseRevision,
+          baseRootHash: draft.baseRootHash,
           actor: "ai",
           reason: "config_visibility_draft_commit",
           operations: draft.operations,
         };
         const receipt = await context.live.authority.mutate(request);
+        approval.consumedAt = Date.now();
+        persistApprovalRecord(approval);
         drafts.delete(draft.id);
-        config.visibilityPlanApproval = undefined;
         return success(`配置联动草稿已原子提交，mutationId=${receipt.mutationId}，revision=${receipt.revision}${formatAuthorityCommitSummary(receipt)}`, {
           success: true,
           status: "committed",
@@ -833,7 +949,11 @@ export function createCommitConfigVisibilityDraftTool(config: AgentConfig): Agen
         });
       } catch (error) {
         const code = error instanceof WorkspaceMutationAuthorityError ? error.code : "WORKSPACE_MUTATION_FAILED";
-        return failure(error instanceof Error ? error.message : code, { error: code, draftId: draft.id });
+        return failure(error instanceof Error ? error.message : code, {
+          error: code,
+          draftId: draft.id,
+          ...(error instanceof WorkspaceMutationAuthorityError ? (error.details ?? {}) : {}),
+        });
       }
     },
   };

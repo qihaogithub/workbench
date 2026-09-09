@@ -18,7 +18,9 @@ export function formatAuthorityCommitSummary(
     !isRecord(receipt) ||
     receipt.committed !== true ||
     typeof receipt.revision !== "number" ||
-    !Number.isFinite(receipt.revision)
+    !Number.isFinite(receipt.revision) ||
+    typeof receipt.rootHash !== "string" ||
+    receipt.rootHash.length === 0
   ) {
     return "";
   }

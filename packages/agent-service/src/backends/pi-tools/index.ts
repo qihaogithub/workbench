@@ -83,8 +83,9 @@ import {
   createRepairConfigVisibilityTool,
   createValidateConfigVisibilityTool,
 } from "./visibility-tools";
+import type { ConfigVisibilityApprovalHandler } from "./visibility-tools";
 
-export const WORKBENCH_TOOL_VERSION = 33;
+export const WORKBENCH_TOOL_VERSION = 34;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
@@ -99,6 +100,7 @@ export interface WorkbenchToolsOptions {
   subagentRunner?: SubagentRunner;
   includePlanApproval?: boolean;
   planApprovalHandler?: PlanApprovalHandler;
+  configVisibilityApprovalHandler?: ConfigVisibilityApprovalHandler;
   includeUserChoice?: boolean;
   userChoiceHandler?: UserChoiceHandler;
   mode?: "workbench" | "viewer-readonly";
@@ -220,7 +222,7 @@ export function createWorkbenchTools(
     createRepairConfigVisibilityTool(config),
     createMigrateConfigVisibilityTool(config),
     createPrepareConfigVisibilityDraftTool(config),
-    createCommitConfigVisibilityDraftTool(config),
+    createCommitConfigVisibilityDraftTool(config, options.configVisibilityApprovalHandler),
     createActivateCapabilitiesTool(options.capabilityActivationHandler),
     createArrangeCanvasPagesTool(config),
     ...(WHITEBOARD_TOOLS_ENABLED

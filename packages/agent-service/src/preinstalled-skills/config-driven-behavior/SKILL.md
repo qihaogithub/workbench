@@ -21,7 +21,7 @@ description: 业务配置驱动页面可见性与区域状态的实现规范：�
 1. 读取 `page-lifecycle`、`react-high-fidelity` 或 `page-runtime-conversion`，确认页面目录、运行时和配置 schema 语义。
 2. 先调用 `inspectConfigVisibility` 获取权威 page ID、页面 schema 字段和源码声明的 region ID；不要根据页面标题猜测目标。
 3. 检查项目级 schema 是否声明来源字段，并在页面代码中为需要区域联动的容器保留稳定 `data-region-id`。
-4. 先调用 `validateConfigVisibility` 校验候选规则；需要解释、修复或迁移既有规则时使用 `explainConfigVisibility`、`repairConfigVisibility`、`migrateConfigVisibility`，它们不写工作区。跨文件变更先请求包含本 Skill 名称的计划审批，再用 `prepareConfigVisibilityDraft` 生成私有草稿，最后以 `confirm: true` 调用 `commitConfigVisibilityDraft`。该提交会把代码、Schema、配置值和规则作为一条 Authority mutation 写入；失败草稿必须保留诊断，不得触碰已发布版本。
+4. 先调用 `validateConfigVisibility` 校验候选规则；需要解释、修复或迁移既有规则时使用 `explainConfigVisibility`、`repairConfigVisibility`、`migrateConfigVisibility`，它们不写工作区。跨文件变更可由 AI 自主决定是否先请求计划，但计划批准不授予写入权限；用 `prepareConfigVisibilityDraft` 生成私有草稿，随后由用户确认实际草稿摘要，再以 `confirm: true` 调用 `commitConfigVisibilityDraft`。该提交会把代码、Schema、配置值和规则作为一条 Authority mutation 写入；失败草稿必须保留诊断，不得触碰已发布版本。
 5. 用共享 resolver 在创作端预览中计算状态：创作端保留页面卡片并置灰提示，页面配置表仍可编辑；不要在配置面板中新增跨页面规则编辑器。
 6. 发布前执行规则与导航可达性校验；指向条件隐藏页面的链接是允许发布的提示项，只有规则无效或发布后不存在任何可用页面才阻断。规则只写入独立不可变资产，发布清单保存路径、版本和内容哈希，禁止在清单中再嵌一份规则正文。
 7. 使用端校验规则资产哈希和版本后再解析；规则无效或被篡改时 fail-closed。隐藏不可见页面，业务配置和规则不可编辑；旧链接指向不可见/不可用页面时优先使用规则声明且当前可用的备用页/替代区域，否则回退到第一个可用页面并给出规则消息。

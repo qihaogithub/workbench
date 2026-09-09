@@ -256,8 +256,8 @@ export interface SketchEditorToolbarProps extends SketchEditorPartProps {
   brushToolbarMode?: SketchBrushToolbarMode;
   /** Opens the canvas-owned image picker and inserts the selected file. */
   onImageUpload: () => void;
-  /** Opens a host-provided image action menu when present. */
-  onImageMenu?: () => void;
+  /** Opens a host-provided image action menu when present, anchored to the image button. */
+  onImageMenu?: (anchor: HTMLElement) => void;
 }
 
 export interface SketchLayerPanelProps extends SketchEditorPartProps {

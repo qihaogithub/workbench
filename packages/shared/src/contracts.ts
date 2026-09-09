@@ -167,6 +167,8 @@ export interface WorkspaceMutationRequest {
   workspaceId: string;
   sessionId?: string;
   baseRevision: WorkspaceRevision;
+  /** Optional frozen root cursor for workflows that approve a complete snapshot. */
+  baseRootHash?: string;
   actor: WorkspaceMutationActor;
   reason: string;
   operations: WorkspaceMutationOperation[];

@@ -136,6 +136,29 @@ describe('PermissionManager', () => {
       expect(manager.hasPendingPermissions()).toBe(false);
     });
   });
+
+  describe('requestConfigVisibilityApproval', () => {
+    it('发出绑定实际草稿摘要的专用确认事件，不写入计划状态', async () => {
+      const promise = manager.requestConfigVisibilityApproval('visibility-1', {
+        draftId: 'draft-1',
+        summary: '{"draftId":"draft-1"}',
+        impact: {
+          changedPaths: ['project.visibility-rules.json'],
+          affectedPages: ['member'],
+          affectedRegions: [],
+          hiddenPagesAtPublishedDefaults: [],
+          disabledPagesAtPublishedDefaults: [],
+          unavailablePagesAtPublishedDefaults: [],
+          validationIssues: [],
+        },
+      });
+      expect((events[0] as any).permissionRequest.toolCall.approvalKind).toBe('config_visibility');
+      expect((events[0] as any).permissionRequest.toolCall.summary).toContain('draft-1');
+      manager.resolvePermission('visibility-1', true);
+      await expect(promise).resolves.toBe(true);
+      expect((config as any).visibilityPlanApproval).toBeUndefined();
+    });
+  });
 });
 
 describe('isKnowledgeBasePath', () => {

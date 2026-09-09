@@ -196,7 +196,7 @@ export class BackendAgent extends BaseAgent {
       this.on(evt, resetInactivityTimer);
     }
     const onPermissionRequest = (event: import("./types").PermissionRequestEvent) => {
-      if (event.permissionRequest.toolCall.approvalKind === "plan_approval") {
+      if (event.permissionRequest.toolCall.approvalKind === "plan_approval" || event.permissionRequest.toolCall.approvalKind === "config_visibility") {
         pauseExecutionTimersForApproval(event.permissionRequest.toolCall.toolCallId);
       }
     };

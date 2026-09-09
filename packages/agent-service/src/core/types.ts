@@ -64,13 +64,6 @@ export interface AgentConfig {
    */
   authorAuthorization?: AgentAuthorAuthorization | null;
 
-  /** One-shot approval proof for configuration schema/value/visibility mutations. */
-  visibilityPlanApproval?: {
-    planMarkdown: string;
-    approvedAt: number;
-    expiresAt: number;
-  };
-
   piAgent?: PiAgentConfig;
 }
 
@@ -326,7 +319,7 @@ export interface PermissionRequestEvent {
       kind?: string;
       summary?: string;
       planId?: string;
-      approvalKind?: "delete" | "plan_approval";
+      approvalKind?: "delete" | "plan_approval" | "config_visibility";
       editable?: boolean;
       initialContent?: string;
     };

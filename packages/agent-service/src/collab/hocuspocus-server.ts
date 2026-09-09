@@ -2,6 +2,7 @@ import { Hocuspocus } from "@hocuspocus/server";
 import type { WebSocketLike } from "@hocuspocus/server";
 import type WebSocket from "ws";
 import type { IncomingMessage } from "node:http";
+import crypto from "node:crypto";
 
 import type { CollabResourceKind } from "@workbench/shared/contracts";
 import type { WorkspaceMutationRequest } from "@workbench/shared/contracts";
@@ -13,6 +14,7 @@ import type { CollabConnectionContext } from "./extensions/session-auth";
 import { WorkspaceFilePersistence } from "./workspace-file-persistence";
 import { CollabStateStore } from "./collab-state-store";
 import { registerCollabDraftProvider } from "../workspace/workspace-mutation-authority";
+import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 1000;
 const DEFAULT_MAX_DEBOUNCE_MS = 10_000;
@@ -42,6 +44,7 @@ export interface RoomDescriptor {
 export class HocuspocusCollabServer {
   readonly hocuspocus: Hocuspocus<CollabConnectionContext>;
   readonly persistence: WorkspaceFilePersistence;
+  private readonly authorityPersistence: AuthorityPersistenceExtension;
   private readonly unregisterDraftProvider: () => void;
 
   constructor(persistence = new WorkspaceFilePersistence()) {
@@ -49,6 +52,7 @@ export class HocuspocusCollabServer {
 
     const stateStore = new CollabStateStore(persistence.dataDir);
 
+    this.authorityPersistence = new AuthorityPersistenceExtension(persistence, stateStore);
     this.hocuspocus = new Hocuspocus<CollabConnectionContext>({
       name: "workbench-collab",
       debounce: Number(
@@ -60,7 +64,7 @@ export class HocuspocusCollabServer {
       unloadImmediately: true,
       extensions: [
         new SessionAuthExtension(persistence),
-        new AuthorityPersistenceExtension(persistence, stateStore),
+        this.authorityPersistence,
       ],
     });
 
@@ -199,7 +203,8 @@ export class HocuspocusCollabServer {
   async writeToResource(
     descriptor: RoomDescriptor,
     content: string,
-  ): Promise<{ revision: number; hash: string }> {
+    precondition: { expectedHash?: string; expectedAbsent?: boolean } = {},
+  ): Promise<{ revision: number; hash: string; receipt?: WorkspaceMutationReceipt }> {
     const validation = this.persistence.validateSession(descriptor);
     if (!validation.ok || !validation.workspacePath) {
       throw new Error(validation.reason || "COLLAB_FORBIDDEN");
@@ -233,6 +238,16 @@ export class HocuspocusCollabServer {
     try {
       await connection.transact((doc) => {
         const text = doc.getText("content");
+        const currentContent = text.toString();
+        if (precondition.expectedAbsent === true && currentContent.length > 0) {
+          throw new Error("WORKSPACE_RESOURCE_CONFLICT");
+        }
+        if (precondition.expectedHash !== undefined) {
+          const currentHash = crypto.createHash("sha256").update(currentContent).digest("hex");
+          if (currentHash !== precondition.expectedHash) {
+            throw new Error("WORKSPACE_RESOURCE_CONFLICT");
+          }
+        }
         if (text.length > 0) {
           text.delete(0, text.length);
         }
@@ -260,7 +275,14 @@ export class HocuspocusCollabServer {
       descriptor.kind,
     );
 
-    return { revision: 0, hash: state.hash };
+    const receipt = this.authorityPersistence.getLastReceipt(descriptor.workspaceId, descriptor.resourcePath);
+    if (!receipt || receipt.committed !== true || receipt.rootHash.length === 0 || receipt.resources.every((resource) => resource.path !== descriptor.resourcePath || resource.afterHash !== state.hash)) {
+      // Direct connections may load an already-current document. This is a
+      // valid no-op (used when synchronising a freshly committed page tree),
+      // not a successful mutation and therefore has no new receipt.
+      return { revision: 0, hash: state.hash };
+    }
+    return { revision: receipt.revision, hash: state.hash, receipt };
   }
 
   /**

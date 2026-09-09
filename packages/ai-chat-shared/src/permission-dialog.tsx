@@ -19,7 +19,7 @@ interface PermissionRequestData {
     kind?: string
     summary?: string
     planId?: string
-    approvalKind?: 'delete' | 'plan_approval'
+    approvalKind?: 'delete' | 'plan_approval' | 'config_visibility'
     editable?: boolean
     initialContent?: string
   }
@@ -53,6 +53,7 @@ export function PermissionDialog({
   const toolTitle = request.toolCall.title || request.toolCall.toolCallId
   const isInline = variant === 'inline'
   const isPlanApproval = request.toolCall.approvalKind === 'plan_approval'
+  const isConfigVisibilityApproval = request.toolCall.approvalKind === 'config_visibility'
   const initialPlan = request.toolCall.initialContent || request.toolCall.summary || ''
   const [isPlanOpen, setIsPlanOpen] = useState(false)
   const [editablePlan, setEditablePlan] = useState(initialPlan)
@@ -143,6 +144,26 @@ export function PermissionDialog({
           </div>
         )}
       </>
+    )
+  }
+
+  if (isConfigVisibilityApproval) {
+    return (
+      <div className={cn(isInline ? 'px-4 py-2' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm', className)}>
+        <ChatCard className={cn('bg-background', isInline ? 'w-full shadow-sm' : 'shadow-xl max-w-2xl w-full mx-4')}>
+          <div className="flex items-center gap-3 px-4 py-3 border-b bg-muted/50">
+            <div className="p-2 rounded-full bg-blue-500/10"><Shield className="h-5 w-5 text-blue-600" /></div>
+            <div className="flex-1"><h3 className="font-medium">确认配置联动草稿</h3><p className="text-xs text-muted-foreground">仅提交下方这份具体草稿，不会改变普通文件写入权限</p></div>
+          </div>
+          <div className="max-h-[55vh] overflow-auto px-4 py-3">
+            <pre className="whitespace-pre-wrap break-words rounded-md bg-muted/40 p-3 text-xs">{request.toolCall.summary || '（无摘要）'}</pre>
+          </div>
+          <div className="flex justify-end gap-2 border-t bg-muted/30 px-4 py-3">
+            <Button variant="ghost" onClick={() => onRespond('reject_once')}>取消</Button>
+            <Button onClick={() => onRespond('allow_once')}><Check className="mr-1.5 h-4 w-4" />批准提交</Button>
+          </div>
+        </ChatCard>
+      </div>
     )
   }
 

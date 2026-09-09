@@ -4,8 +4,9 @@ import type { AgentConfig, AgentEvent } from '../../core/types';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from '../pi-tools/permissions';
 import { PERMISSION_TIMEOUT, type PermissionHandler, type PermissionRequestInfo } from '../pi-tools/delete-page-tool';
 import type { PlanApprovalHandler, PlanApprovalRequest, PlanApprovalResult } from '../pi-tools/plan-approval-tool';
+import type { ConfigVisibilityApprovalHandler } from '../pi-tools/visibility-tools';
 import { logger } from '../../utils/logger';
-import { assertAiMutationAllowed, isVisibilityPlanText } from '../pi-tools/ai-mutation-policy';
+import { assertAiMutationAllowed } from '../pi-tools/ai-mutation-policy';
 
 const PLAN_APPROVAL_TIMEOUT_MS = 10 * 60_000;
 
@@ -77,6 +78,7 @@ export class PermissionManager {
       if (targetPath && !(toolName === "editFile" && String(targetPath).replace(/^\.?\//, "") === "workspace-tree.json")) {
         const decision = assertAiMutationAllowed(this.config, targetPath, {
           content: toolName === "writeFile" ? input?.content : undefined,
+          operation: toolName === "deleteFile" ? "delete" : "write",
         });
         if (!decision.allowed) return { block: true, reason: decision.message ?? "FILE_ACCESS_DENIED" };
       }
@@ -133,10 +135,6 @@ export class PermissionManager {
   requestPlanApproval: PlanApprovalHandler = (toolCallId, request, signal): Promise<PlanApprovalResult> => {
     const sessionId = this.config.sessionId;
 
-    // Approval is a one-shot proof bound to the exact edited plan. A new plan
-    // request must invalidate any previous proof before it reaches the UI.
-    this.config.visibilityPlanApproval = undefined;
-
     if (signal?.aborted) {
       return Promise.resolve({ approved: false, reason: 'cancelled' });
     }
@@ -168,14 +166,6 @@ export class PermissionManager {
 
     return this.waitForPermission(toolCallId, PLAN_APPROVAL_TIMEOUT_MS, signal, 'planApproval')
       .then((result) => {
-        const planMarkdown = result.responseContent?.trim() || request.planMarkdown.trim();
-        if (result.approved && isVisibilityPlanText(planMarkdown)) {
-          this.config.visibilityPlanApproval = {
-            planMarkdown,
-            approvedAt: Date.now(),
-            expiresAt: Date.now() + PLAN_APPROVAL_TIMEOUT_MS,
-          };
-        }
         return {
           approved: result.approved,
           planMarkdown: result.responseContent,
@@ -187,13 +177,50 @@ export class PermissionManager {
   };
 
   /**
+   * Configuration visibility approval is deliberately separate from plan
+   * review. The request is bound to the concrete, server-created draft and
+   * its impact summary; approval never changes ordinary file permissions.
+   */
+  requestConfigVisibilityApproval: ConfigVisibilityApprovalHandler = (
+    toolCallId,
+    request,
+    signal,
+  ): Promise<boolean> => {
+    const sessionId = this.config.sessionId;
+    if (signal?.aborted) return Promise.resolve(false);
+
+    logger.info({ toolCallId, draftId: request.draftId }, 'configVisibility: requesting draft approval');
+    this.eventCallback?.({
+      type: 'permission_request',
+      sessionId,
+      permissionRequest: {
+        sessionId,
+        options: [
+          { optionId: 'allow_once', name: '批准提交' },
+          { optionId: 'reject_once', name: '取消' },
+        ],
+        toolCall: {
+          toolCallId,
+          title: request.title || '确认配置联动草稿',
+          kind: 'execute',
+          summary: request.summary,
+          approvalKind: 'config_visibility',
+        },
+      },
+    });
+
+    return this.waitForPermission(toolCallId, PLAN_APPROVAL_TIMEOUT_MS, signal, 'configVisibility')
+      .then((result) => result.approved);
+  };
+
+  /**
    * 解除权限等待：前端用户确认或取消后调用
    */
   resolvePermission(toolCallId: string, approved: boolean, responseContent?: string): void {
     const pending = this.pendingPermissions.get(toolCallId);
     if (pending) {
       pending.settle({ approved, responseContent, reason: 'user_response' });
-      logger.info({ toolCallId, approved }, 'deletePage: permission resolved');
+      logger.info({ toolCallId, approved }, 'permission request resolved');
     } else {
       logger.warn({ toolCallId }, 'deletePage: no pending permission found for toolCallId');
     }
@@ -217,7 +244,7 @@ export class PermissionManager {
     toolCallId: string,
     timeoutMs: number,
     signal: AbortSignal | undefined,
-    logPrefix: 'deletePage' | 'planApproval',
+    logPrefix: 'deletePage' | 'planApproval' | 'configVisibility',
   ): Promise<PermissionResolution> {
     if (signal?.aborted) {
       return Promise.resolve({ approved: false, reason: 'cancelled' });

@@ -11,6 +11,11 @@ export type AiMutationCategory =
   | "design_spec"
   | "config_definition"
   | "config_visibility"
+  | "visibility_reference_conflict"
+  | "workspace_path"
+  | "readonly_resource"
+  | "resource_reference"
+  | "workspace_conflict"
   | "unverified";
 
 export interface AiMutationDecision {
@@ -23,30 +28,8 @@ function normalized(relativePath: string): string {
   return relativePath.replace(/\\/g, "/").replace(/^\.?\//, "");
 }
 
-function isConfigSchemaPath(filePath: string): boolean {
-  return filePath === "project.config.schema.json"
-    || /^demos\/[^/]+\/config\.schema\.json$/.test(filePath);
-}
-
-function isConfigValuesPath(filePath: string): boolean {
-  return filePath === "project.config.values.json"
-    || /^demos\/[^/]+\/config\.values\.json$/.test(filePath);
-}
-
 function isVisibilityRulesPath(filePath: string): boolean {
   return filePath === "project.visibility-rules.json";
-}
-
-export function isVisibilityPlanText(planMarkdown: string): boolean {
-  const text = planMarkdown.toLowerCase();
-  return text.includes("config-driven-behavior")
-    || text.includes("visibility")
-    || (text.includes("配置") && (text.includes("联动") || text.includes("可见性")));
-}
-
-export function hasApprovedVisibilityPlan(config: AgentConfig): boolean {
-  const approval = config.visibilityPlanApproval;
-  return Boolean(approval && approval.expiresAt > Date.now() && isVisibilityPlanText(approval.planMarkdown));
 }
 
 function deny(config: AgentConfig, category: AiMutationCategory): AiMutationDecision {
@@ -64,7 +47,19 @@ function deny(config: AgentConfig, category: AiMutationCategory): AiMutationDeci
   return {
     allowed: false,
     category,
-    message: "FILE_ACCESS_DENIED: 当前角色无权通过 AI 修改此资源。",
+    message: category === "config_visibility"
+      ? "FILE_ACCESS_DENIED: project.visibility-rules.json 只能通过 prepareConfigVisibilityDraft 与用户确认后的原子提交修改。"
+      : category === "config_definition"
+        ? "FILE_ACCESS_DENIED: 配置定义/配置值不能通过当前操作删除，请使用受管配置流程。"
+        : category === "workspace_tree"
+          ? "FILE_ACCESS_DENIED: 页面树中的模板标记不可由当前角色修改。"
+          : category === "template_page"
+            ? "FILE_ACCESS_DENIED: 当前角色不能修改模板页或其绑定资源。"
+            : category === "convention"
+              ? "FILE_ACCESS_DENIED: 公约资源为只读，请通过对应管理流程修改。"
+              : category === "design_spec"
+                ? "FILE_ACCESS_DENIED: 设计规范资源为只读，请通过对应管理流程修改。"
+                : "FILE_ACCESS_DENIED: 当前角色无权通过 AI 修改此资源。",
   };
 }
 
@@ -124,26 +119,24 @@ function templateBoundWhiteboardIds(workingDir: string | undefined, templateIds:
 export function assertAiMutationAllowed(
   config: AgentConfig,
   relativePath: string,
-  options: { content?: string; pageIds?: string[]; workflow?: "visibility-draft" } = {},
+  options: { content?: string; pageIds?: string[]; workflow?: "visibility-draft"; operation?: "write" | "delete" } = {},
 ): AiMutationDecision {
   const auth = config.authorAuthorization;
   if (auth === undefined) return { allowed: true };
   if (!auth || auth.expiresAt <= Date.now()) return deny(config, "unverified");
   if (auth.role === "admin") {
     const filePath = normalized(relativePath);
-    if (isVisibilityRulesPath(filePath) && (options.workflow !== "visibility-draft" || !hasApprovedVisibilityPlan(config))) return deny(config, "config_visibility");
-    if (isConfigSchemaPath(filePath) && (options.workflow !== "visibility-draft" || !hasApprovedVisibilityPlan(config))) return deny(config, "config_definition");
-    if (isConfigValuesPath(filePath) && !hasApprovedVisibilityPlan(config)) return deny(config, "config_definition");
+    if (isVisibilityRulesPath(filePath) && options.workflow !== "visibility-draft") return deny(config, "config_visibility");
+    if (options.operation === "delete" && (filePath === "project.config.schema.json" || filePath === "project.config.values.json" || /^demos\/[^/]+\/config\.(?:schema|values)\.json$/u.test(filePath))) return deny(config, "config_definition");
     return { allowed: true };
   }
   if (auth.role !== "editor") return deny(config, "unverified");
 
   const filePath = normalized(relativePath);
   if (isVisibilityRulesPath(filePath)) {
-    if (options.workflow !== "visibility-draft" || !hasApprovedVisibilityPlan(config)) return deny(config, "config_visibility");
+    if (options.workflow !== "visibility-draft") return deny(config, "config_visibility");
   }
-  if (isConfigSchemaPath(filePath) && (options.workflow !== "visibility-draft" || !hasApprovedVisibilityPlan(config))) return deny(config, "config_definition");
-  if (isConfigValuesPath(filePath) && !hasApprovedVisibilityPlan(config)) return deny(config, "config_definition");
+  if (options.operation === "delete" && (filePath === "project.config.schema.json" || filePath === "project.config.values.json" || /^demos\/[^/]+\/config\.(?:schema|values)\.json$/u.test(filePath))) return deny(config, "config_definition");
   if (filePath === "convention.md" || /^demos\/[^/]+\/convention\.md$/.test(filePath)) {
     return deny(config, "convention");
   }

@@ -24,6 +24,7 @@ import {
   appendWorkspaceAuthorityDiagnostic,
   appendWorkspaceProjectionDiagnostic,
 } from "./workspace-authority-diagnostics";
+import { validateConfigResourceMutation } from "../backends/pi-tools/config-mutation-validation";
 
 function hashWorkspaceContent(content: string | Buffer): string {
   return crypto.createHash("sha256").update(content).digest("hex");
@@ -1070,10 +1071,11 @@ export class WorkspaceMutationAuthority {
         }
         this.assertManagedTextWrite(operation.path, text, operation.type);
       }
-      // Normal Yjs-first writes merge in the collab room. An approved document
-      // proposal is deliberately different: users approved a frozen snapshot,
-      // so its preconditions are checked inside this serial + lease section.
-      if (request.reason === "document_proposal_apply") {
+      // Normal Yjs-first writes merge in the collab room. Approved document
+      // proposals and visibility drafts are deliberately different: users
+      // approved a frozen snapshot, so their preconditions are checked inside
+      // this serial + lease section.
+      if (request.reason === "document_proposal_apply" || request.reason === "config_visibility_draft_commit") {
         if (operation.type === "move_path" || operation.type === "commit_html_import" || operation.type === "patch_config_values") {
           throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
         }
@@ -1085,9 +1087,90 @@ export class WorkspaceMutationAuthority {
         }
       }
     }
+    const isConfigResourcePath = (resourcePath: string): boolean => resourcePath === "project.config.schema.json"
+      || resourcePath === "project.config.values.json"
+      || /^demos\/[^/]+\/config\.(?:schema|values)\.json$/u.test(resourcePath);
+    const needsConfigValidation = request.operations.some((operation) => {
+      const resourcePath = operation.type === "move_path" ? operation.to : operation.path;
+      const normalized = normalizeWorkspaceResourcePath(resourcePath);
+      return Boolean(normalized && isConfigResourcePath(normalized));
+    });
+    const configCandidates: Array<{ path: string; content: string }> = [];
+    const candidateResources: Record<string, string> = {};
+    if (needsConfigValidation) for (const resourcePath of Object.keys(state.resourceHashes)) {
+      const descriptor = workspaceResourceRegistry.describe(resourcePath);
+      if (!descriptor) continue;
+      const current = this.readResource(workspacePath, resourcePath);
+      if (!current.exists) continue;
+      if (descriptor.text) {
+        const raw = current.content;
+        candidateResources[resourcePath] = typeof raw === "string"
+          ? raw
+          : Buffer.isBuffer(raw)
+              ? raw.toString("utf8")
+            : raw && raw.type === "Buffer" && Array.isArray(raw.data)
+              ? Buffer.from(raw.data).toString("utf8")
+              : "";
+      } else {
+        // Presence is enough for config value asset-reference validation; the
+        // binary bytes are intentionally not loaded into the candidate model.
+        candidateResources[resourcePath] = "";
+      }
+    }
+    for (const operation of request.operations) {
+      if (operation.type === "put_binary") {
+        const normalized = normalizeWorkspaceResourcePath(operation.path);
+        if (normalized && needsConfigValidation) candidateResources[normalized] = "";
+        continue;
+      }
+      if (operation.type === "delete_path") {
+        const normalized = normalizeWorkspaceResourcePath(operation.path);
+        if (normalized && needsConfigValidation) delete candidateResources[normalized];
+        continue;
+      }
+      if (operation.type === "move_path") {
+        const from = normalizeWorkspaceResourcePath(operation.from);
+        const to = normalizeWorkspaceResourcePath(operation.to);
+        if (from && to) {
+          if (needsConfigValidation && candidateResources[from] !== undefined) candidateResources[to] = candidateResources[from];
+          if (needsConfigValidation) delete candidateResources[from];
+        }
+        continue;
+      }
+      if (operation.type !== "put_text" && operation.type !== "put_staged_text") continue;
+      const normalized = normalizeWorkspaceResourcePath(operation.path);
+      if (!normalized || !needsConfigValidation) continue;
+      const content = operation.type === "put_text"
+        ? operation.content
+        : fs.readFileSync(this.stagingPath(request.workspaceId, operation.stagingId), "utf8");
+      if (isConfigResourcePath(normalized)) configCandidates.push({ path: normalized, content });
+      candidateResources[normalized] = content;
+    }
+    for (const candidate of configCandidates) {
+      const issue = validateConfigResourceMutation({ path: candidate.path, content: candidate.content, resources: candidateResources });
+      if (issue) {
+        throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION", issue.message, {
+          category: issue.category,
+          validationCode: issue.code,
+          resourcePath: candidate.path,
+          issues: issue.details,
+        });
+      }
+    }
     this.validateVisibilityRulesMutation(request, workspacePath);
-    // A stale base is harmless only when every targeted resource still matched.
-    if (request.baseRevision > state.revision) throw new WorkspaceMutationAuthorityError("WORKSPACE_RESOURCE_CONFLICT");
+    if (request.reason === "config_visibility_draft_commit") {
+      if (request.baseRevision !== state.revision || request.baseRootHash !== state.rootHash) {
+        throw new WorkspaceMutationAuthorityError("WORKSPACE_RESOURCE_CONFLICT", "Visibility draft base changed", {
+          expectedRevision: request.baseRevision,
+          actualRevision: state.revision,
+          expectedRootHash: request.baseRootHash,
+          actualRootHash: state.rootHash,
+        });
+      }
+    } else if (request.baseRevision > state.revision) {
+      // A stale base is harmless only when every targeted resource still matched.
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_RESOURCE_CONFLICT");
+    }
     return { request, payloadHash, previousState: state, before, preparedAt: Date.now() };
   }
 

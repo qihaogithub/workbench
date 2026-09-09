@@ -6,6 +6,7 @@ import type { CollabDocumentName } from "../document-name";
 import type { WorkspaceFilePersistence } from "../workspace-file-persistence";
 import type { CollabStateStore } from "../collab-state-store";
 import { logger } from "../../utils/logger";
+import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
 
 /**
  * AuthorityPersistenceExtension
@@ -27,6 +28,7 @@ import { logger } from "../../utils/logger";
  */
 export class AuthorityPersistenceExtension implements Extension {
   priority = 100;
+  private readonly lastReceipts = new Map<string, WorkspaceMutationReceipt>();
 
   constructor(
     private readonly persistence: WorkspaceFilePersistence,
@@ -118,7 +120,9 @@ export class AuthorityPersistenceExtension implements Extension {
    * Called by Hocuspocus after the configured debounce window. Skips
    * no-op writes (file content unchanged) to avoid unnecessary mutation
    * events. Uses `baseRevision: 0` because the Yjs room is the single
-   * authority and the Authority auto-adopts drift.
+   * content authority and the Authority auto-adopts drift. The resulting
+   * durable receipt is retained for the direct writer; callers must never
+   * construct a revision-0/empty-root success receipt themselves.
    */
   async onStoreDocument(data: {
     document: Y.Doc;
@@ -126,6 +130,8 @@ export class AuthorityPersistenceExtension implements Extension {
   }): Promise<void> {
     const ctx = data.lastContext;
     if (!ctx?.ok) return;
+
+    this.lastReceipts.delete(`${ctx.workspaceId}:${ctx.resourcePath}`);
 
     const text = data.document.getText("content");
     let roomContent = text.toString();
@@ -165,7 +171,7 @@ export class AuthorityPersistenceExtension implements Extension {
         kind: ctx.kind as never,
         role: ctx.role,
       });
-      await this.persistence.commitResource({
+      const result = await this.persistence.commitResource({
         projectId: ctx.projectId,
         workspaceId: ctx.workspaceId,
         sessionId: ctx.sessionId,
@@ -174,6 +180,7 @@ export class AuthorityPersistenceExtension implements Extension {
         content: roomContent,
         baseRevision: 0,
       });
+      this.lastReceipts.set(`${ctx.workspaceId}:${ctx.resourcePath}`, result.receipt);
 
       if (this.stateStore) {
         this.persistState(data.document, ctx);
@@ -190,6 +197,10 @@ export class AuthorityPersistenceExtension implements Extension {
       );
       throw error;
     }
+  }
+
+  getLastReceipt(workspaceId: string, resourcePath: string): WorkspaceMutationReceipt | undefined {
+    return this.lastReceipts.get(`${workspaceId}:${resourcePath}`);
   }
 
   private persistState(
