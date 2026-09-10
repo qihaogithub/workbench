@@ -23,6 +23,8 @@ import {
 } from "./shared-runtime.js";
 import { MAX_PROTOTYPE_CSS_LENGTH } from "./constants.js";
 
+export { HTML_IMPORT_ANALYSIS_VERSION };
+
 interface HtmlNode {
   nodeName: string;
   tagName?: string;
