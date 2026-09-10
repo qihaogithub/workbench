@@ -19,7 +19,6 @@ import {
   getPageEntryFileName,
   getPageDir,
   isSafePageId,
-  readWorkspaceTree,
   type WorkspacePage,
   type WorkspaceTree,
 } from "./workspace-page-utils";
@@ -122,13 +121,13 @@ function validatePageInput(args: CreatePageParams, tree: WorkspaceTree): string 
   if (args.name.trim().length === 0) return "name must not be blank.";
   if (!Number.isSafeInteger(args.order) || args.order < 0) return "order must be a non-negative integer.";
   if (!SUPPORTED_RUNTIME_TYPES.includes(args.runtimeType)) return "runtimeType is not supported.";
-  if (tree.pages.some((page) => page.id === args.pageId)) return `pageId \"${args.pageId}\" already exists.`;
+  if (tree.pages.some((page) => page.id === args.pageId)) return `pageId "${args.pageId}" already exists.`;
   if (tree.pages.some((page) => page.order === args.order)) {
-    return `order ${args.order} is already used by page \"${tree.pages.find((page) => page.order === args.order)!.id}\".`;
+    return `order ${args.order} is already used by page "${tree.pages.find((page) => page.order === args.order)!.id}".`;
   }
   if (args.parentId !== null && !tree.folders.some((folder) => (
     typeof folder === "object" && folder !== null && (folder as { id?: unknown }).id === args.parentId
-  ))) return `parentId \"${args.parentId}\" does not identify an existing folder.`;
+  ))) return `parentId "${args.parentId}" does not identify an existing folder.`;
   return null;
 }
 
@@ -235,7 +234,7 @@ function pageOperations(args: CreatePageParams, tree: WorkspaceTree): WorkspaceM
 
 async function createPageInFilesystem(workingDir: string, args: CreatePageParams, tree: WorkspaceTree): Promise<void> {
   const pageDir = getPageDir(workingDir, args.pageId);
-  if (fs.existsSync(pageDir)) throw new Error(`page directory \"demos/${args.pageId}\" already exists.`);
+  if (fs.existsSync(pageDir)) throw new Error(`page directory "demos/${args.pageId}" already exists.`);
 
   const demosDir = path.join(workingDir, "demos");
   const stagingDir = path.join(demosDir, `.create-page-${crypto.randomUUID()}`);
@@ -285,10 +284,10 @@ export function createCreatePageTool(config: AgentConfig): AgentTool<typeof Crea
 
         const pageDir = getPageDir(workingDir, args.pageId);
         if (liveWorkspace && (`demos/${args.pageId}/${getPageEntryFileName(args.runtimeType)}` in snapshot!.resources || `demos/${args.pageId}/config.schema.json` in snapshot!.resources)) {
-          return errorResult("page_resources_exist", `page resources for \"${args.pageId}\" already exist.`, { pageId: args.pageId });
+          return errorResult("page_resources_exist", `page resources for "${args.pageId}" already exist.`, { pageId: args.pageId });
         }
         if (!liveWorkspace && fs.existsSync(pageDir)) {
-          return errorResult("page_resources_exist", `page directory \"demos/${args.pageId}\" already exists.`, { pageId: args.pageId });
+          return errorResult("page_resources_exist", `page directory "demos/${args.pageId}" already exists.`, { pageId: args.pageId });
         }
 
         const nextTree = buildTree(tree, args);
@@ -327,7 +326,7 @@ export function createCreatePageTool(config: AgentConfig): AgentTool<typeof Crea
 
         const createdPage = nextTree.pages.find((page) => page.id === args.pageId)!;
         return {
-          content: [{ type: "text", text: `Created page \"${createdPage.name}\" (${createdPage.id}) as ${createdPage.runtimeType}.${formatAuthorityCommitSummary(receipt)}` }],
+          content: [{ type: "text", text: `Created page "${createdPage.name}" (${createdPage.id}) as ${createdPage.runtimeType}.${formatAuthorityCommitSummary(receipt)}` }],
           details: { createdPage, receipt },
         };
       } catch (error) {

@@ -2,8 +2,8 @@ import * as path from 'path';
 
 import type { AgentConfig, AgentEvent } from '../../core/types';
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from '../pi-tools/permissions';
-import { PERMISSION_TIMEOUT, type PermissionHandler, type PermissionRequestInfo } from '../pi-tools/delete-page-tool';
-import type { PlanApprovalHandler, PlanApprovalRequest, PlanApprovalResult } from '../pi-tools/plan-approval-tool';
+import { PERMISSION_TIMEOUT, type PermissionHandler } from '../pi-tools/delete-page-tool';
+import type { PlanApprovalHandler, PlanApprovalResult } from '../pi-tools/plan-approval-tool';
 import type { ConfigVisibilityApprovalHandler } from '../pi-tools/visibility-tools';
 import { logger } from '../../utils/logger';
 import { assertAiMutationAllowed } from '../pi-tools/ai-mutation-policy';
@@ -251,7 +251,6 @@ export class PermissionManager {
     }
 
     return new Promise<PermissionResolution>((resolve) => {
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       let abortListener: (() => void) | undefined;
       const pending: PendingPermission = {
         settle: (result) => {
@@ -265,7 +264,7 @@ export class PermissionManager {
       };
 
       this.pendingPermissions.set(toolCallId, pending);
-      timeoutId = setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         if (pending.settle({ approved: false, reason: 'timeout' })) {
           logger.warn({ toolCallId }, `${logPrefix}: permission request timed out`);
         }

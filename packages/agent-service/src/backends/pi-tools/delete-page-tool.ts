@@ -7,7 +7,6 @@ import { createWorkspaceResourceRegistry } from "@workbench/project-core/workspa
 import type { AgentConfig } from "../../core/types";
 import { logger } from "../../utils/logger";
 import { resolveLiveWorkspaceMutationContext } from "../../workspace/workspace-mutation-authority";
-import type { WorkspaceAuthoritySnapshot } from "../../workspace/workspace-mutation-authority";
 import {
   WORKSPACE_TREE_FILENAME,
   type WorkspacePage,

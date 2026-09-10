@@ -19,7 +19,6 @@ export type CheckpointResyncResult =
   | { ok: false; code: "CHECKPOINT_VERSION_CONFLICT" | "CHECKPOINT_ANCHOR_REQUIRED" | "CHECKPOINT_ANCHOR_NOT_FOUND" | "CHECKPOINT_FALLBACK_DISABLED" };
 
 const MAX_MESSAGES = 24;
-const MAX_MESSAGE_CHARS = 4_000;
 const MAX_TOTAL_CHARS = 48_000;
 
 /** 移除前端为旧版服务端重放临时注入的历史，checkpoint 只保存真实用户输入。 */
@@ -31,21 +30,6 @@ export function stripInjectedConversationHistory(content: string): string {
 
 export function isCanonicalCheckpointEnabled(): boolean {
   return process.env.PI_AGENT_CANONICAL_CHECKPOINTS_ENABLED === "true";
-}
-
-function normalizeMessage(value: unknown, index: number): CheckpointMessage | null {
-  if (!value || typeof value !== "object") return null;
-  const raw = value as Partial<CheckpointMessage>;
-  if (raw.role !== "user" && raw.role !== "assistant") return null;
-  if (typeof raw.content !== "string" || raw.content.trim().length === 0) return null;
-  const id = typeof raw.id === "string" && raw.id.trim()
-    ? raw.id.trim()
-    : `fallback-${index}`;
-  return {
-    id,
-    role: raw.role,
-    content: raw.content.trim().slice(0, MAX_MESSAGE_CHARS),
-  };
 }
 
 function limitMessages(messages: CheckpointMessage[]): CheckpointMessage[] {

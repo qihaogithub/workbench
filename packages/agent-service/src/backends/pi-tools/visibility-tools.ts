@@ -739,6 +739,7 @@ function migrateVisibilityRulesInput(raw: unknown): unknown {
       const condition = migrateCondition(rule.condition);
       if (isRecord(condition) && (condition.kind === "all" || condition.kind === "any")) {
         const { source: _redundantSource, ...rest } = rule;
+        void _redundantSource;
         return { ...rest, condition };
       }
       return { ...rule, condition };

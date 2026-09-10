@@ -1,7 +1,4 @@
-import {
-  classifyManagedDocumentPath,
-  resolveManagedDocumentPath,
-} from "@workbench/project-core/document-proposal";
+import { resolveManagedDocumentPath } from "@workbench/project-core/document-proposal";
 import {
   DocumentProposalStore,
   type DocumentProposalTargetInput,
