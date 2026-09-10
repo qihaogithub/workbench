@@ -1620,10 +1620,14 @@ export function PageConfigPanel({
                         designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "project")}
                         onEditDesignSpec={onEditDesignSpec}
                         onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
-                        onEditConfigDefinition={onProjectDefinitionChange ? (key) => openDefinitionEditor("project", key) : undefined}
+                        onEditConfigDefinition={onProjectDefinitionChange
+                          ? (key, _field, schemaFieldPath) =>
+                              openDefinitionEditor("project", key, schemaFieldPath)
+                          : undefined}
                         configItemCapabilities={selectedPage.configItemCapabilities?.project}
                         onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
                         hasConfigComment={configComments ? hasConfigComment : undefined}
+                        hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
                         imageConfigScope="project"
                         configContextPageId={selectedPage.id}
                         referenceContext={referenceContext}
@@ -1656,10 +1660,14 @@ export function PageConfigPanel({
                         designSpecEntries={effectiveDesignSpecEntries.filter((entry) => entry.scope === "page" && entry.pageId === selectedPage.id)}
                         onEditDesignSpec={onEditDesignSpec}
                         onOpenDesignSpec={(spec, fieldTitle, anchor, trigger) => toggleDesignSpec({ kind: "config", spec, fieldTitle, anchor }, trigger)}
-                        onEditConfigDefinition={onPageDefinitionChange ? (key) => openDefinitionEditor("page", key) : undefined}
+                        onEditConfigDefinition={onPageDefinitionChange
+                          ? (key, _field, schemaFieldPath) =>
+                              openDefinitionEditor("page", key, schemaFieldPath)
+                          : undefined}
                         configItemCapabilities={selectedPage.configItemCapabilities?.page}
                         onAddConfigComment={configComments || onAddConfigComment ? handleOpenConfigComment : undefined}
                         hasConfigComment={configComments ? hasConfigComment : undefined}
+                        hideEmptyConfigCommentTag={hideEmptyConfigCommentTag}
                         imageConfigScope="page"
                         pageId={selectedPage.id}
                         configContextPageId={selectedPage.id}
