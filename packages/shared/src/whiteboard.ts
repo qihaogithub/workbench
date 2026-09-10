@@ -264,6 +264,7 @@ export function getWhiteboardDocumentRevision(document: WhiteboardDocument | nul
 export function asWhiteboardDocumentV2(document: WhiteboardDocument): WhiteboardDocumentV2 {
   if (document.version === 2) return document;
   const { sceneFormat: _sceneFormat, ...legacyEnvelope } = document.version === 3 ? document : { ...document, sceneFormat: undefined };
+  void _sceneFormat;
   const nodeSemantics: Record<string, WhiteboardNodeSemantics> = {};
   return {
     ...legacyEnvelope,

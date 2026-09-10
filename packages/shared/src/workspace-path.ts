@@ -14,10 +14,12 @@ export function validateWorkspacePathSegment(
   if (!value) return { ok: false, code: "EMPTY" };
   if (value === "." || value === "..") return { ok: false, code: "DOT_SEGMENT" };
   if (/[\\/]/.test(value)) return { ok: false, code: "SEPARATOR" };
-  if (/[\u0000-\u001f\u007f]/.test(value)) return { ok: false, code: "CONTROL" };
 
   for (let index = 0; index < value.length; index += 1) {
     const codeUnit = value.charCodeAt(index);
+    if (codeUnit <= 0x1f || codeUnit === 0x7f) {
+      return { ok: false, code: "CONTROL" };
+    }
     if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
       const next = value.charCodeAt(index + 1);
       if (!Number.isInteger(next) || next < 0xdc00 || next > 0xdfff) {
