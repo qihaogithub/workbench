@@ -5,6 +5,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${PROJECT_DIR}/.env.docker"
 
 with_screenshot=false
+without_viewer=false
 build=true
 verify=true
 
@@ -15,12 +16,16 @@ Usage:
 
 Options:
   --with-screenshot   Also start screenshot-service through the screenshot profile.
+  --without-viewer    Do not start, rebuild, or replace viewer-site.
   --no-build          Start containers without rebuilding images.
   --no-verify         Skip HTTP verification after startup.
   -h, --help          Show this help.
 
 Default startup scope:
   knowledge-service agent-service author-site viewer-site
+
+With --without-viewer:
+  knowledge-service agent-service author-site
 EOF
 }
 
@@ -30,6 +35,9 @@ while [ "$#" -gt 0 ]; do
             ;;
         --with-screenshot)
             with_screenshot=true
+            ;;
+        --without-viewer)
+            without_viewer=true
             ;;
         --no-build)
             build=false
@@ -61,7 +69,16 @@ if ! docker info >/dev/null 2>&1; then
     exit 1
 fi
 
-export APP_DATA_DIR="${APP_DATA_DIR:-${PROJECT_DIR}/data}"
+APP_DATA_DIR_FROM_ENV="$(grep -E '^APP_DATA_DIR=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)"
+VIEWER_PUBLISHED_DIR_FROM_ENV="$(grep -E '^VIEWER_PUBLISHED_DIR=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || true)"
+export APP_DATA_DIR="${APP_DATA_DIR:-${APP_DATA_DIR_FROM_ENV:-${PROJECT_DIR}/data}}"
+export VIEWER_PUBLISHED_DIR="${VIEWER_PUBLISHED_DIR:-${VIEWER_PUBLISHED_DIR_FROM_ENV:-${APP_DATA_DIR}/published}}"
+if [ ! -d "${APP_DATA_DIR}" ] || [ ! -d "${VIEWER_PUBLISHED_DIR}" ]; then
+    echo "Missing Docker data directory. Create APP_DATA_DIR and VIEWER_PUBLISHED_DIR before starting." >&2
+    echo "APP_DATA_DIR=${APP_DATA_DIR}" >&2
+    echo "VIEWER_PUBLISHED_DIR=${VIEWER_PUBLISHED_DIR}" >&2
+    exit 1
+fi
 # Read SERVER_IP from .env.docker to derive browser-facing URLs for services
 # that require one. Agent-service is always derived from window.location by
 # the browser bundle and must never be injected as a NEXT_PUBLIC build value.
@@ -82,7 +99,10 @@ fi
 export NEXT_PUBLIC_DATA_BASE="${NEXT_PUBLIC_DATA_BASE:-}"
 export PUPPETEER_DISABLE_SANDBOX="${PUPPETEER_DISABLE_SANDBOX:-true}"
 
-services=(knowledge-service agent-service author-site viewer-site)
+services=(knowledge-service agent-service author-site)
+if [ "${without_viewer}" = false ]; then
+    services+=(viewer-site)
+fi
 compose_args=(--env-file "${ENV_FILE}")
 
 if [ "${with_screenshot}" = true ]; then
@@ -97,6 +117,7 @@ fi
 
 echo "Starting local OrbStack services: ${services[*]}"
 echo "APP_DATA_DIR=${APP_DATA_DIR}"
+echo "VIEWER_PUBLISHED_DIR=${VIEWER_PUBLISHED_DIR}"
 docker compose "${compose_args[@]}" "${up_args[@]}" "${services[@]}"
 
 if [ "${verify}" = true ]; then

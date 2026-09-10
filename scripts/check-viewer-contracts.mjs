@@ -136,7 +136,8 @@ const sampleProject = {
 validateProjectsIndex(sampleIndex, "sample projects index");
 validatePublishedProject(sampleProject, "sample published project");
 
-const publishedDir = path.join(root, "data", "published");
+const dataRoot = process.env.APP_DATA_DIR ? path.resolve(process.env.APP_DATA_DIR) : path.join(root, "data");
+const publishedDir = path.join(dataRoot, "published");
 if (fs.existsSync(publishedDir)) {
   const projectJsonPaths = [];
   for (const entry of fs.readdirSync(publishedDir, { withFileTypes: true })) {

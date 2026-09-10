@@ -10,7 +10,9 @@ REMOTE_DIR="${REMOTE_DIR:-/Users/jojo/Documents/workbench}"
 # 认证方式：默认使用密码登录（SSH_PASSWORD），置空则回退到 SSH 私钥（SSH_KEY）
 SSH_PASSWORD="${SSH_PASSWORD:-123456}"
 SSH_KEY="${SSH_KEY:-${HOME}/.ssh/figma-mirror-deploy-key}"
-LOCAL_DATA_DIR="${LOCAL_DATA_DIR:-${PROJECT_DIR}/data}"
+LOCAL_ENV_FILE="${PROJECT_DIR}/.env.docker"
+LOCAL_APP_DATA_DIR_FROM_ENV="$(awk -F= '$1 == "APP_DATA_DIR" { print substr($0, index($0, "=") + 1); exit }' "${LOCAL_ENV_FILE}" 2>/dev/null || true)"
+LOCAL_DATA_DIR="${LOCAL_DATA_DIR:-${LOCAL_APP_DATA_DIR_FROM_ENV:-${PROJECT_DIR}/data}}"
 LOCAL_BACKUP_DIR="${LOCAL_BACKUP_DIR:-${PROJECT_DIR}/../workbench-data-backups}"
 LOCAL_STAGING_ROOT="${LOCAL_STAGING_ROOT:-${PROJECT_DIR}/../workbench-data-staging}"
 

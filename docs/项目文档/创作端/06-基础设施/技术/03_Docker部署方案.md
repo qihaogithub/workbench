@@ -171,7 +171,8 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | `FIGMA_MCP_REGION`                   | 区域标识                         | agent-service 调用 Figma MCP 时透传的可选区域配置                          |
 | `PREVIEW_RUNTIME_SOURCE`             | `local`                          | 预览 iframe 默认使用同源 preview-runtime；设为 `cdn` 时走远程 CDN 回退     |
 | `PREVIEW_SHELL_MODE`                 | `fixed`                          | author-site 默认固定 shell；viewer-site 生产静态导出默认 inline shell      |
-| `DATA_DIR`                           | `/app/data`                      | 容器内应用数据目录；由宿主机 `APP_DATA_DIR` 绑定持久化                     |
+| `DATA_DIR`                           | `/app/data`                      | 写服务容器内应用数据目录；由宿主机 `APP_DATA_DIR` 绑定持久化                 |
+| `VIEWER_PUBLISHED_DIR`               | `/var/lib/workbench/data/published` | viewer-site 只读挂载的宿主机发布产物目录                                   |
 | `INTERNAL_API_TOKEN`                 | 共享随机密钥                     | author-site 调用 agent-service 内部配置接口的鉴权密钥，两个容器必须一致    |
 
 ### 3.2 .env.docker（宿主机 / Docker 环境变量注入）
@@ -179,7 +180,8 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | 变量                                 | 示例值                                                            | 说明                                                |
 | ------------------------------------ | ----------------------------------------------------------------- | --------------------------------------------------- |
 | `NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES` | `xjjj/,jojo/`                                                     | 前端模型白名单                                      |
-| `APP_DATA_DIR`                       | `/opt/workbench/data`                                             | 宿主机持久数据目录，绑定到容器 `/app/data`          |
+| `APP_DATA_DIR`                       | `/var/lib/workbench/data`                                         | 仓库外宿主机持久数据目录，绑定到写服务容器 `/app/data` |
+| `VIEWER_PUBLISHED_DIR`               | `/var/lib/workbench/data/published`                               | 仓库外发布产物目录，只读绑定到 viewer-site `/app/data/published` |
 | `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL` | `http://10.130.33.131:3202`                                       | **局域网 IP**，浏览器端使用                         |
 | `NEXT_PUBLIC_VIEWER_URL`             | `http://10.130.33.131:3300`                                       | **局域网 IP**，浏览器端访问浏览端                     |
 | `NEXT_PUBLIC_DATA_BASE`              | `/data`                                                           | viewer-site 静态导出的数据基址                      |
@@ -214,6 +216,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | --------------------------------------------- | ------------------------------------------------------------------- |
 | `corepack pnpm docker:orbstack`               | 构建并启动主应用服务：`agent-service`、`author-site`、`viewer-site` |
 | `corepack pnpm docker:orbstack:screenshot`    | 构建并启动主应用服务和 `screenshot-service`                         |
+| `scripts/docker-orbstack-up.sh --without-viewer --with-screenshot` | 仅构建并启动四个非 viewer 服务，不触碰 `viewer-site` |
 | `corepack pnpm docker:orbstack:verify`        | 验证本地 `3200`、`3201`、`3300` 的 HTTP 表面                        |
 | `corepack pnpm docker:screenshot:deep-health` | 单独验证截图服务 Chromium 深度健康检查                              |
 | `corepack pnpm docker:prepull`                | 预拉常用基础镜像，减少部署时等待                                    |
@@ -221,7 +224,7 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 
 `scripts/docker-orbstack-up.sh` 默认设置：
 
-- `APP_DATA_DIR=$PWD/data`
+- `APP_DATA_DIR` 与 `VIEWER_PUBLISHED_DIR` 从 `.env.docker` 读取；生产环境不得回退到仓库内 `data/`。
 - `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=http://localhost:3202`
 - `NEXT_PUBLIC_WEB_URL=http://localhost:3200`
 - `NEXT_PUBLIC_AUTHOR_SITE_URL=http://localhost:3200`
@@ -272,15 +275,15 @@ Chromium 是否能真实启动属于截图能力诊断，不作为默认容器�
 
 ### 3.7 数据持久化
 
-`docker-compose.yml` 使用 `${APP_DATA_DIR:-/opt/workbench/data}:/app/data` 绑定宿主机目录。这个目录是生产数据源，至少包含：
+`docker-compose.yml` 使用 `${APP_DATA_DIR:-/opt/workbench/data}:/app/data` 绑定写服务的宿主机目录，`viewer-site` 使用 `${VIEWER_PUBLISHED_DIR:-/opt/workbench/data/published}:/app/data/published:ro` 单独绑定发布子目录。生产数据目录必须位于仓库外，至少包含：
 
 - `users.db`、`users.db-wal`、`users.db-shm`：用户、管理后台配置、个人模型配置和外部授权配置。
-- `projects/`、`sessions/`、`published/`：项目、会话和发布数据。
+- `projects/`、`sessions/`、`published/`：项目、会话和发布数据；viewer-site 只读取 `published/`。
 - `screenshots/`：截图缓存，可按容量策略单独备份或重建。
 - `knowledge/knowledge.db*`：模板项目全文索引，可由项目文件重建。
 - `backups/knowledge/`：knowledge-service 通过 SQLite Online Backup API 生成的一致性备份。
 
-不要把管理后台配置只依赖 Docker named volume。named volume 会受 compose project 名称、`down -v` 和平台清理策略影响。生产环境应固定 `APP_DATA_DIR`；部署脚本默认拒绝缺失的目录，只有首次部署显式设置 `ALLOW_CREATE_APP_DATA_DIR=true` 才创建空目录。`users.db` 的人工备份仍需停服务或同时保留 WAL/SHM；`knowledge.db` 应使用服务内置在线备份接口，不能直接复制活动数据库文件。
+不要把管理后台配置只依赖 Docker named volume。named volume 会受 compose project 名称、`down -v` 和平台清理策略影响。生产环境应固定仓库外的 `APP_DATA_DIR` 与 `VIEWER_PUBLISHED_DIR`；部署脚本默认拒绝缺失的目录，只有首次部署显式设置 `ALLOW_CREATE_APP_DATA_DIR=true` 才创建空目录。`users.db` 的人工备份仍需停服务或同时保留 WAL/SHM；`knowledge.db` 应使用服务内置在线备份接口，不能直接复制活动数据库文件。viewer-site 重建或重启不会删除宿主机发布目录。
 
 ### 3.8 Docker 构建上下文约束
 
@@ -377,16 +380,16 @@ Pi Agent 内置 5 个工具，通过 `beforeToolCall`/`afterToolCall` 拦截机�
 - 部署前检查脚本的 managed-resource 规则必须与 Workspace Authority 注册表同步，覆盖页面 `config.schema.json`/`config.values.json`、`requirements.md`、项目可见性规则、设计规范、白板绑定与白板状态等资源；否则会把合法资源误报为 external drift 并阻断部署。对应契约测试位于 `scripts/check-workspace-deploy-preflight.test.mjs`。
 - 远程 Authority 扫描会阻断未注册 live Workspace、external drift、active/stale lease、prepared/reconcile-prepared 事务、committed backup 缺失/损坏和孤立 Authority state。部署脚本不会自动 adopt 或 restore，必须先通过显式运维命令收敛。
 - 编辑页的 Authority 事件与 projection-ack 读取属于只读热路径，只应读取已持久化的 state cursor 和增量记录，不得在每次轮询时重新哈希整个 Workspace 或争用写锁。全量漂移检查仍保留在 mutation、snapshot、health 和部署前检查路径；若旧镜像导致 agent-service 高 CPU、不健康，且编辑页同步持续“连接中”、模型列表为空，应先升级 agent-service，再检查 `/health` 与 `/models`，不要手工删除活动 lease。
-- 在远端启动前根据 `.env.docker` 中的 `APP_DATA_DIR` 检查稳定持久数据目录；默认不自动创建缺失目录，避免正式环境误切到空 data。首次部署确需创建空目录时，必须显式设置 `ALLOW_CREATE_APP_DATA_DIR=true`。
+- 在远端启动前根据 `.env.docker` 中的 `APP_DATA_DIR` 与 `VIEWER_PUBLISHED_DIR` 检查稳定持久数据目录；默认不自动创建缺失目录，避免正式环境误切到空 data。首次部署确需创建空目录时，必须显式设置 `ALLOW_CREATE_APP_DATA_DIR=true`。
 - 只有显式设置 `DEPLOY_BUILD_MODE=remote` 时才会在服务器执行限定服务集合的 `docker compose build`；该模式会先检查远端可用内存和 1 分钟负载，资源不足时拒绝构建。
 - 部署前校验 `.env.docker` 必须包含非空 `INTERNAL_API_TOKEN`。
 - 部署后检查本次部署服务的容器状态、健康检查和端口；当部署范围包含 author-site 或 agent-service 时，还会用 `INTERNAL_API_TOKEN` 调用 agent-service 内部模型配置接口，确认管理后台配置同步链路可用。
 
 ### 5.2 非 viewer 服务自动部署
 
-Codex Cron 可按每 30 分钟周期检查本地 `main` 分支，并从独立干净 worktree 自动部署四个非 viewer 服务：`knowledge-service`、`agent-service`、`author-site` 和 `screenshot-service`。任务固定执行 `scripts/deploy-fast.sh knowledge agent author shot`，不会构建、重启或替换 `viewer-site`。
+Codex Cron 每 1 小时检查 `origin/main`；本地 `main` 工作区干净且可快进时，自动拉取更新，并在当前 Mac 的 OrbStack 中部署四个非 viewer 服务：`knowledge-service`、`agent-service`、`author-site` 和 `screenshot-service`。任务固定使用 `scripts/docker-orbstack-up.sh --without-viewer --with-screenshot`，不会构建、重启或替换 `viewer-site`。
 
-自动任务首次运行只建立提交基线；后续仅在部署相关路径发生新提交时执行。部署前会运行 viewer 契约检查，并记录远端 `viewer-site` 容器 ID、启动时间和 HTTP 状态；部署后要求这些值不变。部署失败不自动回滚，保留待部署提交并在下一周期重试。
+自动任务首次运行若已同步只建立提交基线；检测到新提交时才拉取和部署。部署前后会记录本机 `viewer-site` 容器 ID、启动时间和 HTTP 状态，并要求这些值不变。部署失败不自动回滚，保留待部署提交并在下一周期重试。
 
 由于 `viewer-site` 会代理部分 `author-site` API 并读取共享发布数据，即使 viewer 容器未重启，共享依赖、上游 API 或 `/app/data` 变化仍可能影响 viewer 的运行时行为。自动任务必须在通知中明确这一边界。
 

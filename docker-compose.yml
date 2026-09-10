@@ -199,7 +199,8 @@ services:
     ports:
       - "3300:80"
     volumes:
-      - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data:ro
+      # viewer 只需要读取已发布产物，不挂载 users.db、sessions、workspaces 等私有运行数据。
+      - ${VIEWER_PUBLISHED_DIR:-/opt/workbench/data/published}:/app/data/published:ro
     depends_on:
       - author-site
     cpus: "0.5"

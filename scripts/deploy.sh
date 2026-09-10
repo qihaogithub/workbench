@@ -256,6 +256,8 @@ echo -e "${GREEN}✅ SSH 连接正常${NC}"
 
 DEPLOY_APP_DATA_DIR="$(awk -F= '$1 == "APP_DATA_DIR" { print substr($0, index($0, "=") + 1); exit }' "${DEPLOY_ENV_FILE}")"
 DEPLOY_APP_DATA_DIR="${DEPLOY_APP_DATA_DIR:-/opt/workbench/data}"
+DEPLOY_VIEWER_PUBLISHED_DIR="$(awk -F= '$1 == "VIEWER_PUBLISHED_DIR" { print substr($0, index($0, "=") + 1); exit }' "${DEPLOY_ENV_FILE}")"
+DEPLOY_VIEWER_PUBLISHED_DIR="${DEPLOY_VIEWER_PUBLISHED_DIR:-${DEPLOY_APP_DATA_DIR}/published}"
 case "${DEPLOY_APP_DATA_DIR}" in
     /*) ;;
     *)
@@ -265,6 +267,17 @@ case "${DEPLOY_APP_DATA_DIR}" in
 esac
 if [[ "${DEPLOY_APP_DATA_DIR}" == *"'"* ]] || [[ "${DEPLOY_APP_DATA_DIR}" == *$'\n'* ]]; then
     echo -e "${RED}❌ APP_DATA_DIR 包含不安全字符${NC}"
+    exit 1
+fi
+case "${DEPLOY_VIEWER_PUBLISHED_DIR}" in
+    /*) ;;
+    *)
+        echo -e "${RED}❌ VIEWER_PUBLISHED_DIR 必须是绝对路径，当前值: ${DEPLOY_VIEWER_PUBLISHED_DIR}${NC}"
+        exit 1
+        ;;
+esac
+if [[ "${DEPLOY_VIEWER_PUBLISHED_DIR}" == *"'"* ]] || [[ "${DEPLOY_VIEWER_PUBLISHED_DIR}" == *$'\n'* ]]; then
+    echo -e "${RED}❌ VIEWER_PUBLISHED_DIR 包含不安全字符${NC}"
     exit 1
 fi
 
@@ -506,7 +519,10 @@ cd ${REMOTE_DIR}
 cp -f .deploy.env .env.docker
 APP_DATA_DIR=\$(awk -F= '\$1 == "APP_DATA_DIR" { print substr(\$0, index(\$0, "=") + 1); exit }' .env.docker)
 APP_DATA_DIR=\${APP_DATA_DIR:-/opt/workbench/data}
+VIEWER_PUBLISHED_DIR=\$(awk -F= '\$1 == "VIEWER_PUBLISHED_DIR" { print substr(\$0, index(\$0, "=") + 1); exit }' .env.docker)
+VIEWER_PUBLISHED_DIR=\${VIEWER_PUBLISHED_DIR:-\${APP_DATA_DIR}/published}
 echo "📁 APP_DATA_DIR=\${APP_DATA_DIR}"
+echo "📁 VIEWER_PUBLISHED_DIR=\${VIEWER_PUBLISHED_DIR}"
 if [ ! -d "\${APP_DATA_DIR}" ]; then
     if [ '${ALLOW_CREATE_APP_DATA_DIR}' = 'true' ]; then
         mkdir -p "\${APP_DATA_DIR}"
@@ -515,6 +531,16 @@ if [ ! -d "\${APP_DATA_DIR}" ]; then
         echo "❌ APP_DATA_DIR 不存在: \${APP_DATA_DIR}"
         echo "   普通部署不会自动创建空 data 目录，避免正式环境切到空数据。"
         echo "   请先恢复/同步 data，或确认首次部署后使用 ALLOW_CREATE_APP_DATA_DIR=true。"
+        exit 1
+    fi
+fi
+if [ ! -d "\${VIEWER_PUBLISHED_DIR}" ]; then
+    if [ '${ALLOW_CREATE_APP_DATA_DIR}' = 'true' ]; then
+        mkdir -p "\${VIEWER_PUBLISHED_DIR}"
+        echo "⚠️  已创建空 VIEWER_PUBLISHED_DIR: \${VIEWER_PUBLISHED_DIR}"
+    else
+        echo "❌ VIEWER_PUBLISHED_DIR 不存在: \${VIEWER_PUBLISHED_DIR}"
+        echo "   普通部署不会自动创建空 viewer 发布目录，避免浏览端切到空数据。"
         exit 1
     fi
 fi
@@ -618,7 +644,10 @@ cd ${REMOTE_DIR}
 cp -f .deploy.env .env.docker
 APP_DATA_DIR=\$(awk -F= '\$1 == "APP_DATA_DIR" { print substr(\$0, index(\$0, "=") + 1); exit }' .env.docker)
 APP_DATA_DIR=\${APP_DATA_DIR:-/opt/workbench/data}
+VIEWER_PUBLISHED_DIR=\$(awk -F= '\$1 == "VIEWER_PUBLISHED_DIR" { print substr(\$0, index(\$0, "=") + 1); exit }' .env.docker)
+VIEWER_PUBLISHED_DIR=\${VIEWER_PUBLISHED_DIR:-\${APP_DATA_DIR}/published}
 echo "📁 APP_DATA_DIR=\${APP_DATA_DIR}"
+echo "📁 VIEWER_PUBLISHED_DIR=\${VIEWER_PUBLISHED_DIR}"
 if [ ! -d "\${APP_DATA_DIR}" ]; then
     if [ '${ALLOW_CREATE_APP_DATA_DIR}' = 'true' ]; then
         mkdir -p "\${APP_DATA_DIR}"
@@ -627,6 +656,16 @@ if [ ! -d "\${APP_DATA_DIR}" ]; then
         echo "❌ APP_DATA_DIR 不存在: \${APP_DATA_DIR}"
         echo "   普通部署不会自动创建空 data 目录，避免正式环境切到空数据。"
         echo "   请先恢复/同步 data，或确认首次部署后使用 ALLOW_CREATE_APP_DATA_DIR=true。"
+        exit 1
+    fi
+fi
+if [ ! -d "\${VIEWER_PUBLISHED_DIR}" ]; then
+    if [ '${ALLOW_CREATE_APP_DATA_DIR}' = 'true' ]; then
+        mkdir -p "\${VIEWER_PUBLISHED_DIR}"
+        echo "⚠️  已创建空 VIEWER_PUBLISHED_DIR: \${VIEWER_PUBLISHED_DIR}"
+    else
+        echo "❌ VIEWER_PUBLISHED_DIR 不存在: \${VIEWER_PUBLISHED_DIR}"
+        echo "   普通部署不会自动创建空 viewer 发布目录，避免浏览端切到空数据。"
         exit 1
     fi
 fi

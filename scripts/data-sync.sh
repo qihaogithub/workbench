@@ -24,6 +24,9 @@ set -euo pipefail
 # ============================================================
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="${PROJECT_DIR}/.env.docker"
+APP_DATA_DIR_FROM_ENV="$(awk -F= '$1 == "APP_DATA_DIR" { print substr($0, index($0, "=") + 1); exit }' "${ENV_FILE}" 2>/dev/null || true)"
+LOCAL_DATA_DIR="${LOCAL_DATA_DIR:-${APP_DATA_DIR_FROM_ENV:-${PROJECT_DIR}/data}}"
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -122,7 +125,7 @@ case "$direction" in
     prod2local)
         confirm_direction "正式环境 data 覆盖本地 data" \
             "正式 (SERVER_USER@SERVER_IP:REMOTE_DIR/data)" \
-            "本地 (${PROJECT_DIR}/data)"
+            "本地 (${LOCAL_DATA_DIR})"
 
         ARGS=()
         if [ "$dry_run" = true ]; then
@@ -136,7 +139,7 @@ case "$direction" in
 
     local2prod)
         confirm_direction "本地 data 覆盖正式环境 data" \
-            "本地 (${PROJECT_DIR}/data)" \
+            "本地 (${LOCAL_DATA_DIR})" \
             "正式 (SERVER_USER@SERVER_IP:REMOTE_DIR/data)"
 
         ARGS=()
