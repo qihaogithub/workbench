@@ -4,9 +4,9 @@ import { validateSketchSceneDocument } from "@workbench/sketch-core";
 import {
   isWhiteboardBinding,
   isWhiteboardDocument,
+  parseVisibilityRules,
   WHITEBOARD_DOCUMENT_MAX_BYTES,
 } from "./shared-runtime.js";
-import { parseVisibilityRules } from "@workbench/shared";
 
 export type WorkspaceResourceKind =
   | "page-code"

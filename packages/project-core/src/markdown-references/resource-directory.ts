@@ -1,4 +1,4 @@
-import { encodeMarkdownReferenceUri } from "@workbench/shared/markdown-reference";
+import { encodeMarkdownReferenceUri } from "../shared-runtime.js";
 import type {
   MarkdownReferenceCandidate,
   MarkdownReferenceTarget,

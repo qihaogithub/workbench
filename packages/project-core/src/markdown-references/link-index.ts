@@ -1,7 +1,11 @@
 import type { MarkdownReferenceSourceDocument, MarkdownLinkIndexSnapshot, MarkdownLinkRecord, MarkdownReferenceTarget, MarkdownReferenceSource, ResourceDirectorySnapshot } from "./types.js";
 import { EntityResolver } from "./entity-resolver.js";
 import { ResourceDirectory } from "./resource-directory.js";
-import { parseMarkdownReferences, encodeMarkdownReferenceUri, MARKDOWN_REFERENCE_INDEX_VERSION } from "@workbench/shared/markdown-reference";
+import {
+  encodeMarkdownReferenceUri,
+  MARKDOWN_REFERENCE_INDEX_VERSION,
+  parseMarkdownReferences,
+} from "../shared-runtime.js";
 
 export interface MarkdownReferenceIndexStore {
   rebuild(input: RebuildMarkdownReferenceIndexInput): MarkdownLinkIndexSnapshot;

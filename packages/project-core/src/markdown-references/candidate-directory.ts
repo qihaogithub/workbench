@@ -1,5 +1,7 @@
-import { enumerateSchemaFields } from "@workbench/shared/demo/config-schema-fields";
-import { encodeMarkdownReferenceUri } from "@workbench/shared/markdown-reference";
+import {
+  encodeMarkdownReferenceUri,
+  enumerateSchemaFields,
+} from "../shared-runtime.js";
 import type { ResourceDirectoryEntry } from "./types.js";
 
 /** Metadata only: callers supply already authorized, current-project resources. */
