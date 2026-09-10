@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   applySchemaDefinitionCommand,
@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ConfigForm } from "./ConfigForm";
 import { ColorDefinitionFields } from "./ColorDefinitionFields";
+import { ImageDimensionRuleEditor } from "./ImageDimensionRuleEditor";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -117,6 +118,7 @@ export function ConfigDefinitionManagerDialog({
   const [pendingSave, setPendingSave] = useState<{ mutation: SchemaDefinitionMutation; needsAi: boolean; impact: ConfigDefinitionImpactSummary | null } | null>(null);
   const [workingSchema, setWorkingSchema] = useState(EMPTY_SCHEMA);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
+  const [dimensionValidity, setDimensionValidity] = useState({ width: true, height: true });
   const schema = scope === "project" ? projectSchema || EMPTY_SCHEMA : pageSchema || EMPTY_SCHEMA;
   const bindings = scope === "project" ? projectBindings : pageBindings;
   const fields = useMemo(() => {
@@ -135,7 +137,7 @@ export function ConfigDefinitionManagerDialog({
     if (!open) return;
     setScope(pageSchema ? "page" : "project");
     setWorkingSchema(pageSchema ? pageSchema : projectSchema || EMPTY_SCHEMA);
-    setSelectedKey(null); setDraft(null); setError(""); setConnectWithAi(false); setDraftDirty(false); setHasPendingChanges(false); setAiSyncSent(false); setDefaultEditorOpen(false);
+    setSelectedKey(null); setDraft(null); setError(""); setConnectWithAi(false); setDraftDirty(false); setHasPendingChanges(false); setAiSyncSent(false); setDefaultEditorOpen(false); setDimensionValidity({ width: true, height: true });
   }, [open, pageSchema]);
 
   useEffect(() => {
@@ -161,12 +163,16 @@ export function ConfigDefinitionManagerDialog({
     return mutation.schema;
   };
   const choose = (field: ConfigDefinitionDraft) => {
-    try { stageDraft(); setSelectedKey(field.key); setDraft(field); setError(""); setConnectWithAi(false); setDraftDirty(false); }
+    try { stageDraft(); setSelectedKey(field.key); setDraft(field); setError(""); setConnectWithAi(false); setDraftDirty(false); setDimensionValidity({ width: true, height: true }); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "无法暂存字段修改"); }
   };
   const change = (patch: Partial<ConfigDefinitionDraft>) => { setDraftDirty(true); setDraft((current) => current ? { ...current, ...patch } : current); };
   const save = () => {
     try {
+      if (!dimensionValidity.width || !dimensionValidity.height) {
+        setError("请先补全并修正尺寸区间");
+        return;
+      }
       const stagedSchema = stageDraft();
       const mutation = buildStagedMutation(schema, stagedSchema);
       if (!mutation.diff.added.length && !mutation.diff.updated.length && !mutation.diff.deleted.length) return;
@@ -213,11 +219,15 @@ export function ConfigDefinitionManagerDialog({
       : { type: "group.delete", group, disposition: "ungroup" });
   };
   const isImage = draft?.kind === "image" || draft?.kind === "images";
+  const updateDimensionValidity = useCallback((axis: "width" | "height", valid: boolean) => {
+    setDimensionValidity((current) => current[axis] === valid ? current : { ...current, [axis]: valid });
+  }, []);
   const switchScope = (nextScope: ConfigDefinitionScope) => {
     if (nextScope === scope) return;
     if ((draftDirty || hasPendingChanges) && !window.confirm("切换作用域会放弃当前暂存修改，确定继续吗？")) return;
     setSelectedKey(null);
     setDraft(null);
+    setDimensionValidity({ width: true, height: true });
     setScope(nextScope);
   };
   const openDefaultEditor = () => {
@@ -240,7 +250,7 @@ export function ConfigDefinitionManagerDialog({
       <div className="grid min-h-0 flex-1 gap-0 md:grid-cols-[260px_1fr]">
         <aside className="min-h-0 overflow-y-auto border-r px-4 pb-4">
           <div className="sticky top-0 z-10 -mx-4 border-b bg-background px-4 py-3">
-            <Button type="button" size="sm" className="w-full gap-1" disabled={readonly} onClick={() => { const field = newField(nextFieldKey("新配置项", fields.map((item) => item.key))); setSelectedKey(null); setDraft(field); setDraftDirty(false); }}><Plus className="h-3.5 w-3.5" />添加配置项</Button>
+            <Button type="button" size="sm" className="w-full gap-1" disabled={readonly} onClick={() => { const field = newField(nextFieldKey("新配置项", fields.map((item) => item.key))); setSelectedKey(null); setDraft(field); setDraftDirty(false); setDimensionValidity({ width: true, height: true }); }}><Plus className="h-3.5 w-3.5" />添加配置项</Button>
             <p className="mt-2 text-xs text-muted-foreground">共 {fields.length} 项，分组用于整理字段，不单独保存为空目录。</p>
           </div>
           {groupedFields.length === 0 ? <p className="px-1 py-4 text-xs text-muted-foreground">暂无配置项。点击上方按钮创建第一个字段。</p> : <div className="pt-3">{groupedFields.map(([group, groupFields]) => <section key={group} className="mb-4"><div className="flex items-center gap-1 px-1 pb-1"><p className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">{group} · {groupFields.length}</p>{group !== "未分组" && !readonly && <><button type="button" className="rounded px-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => { const next = window.prompt("重命名分组", group); if (next?.trim() && next.trim() !== group) applyCommand({ type: "group.rename", from: group, to: next }); }}>重命名</button><button type="button" className="rounded px-1 text-xs text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => deleteGroup(group)}>删除</button></>}</div><div className="space-y-1">{groupFields.map((field) => <button key={field.key} type="button" onClick={() => choose(field)} className={`block w-full rounded-md border border-transparent px-2 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selectedKey === field.key ? "border-primary/30 bg-primary/10" : "hover:bg-muted/60"}`}><span className="block truncate font-medium">{field.title}</span><span className="text-xs text-muted-foreground">{KINDS.find(([kind]) => kind === field.kind)?.[1]} · {bindings.includes(field.key) ? "已绑定" : "未绑定"}</span></button>)}</div></section>)}</div>}
@@ -257,7 +267,7 @@ export function ConfigDefinitionManagerDialog({
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!draft.required} onChange={(event) => change({ required: event.target.checked })} disabled={readonly} />必填</label>
           {draft.kind === "enum" && <label className="block space-y-1 text-sm">枚举选项（每行一个）<Textarea value={(draft.enum ?? []).join("\n")} onChange={(event) => change({ enum: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} disabled={readonly} /></label>}
           {draft.kind === "color" && <ColorDefinitionFields draft={draft} onChange={change} readOnly={readonly} />}
-          {isImage && <fieldset className="space-y-3 rounded-md border p-3"><legend className="px-1 text-sm font-medium">图片限制</legend><label className="block space-y-1 text-sm">接受的文件类型<select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={draft.accept || "image/*"} onChange={(event) => change({ accept: event.target.value })} disabled={readonly}>{ACCEPT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="block space-y-1 text-sm">文件大小上限（bytes）<Input type="number" min="0" value={draft.maxSize ?? ""} onChange={(event) => change({ maxSize: event.target.value === "" ? undefined : Number(event.target.value) })} disabled={readonly} /></label><div className="space-y-2"><p className="text-sm font-medium">尺寸规则</p><p className="text-xs text-muted-foreground">每一条规则单独生效，例如 W ≥ 100、H ≤ 800。</p>{([['W','minWidth','≥'],['W','maxWidth','≤'],['H','minHeight','≥'],['H','maxHeight','≤']] as const).map(([axis, key, symbol]) => <div key={key} className="grid grid-cols-[44px_76px_1fr_24px] items-center gap-2"><span className="rounded-md bg-muted px-2 py-2 text-center text-sm font-medium">{axis}</span><select aria-label={`${key} 比较符`} className="h-9 rounded-md border bg-background px-2 text-sm" value={symbol} onChange={(event) => { const alternative = key.startsWith('min') ? key.replace('min', 'max') as typeof key : key.replace('max', 'min') as typeof key; const value = draft[key]; change({ [key]: undefined, [alternative]: event.target.value === '≥' ? value : value }); }} disabled={readonly}><option value="≥">≥</option><option value="≤">≤</option></select><Input aria-label={`${axis}${symbol}具体数值`} type="number" min="0" value={draft[key] ?? ""} placeholder="输入数值" onChange={(event) => change({ [key]: event.target.value === "" ? undefined : Number(event.target.value) })} disabled={readonly} /><span className="text-xs text-muted-foreground">px</span></div>)}</div></fieldset>}
+          {isImage && <fieldset className="space-y-3 rounded-md border p-3"><legend className="px-1 text-sm font-medium">图片限制</legend><label className="block space-y-1 text-sm">接受的文件类型<select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={draft.accept || "image/*"} onChange={(event) => change({ accept: event.target.value })} disabled={readonly}>{ACCEPT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="block space-y-1 text-sm">文件大小上限（bytes）<Input type="number" min="0" value={draft.maxSize ?? ""} onChange={(event) => change({ maxSize: event.target.value === "" ? undefined : Number(event.target.value) })} disabled={readonly} /></label><div className="grid gap-3 sm:grid-cols-2"><ImageDimensionRuleEditor axis="W" rule={draft.widthRule} onChange={(widthRule) => change({ widthRule })} onValidityChange={(valid) => updateDimensionValidity("width", valid)} readOnly={readonly} /><ImageDimensionRuleEditor axis="H" rule={draft.heightRule} onChange={(heightRule) => change({ heightRule })} onValidityChange={(valid) => updateDimensionValidity("height", valid)} readOnly={readonly} /></div></fieldset>}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           {lastImpact && <div className="rounded-md border bg-muted/40 p-3 text-xs"><p className="font-medium">影响分析：{lastImpact.risk === "ai_required" ? "需要 AI 同步页面" : lastImpact.risk === "metadata" ? "存在引用，请确认展示与说明" : "未发现页面绑定"}</p>{lastImpact.boundPages.map((page) => <p key={page.pageName} className="mt-1 text-muted-foreground">{page.pageName}：{page.keys.join("、")}</p>)}{lastImpact.requirementRefCount > 0 && <p className="mt-1 text-muted-foreground">配置要求引用：{lastImpact.requirementRefCount} 处</p>}{lastImpact.designSpecRefCount > 0 && <p className="mt-1 text-muted-foreground">设计规范引用：{lastImpact.designSpecRefCount} 处</p>}</div>}
           {aiSyncSent && <p className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground">定义已保存，AI 页面同步任务已发送。请在 AI 对话中查看运行状态、mutation receipt 与 run summary。</p>}

@@ -7,6 +7,7 @@ import type {
   ConfigPoolItemKind,
   DesignSpecRef,
 } from "@/lib/design-specs";
+import { formatImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
 
 export const KIND_META: Record<ConfigPoolItemKind, { label: string }> = {
   color: { label: "色值" },
@@ -61,13 +62,13 @@ export function pageLabel(item: ConfigPoolItem): string {
   return item.scope === "project" ? "项目级" : item.pageName || "页面";
 }
 
-/** 尺寸格式化：W=xxx H=xxx / W≥xxx H=xxx / W=不限 H=xxx */
+/** 尺寸格式化：复用共享的 W/H min/max 边界文案。 */
 export function formatSize(item: ConfigPoolItem): string {
   const s = item.size;
   if (!s) return "—";
-  const wStr = s.wAny ? "不限" : `${s.wOperator || (s.wMin ? "≥" : "=")} ${s.w}px`;
-  const hStr = s.hAny ? "不限" : `${s.hOperator || (s.hMin ? "≥" : "=")} ${s.h}px`;
-  return `W ${wStr} · H ${hStr}`;
+  const wStr = formatImageDimensionRule(s.width, "W");
+  const hStr = formatImageDimensionRule(s.height, "H");
+  return `${wStr} · ${hStr}`;
 }
 
 export function Swatch({

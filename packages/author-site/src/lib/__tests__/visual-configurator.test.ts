@@ -100,8 +100,8 @@ export default function Demo({}: DemoProps) {
         fieldKey: "bannerImage",
         title: "Banner",
         defaultValue: "/banner.png",
-        widthRule: { operator: "≥", value: 320 },
-        heightRule: { operator: "≤", value: 900 },
+        widthRule: { min: { value: 320, inclusive: true } },
+        heightRule: { max: { value: 900, inclusive: true } },
       },
     });
 
@@ -113,7 +113,7 @@ export default function Demo({}: DemoProps) {
       title: "Banner",
       default: "/banner.png",
       format: "image",
-      "ui:options": { widthRule: { operator: "≥", value: 320 }, heightRule: { operator: "≤", value: 900 } },
+      "ui:options": { widthRule: { min: { value: 320, inclusive: true } }, heightRule: { max: { value: 900, inclusive: true } } },
     });
   });
 
@@ -203,10 +203,10 @@ export default function Demo({}: DemoProps) {
     const result = applyPrototypeVisualConfiguration({
       html: '<img data-ow-id="banner" src="/banner.png" />', schema,
       node: node({ nodeId: "banner", tagName: "img", textContent: undefined, attrs: { src: "/banner.png" } }),
-      target: { kind: "image", fieldKey: "bannerImage", title: "Banner", defaultValue: "/banner.png", widthRule: { operator: "=", value: 400 }, heightRule: { operator: "<", value: 600 } },
+      target: { kind: "image", fieldKey: "bannerImage", title: "Banner", defaultValue: "/banner.png", widthRule: { min: { value: 400, inclusive: true }, max: { value: 400, inclusive: true } }, heightRule: { min: { value: 670, inclusive: false }, max: { value: 890, inclusive: false } } },
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(JSON.parse(result.schema).properties.bannerImage["ui:options"]).toEqual({ widthRule: { operator: "=", value: 400 }, heightRule: { operator: "<", value: 600 } });
+    expect(JSON.parse(result.schema).properties.bannerImage["ui:options"]).toEqual({ widthRule: { min: { value: 400, inclusive: true }, max: { value: 400, inclusive: true } }, heightRule: { min: { value: 670, inclusive: false }, max: { value: 890, inclusive: false } } });
   });
 });

@@ -93,15 +93,64 @@ describe("configuration definition mutations", () => {
     expect(readConfigDefinitionFields(select.schema).find((item) => item.key === "layout")?.enumWidget).toBe("select");
   });
 
-  it("adds image constraints using one rule per dimension", () => {
+  it("adds normalized image constraints for single bounds and exact values", () => {
     const result = applySchemaDefinitionCommand(SCHEMA, {
       type: "field.update",
       key: "heroImage",
-      patch: { widthRule: { operator: "≥", value: 320 }, heightRule: { operator: "=", value: 1280 }, maxSize: 2048 },
+      patch: {
+        widthRule: { min: { value: 320, inclusive: true } },
+        heightRule: { min: { value: 1280, inclusive: true }, max: { value: 1280, inclusive: true } },
+        maxSize: 2048,
+      },
     });
     const parsed = JSON.parse(result.schema);
-    expect(parsed.properties.heroImage["ui:options"]).toEqual({ widthRule: { operator: "≥", value: 320 }, heightRule: { operator: "=", value: 1280 }, maxSize: 2048 });
+    expect(parsed.properties.heroImage["ui:options"]).toEqual({
+      widthRule: { min: { value: 320, inclusive: true } },
+      heightRule: { min: { value: 1280, inclusive: true }, max: { value: 1280, inclusive: true } },
+      maxSize: 2048,
+    });
     expect(result.diff.updated).toEqual(["heroImage"]);
+  });
+
+  it("normalizes the existing operator/value shape when reading and saving", () => {
+    const legacy = JSON.stringify({
+      type: "object",
+      properties: {
+        heroImage: {
+          type: "string",
+          format: "image",
+          "ui:options": { heightRule: { operator: ">", value: 670 } },
+        },
+      },
+    });
+    expect(readConfigDefinitionFields(legacy)[0].heightRule).toEqual({ min: { value: 670, inclusive: false } });
+    const result = applySchemaDefinitionCommand(legacy, {
+      type: "field.update",
+      key: "heroImage",
+      patch: { title: "弹窗图片" },
+    });
+    expect(JSON.parse(result.schema).properties.heroImage["ui:options"]).toEqual({
+      heightRule: { min: { value: 670, inclusive: false } },
+    });
+  });
+
+  it("writes an open height interval", () => {
+    const result = applySchemaDefinitionCommand(SCHEMA, {
+      type: "field.update",
+      key: "heroImage",
+      patch: {
+        heightRule: {
+          min: { value: 670, inclusive: false },
+          max: { value: 890, inclusive: false },
+        },
+      },
+    });
+    expect(JSON.parse(result.schema).properties.heroImage["ui:options"]).toEqual({
+      heightRule: {
+        min: { value: 670, inclusive: false },
+        max: { value: 890, inclusive: false },
+      },
+    });
   });
 
   it("creates a video field with an object value and hidden preview options", () => {

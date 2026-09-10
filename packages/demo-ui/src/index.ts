@@ -165,6 +165,8 @@ export type {
   ConfigDefinitionImpactSummary,
 } from "./ConfigDefinitionManagerDialog";
 export { ConfigItemEditorDialog } from "./ConfigItemEditorDialog";
+export { ImageDimensionRuleEditor } from "./ImageDimensionRuleEditor";
+export type { ImageDimensionRuleEditorProps } from "./ImageDimensionRuleEditor";
 export type {
   ConfigItemEditorDialogProps,
   ConfigItemApplyPlanSnapshot,

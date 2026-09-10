@@ -1,4 +1,24 @@
 /** Controlled mutations for the flat JSON Schema dialect used by configuration panels. */
+import {
+  normalizeImageDimensionRule,
+  type ImageDimensionRule,
+} from "./image-dimension-rules";
+
+export {
+  exactImageDimensionRule,
+  formatImageDimensionRule,
+  formatImageDimensionRuleCompact,
+  matchesImageDimension,
+  normalizeImageDimensionRule,
+  validateImageDimensions,
+  validateImageDimensionRule,
+} from "./image-dimension-rules";
+export type {
+  ImageDimensionBound,
+  ImageDimensionOperator,
+  ImageDimensionRule,
+} from "./image-dimension-rules";
+
 export type ConfigDefinitionKind =
   | "text"
   | "textarea"
@@ -23,13 +43,6 @@ export interface ConfigColorPreset {
   value: string;
 }
 
-export type ImageDimensionOperator = "=" | ">" | "≥" | "<" | "≤";
-
-export interface ImageDimensionRule {
-  operator: ImageDimensionOperator;
-  value: number;
-}
-
 export interface ConfigDefinitionDraft {
   key: string;
   title: string;
@@ -49,11 +62,6 @@ export interface ConfigDefinitionDraft {
   maxSize?: number;
   widthRule?: ImageDimensionRule;
   heightRule?: ImageDimensionRule;
-  /** @deprecated Internal legacy manager state. New schema writes use widthRule/heightRule. */
-  minWidth?: number;
-  maxWidth?: number;
-  minHeight?: number;
-  maxHeight?: number;
 }
 
 export type SchemaDefinitionCommand =
@@ -230,13 +238,7 @@ function numberOption(value: unknown, label: string): number | undefined {
 }
 
 function dimensionRule(value: unknown, label: string): ImageDimensionRule | undefined {
-  if (value === undefined || value === null) return undefined;
-  const rule = record(value);
-  const operator = rule.operator;
-  if (!["=", ">", "≥", "<", "≤"].includes(String(operator))) throw new Error(`${label} 比较符无效`);
-  const size = numberOption(rule.value, `${label}数值`);
-  if (size === undefined) throw new Error(`${label} 需要填写数值`);
-  return { operator: operator as ImageDimensionOperator, value: size };
+  return normalizeImageDimensionRule(value, label);
 }
 
 function resolveColorFormat(value: unknown): ConfigColorFormat {
@@ -474,6 +476,18 @@ function applyMetadataPatch(
     }
     if (changed("heightRule")) {
       const heightRule = dimensionRule(next.heightRule, "高度规则");
+      if (heightRule) options.heightRule = heightRule;
+      else delete options.heightRule;
+    }
+    // A metadata-only edit also canonicalizes any currently persisted legacy
+    // operator/value rule so the next schema write has one stable shape.
+    if (Object.prototype.hasOwnProperty.call(options, "widthRule")) {
+      const widthRule = dimensionRule(options.widthRule, "宽度规则");
+      if (widthRule) options.widthRule = widthRule;
+      else delete options.widthRule;
+    }
+    if (Object.prototype.hasOwnProperty.call(options, "heightRule")) {
+      const heightRule = dimensionRule(options.heightRule, "高度规则");
       if (heightRule) options.heightRule = heightRule;
       else delete options.heightRule;
     }

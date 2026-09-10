@@ -4,6 +4,10 @@ import React, { useState, useCallback, useRef, useMemo, type ReactNode } from 'r
 import { Trash2, Plus, Loader2, AlertTriangle, ZoomIn, Undo2 } from 'lucide-react';
 
 import { resolveConfigImageSrc } from './preview-config-utils';
+import {
+  validateImageDimensions,
+  type ImageDimensionRule,
+} from '@workbench/shared/demo/config-schema-definition';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -32,25 +36,8 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
 }
 
 interface DimensionOptions {
-  widthRule?: { operator: "=" | ">" | "≥" | "<" | "≤"; value: number };
-  heightRule?: { operator: "=" | ">" | "≥" | "<" | "≤"; value: number };
-}
-
-function validateImageDimensions(
-  actual: { width: number; height: number },
-  options: DimensionOptions
-): { valid: boolean; message: string } {
-  const parts: string[] = [];
-  const matches = (actualValue: number, rule: DimensionOptions["widthRule"]) => !rule
-    || ({ "=": actualValue === rule.value, ">": actualValue > rule.value, "≥": actualValue >= rule.value, "<": actualValue < rule.value, "≤": actualValue <= rule.value }[rule.operator]);
-  if (!matches(actual.width, options.widthRule) && options.widthRule) parts.push(`宽度${options.widthRule.operator}${options.widthRule.value}px`);
-  if (!matches(actual.height, options.heightRule) && options.heightRule) parts.push(`高度${options.heightRule.operator}${options.heightRule.value}px`);
-
-  if (parts.length === 0) return { valid: true, message: '' };
-  return {
-    valid: false,
-    message: `图片尺寸不符合要求：${parts.join('，')}（实际 ${actual.width}x${actual.height}px）`,
-  };
+  widthRule?: ImageDimensionRule;
+  heightRule?: ImageDimensionRule;
 }
 
 async function deleteServerFile(sessionId: string, url: string) {

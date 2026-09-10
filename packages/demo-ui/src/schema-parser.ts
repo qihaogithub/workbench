@@ -57,6 +57,7 @@ export interface FieldConfig {
 }
 
 import { isAtomicConfigField } from "@workbench/shared";
+import { normalizeImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
 
 export interface FieldGroup {
   title: string;
@@ -220,9 +221,22 @@ function parseFieldConfig(
   required: boolean,
   typeLimits?: Record<string, number>,
 ): FieldConfig {
-  const uiOptions = isPlainRecord(prop["ui:options"])
+  const rawUiOptions = isPlainRecord(prop["ui:options"])
     ? (prop["ui:options"] as Record<string, unknown>)
     : undefined;
+  const uiOptions = rawUiOptions ? { ...rawUiOptions } : undefined;
+  if (uiOptions) {
+    for (const key of ["widthRule", "heightRule"] as const) {
+      if (!Object.prototype.hasOwnProperty.call(uiOptions, key)) continue;
+      try {
+        const normalized = normalizeImageDimensionRule(uiOptions[key], key === "widthRule" ? "宽度规则" : "高度规则");
+        if (normalized) uiOptions[key] = normalized;
+        else delete uiOptions[key];
+      } catch {
+        // Keep malformed metadata available for the field renderer to ignore safely.
+      }
+    }
+  }
   const demoOptions = isPlainRecord(prop.$demo)
     ? (prop.$demo as Record<string, unknown>)
     : undefined;

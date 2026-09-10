@@ -17,7 +17,7 @@ function PoolProbe() {
       <button type="button" onClick={() => workspace.setActiveDocId("spec-1")}>
         打开规范
       </button>
-      <span data-testid="pool-size">{workspace.pool[0]?.size?.w ?? ""}</span>
+      <span data-testid="pool-size">{workspace.pool[0]?.size?.width?.min?.value ?? ""}</span>
     </>
   );
 }
@@ -177,7 +177,7 @@ describe("DesignSpecWorkspace 配置素材池刷新", () => {
           key: "hero",
           title: "背景图",
           kind: "image",
-          size: { w: "1920", h: "1080" },
+          size: { width: { min: { value: 1920, inclusive: true }, max: { value: 1920, inclusive: true } }, height: { min: { value: 1080, inclusive: true }, max: { value: 1080, inclusive: true } } },
         },
       ],
       pages: [{ id: "page-1", name: "页面一" }],
@@ -270,7 +270,7 @@ describe("DesignSpecWorkspace 配置素材池刷新", () => {
             key: "hero",
             title: "背景图",
             kind: "image",
-            size: { w: "1920", h: "1080" },
+            size: { width: { min: { value: 1920, inclusive: true }, max: { value: 1920, inclusive: true } }, height: { min: { value: 1080, inclusive: true }, max: { value: 1080, inclusive: true } } },
           },
         ],
         pages: [{ id: "page-1", name: "页面一" }],
@@ -284,7 +284,7 @@ describe("DesignSpecWorkspace 配置素材池刷新", () => {
             key: "hero",
             title: "背景图",
             kind: "image",
-            size: { w: "1440", h: "900" },
+            size: { width: { min: { value: 1440, inclusive: true }, max: { value: 1440, inclusive: true } }, height: { min: { value: 900, inclusive: true }, max: { value: 900, inclusive: true } } },
           },
         ],
         pages: [{ id: "page-1", name: "页面一" }],

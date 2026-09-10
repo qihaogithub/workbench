@@ -1,4 +1,9 @@
 import { enumerateSchemaFields, type SchemaCatalogField } from "@workbench/shared/demo/config-schema-fields";
+import {
+  exactImageDimensionRule,
+  normalizeImageDimensionRule,
+  type ImageDimensionRule,
+} from "@workbench/shared/demo/config-schema-definition";
 import type { ConfigPoolItem, ConfigPoolItemKind } from "./types";
 
 /** 页面元信息（用于聚合配置项池） */
@@ -94,12 +99,8 @@ function resolveImageSize(
   const heightRule = readImageRule(field.uiOptions?.heightRule);
   if (widthRule || heightRule) {
     return {
-      w: widthRule ? String(widthRule.value) : "",
-      h: heightRule ? String(heightRule.value) : "",
-      wOperator: widthRule?.operator,
-      hOperator: heightRule?.operator,
-      wAny: !widthRule,
-      hAny: !heightRule,
+      width: widthRule,
+      height: heightRule,
     };
   }
 
@@ -108,7 +109,10 @@ function resolveImageSize(
   if (!size || !isPositivePixel(size.width) || !isPositivePixel(size.height)) {
     return undefined;
   }
-  return { w: String(size.width), h: String(size.height) };
+  return {
+    width: exactImageDimensionRule(size.width),
+    height: exactImageDimensionRule(size.height),
+  };
 }
 
 function isPositivePixel(value: unknown): value is number {
@@ -178,10 +182,10 @@ function inferFormat(field: SchemaCatalogField): string | undefined {
   return undefined;
 }
 
-function readImageRule(value: unknown): { operator: string; value: number } | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const rule = value as Record<string, unknown>;
-  return typeof rule.operator === "string" && typeof rule.value === "number" && Number.isFinite(rule.value)
-    ? { operator: rule.operator, value: rule.value }
-    : undefined;
+function readImageRule(value: unknown): ImageDimensionRule | undefined {
+  try {
+    return normalizeImageDimensionRule(value);
+  } catch {
+    return undefined;
+  }
 }

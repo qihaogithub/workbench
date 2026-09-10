@@ -19,6 +19,10 @@ import type { SpineAssetRefV1 } from '@workbench/shared';
 import type { WorkspaceMutationReceipt } from '@workbench/shared/contracts';
 import type { ConfigChangeMeta } from './types';
 import { ColorPicker, type ColorPickerFormat, type ColorPreset } from '@workbench/color-picker';
+import {
+  validateImageDimensions,
+  type ImageDimensionRule,
+} from '@workbench/shared/demo/config-schema-definition';
 
 function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
@@ -37,25 +41,8 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
 }
 
 interface DimensionOptions {
-  widthRule?: { operator: "=" | ">" | "≥" | "<" | "≤"; value: number };
-  heightRule?: { operator: "=" | ">" | "≥" | "<" | "≤"; value: number };
-}
-
-function validateImageDimensions(
-  actual: { width: number; height: number },
-  options: DimensionOptions
-): { valid: boolean; message: string } {
-  const parts: string[] = [];
-  const matches = (actualValue: number, rule: DimensionOptions["widthRule"]) => !rule
-    || ({ "=": actualValue === rule.value, ">": actualValue > rule.value, "≥": actualValue >= rule.value, "<": actualValue < rule.value, "≤": actualValue <= rule.value }[rule.operator]);
-  if (!matches(actual.width, options.widthRule) && options.widthRule) parts.push(`宽度${options.widthRule.operator}${options.widthRule.value}px`);
-  if (!matches(actual.height, options.heightRule) && options.heightRule) parts.push(`高度${options.heightRule.operator}${options.heightRule.value}px`);
-
-  if (parts.length === 0) return { valid: true, message: '' };
-  return {
-    valid: false,
-    message: `图片尺寸不符合要求：${parts.join('，')}（实际 ${actual.width}x${actual.height}px）`,
-  };
+  widthRule?: ImageDimensionRule;
+  heightRule?: ImageDimensionRule;
 }
 
 async function deleteServerFile(sessionId: string, url: string) {

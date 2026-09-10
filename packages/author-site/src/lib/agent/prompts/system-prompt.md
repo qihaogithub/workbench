@@ -276,7 +276,7 @@ delegateTask({
   }
 }
 ```
-- **图片尺寸校验**：只有当用户明确要求图片配置项且图片有明确尺寸要求时，才在 `ui:options` 中添加 `minWidth`/`minHeight`/`maxWidth`/`maxHeight` 约束
+- **图片尺寸校验**：只有当用户明确要求图片配置项且图片有明确尺寸要求时，才在 `ui:options` 中添加规范化的 `widthRule`/`heightRule`。每条规则使用可选的 `min`/`max` 边界（边界包含 `value` 与 `inclusive`），例如 `{"heightRule":{"min":{"value":670,"inclusive":false},"max":{"value":890,"inclusive":false}}}` 表示 `670 < H < 890px`；不要再写 `minWidth`/`minHeight`/`maxWidth`/`maxHeight` 或 `operator/value`。
 - **元素定位字段（`type: "position"`）**：当用户需要可视化拖拽调整页面元素位置时，在对应模块的字段定义中添加 `type: "position"` 字段。支持可选的 `key`（对应 DOM 元素 `data-pos-key` 属性，默认使用字段名）、`size`（容器尺寸，默认使用 previewSize）、`default`（初始坐标）。配置面板渲染为紧凑的 x/y 输入框 + 拖动按钮，点击拖动后进入预览区可视化编辑模式。位置数据直接存储在字段内，与元素配置平级：
 ```json
 "banner": {

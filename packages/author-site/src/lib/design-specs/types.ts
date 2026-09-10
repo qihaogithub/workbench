@@ -1,5 +1,7 @@
 /** 设计规范模块类型定义 */
 
+import type { ImageDimensionRule } from "@workbench/shared/demo/config-schema-definition";
+
 /** 配置项引用：设计规范只存引用，不存值 */
 export interface DesignSpecRef {
   scope: "project" | "page";
@@ -78,14 +80,8 @@ export interface ConfigPoolItem {
   format?: string;
   /** 图片尺寸信息（schema 无法可靠推导时省略） */
   size?: {
-    w: string;
-    h: string;
-    wOperator?: string;
-    hOperator?: string;
-    wMin?: boolean;
-    wAny?: boolean;
-    hMin?: boolean;
-    hAny?: boolean;
+    width?: ImageDimensionRule;
+    height?: ImageDimensionRule;
   } | null;
   /** 项目级配置项受影响的页面 IDs，用于页面筛选。 */
   pageIds?: string[];

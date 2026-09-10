@@ -229,7 +229,10 @@ describe("配置项素材池聚合", () => {
         : null,
     });
 
-    expect(pool[0].size).toEqual({ w: "750", h: "148" });
+    expect(pool[0].size).toEqual({
+      width: { min: { value: 750, inclusive: true }, max: { value: 750, inclusive: true } },
+      height: { min: { value: 148, inclusive: true }, max: { value: 148, inclusive: true } },
+    });
   });
 
   it("将图片 ui:options 的格式与尺寸规则带到设计规范摘要", () => {
@@ -254,12 +257,8 @@ describe("配置项素材池聚合", () => {
 
     expect(pool[0].format).toBe("png/jpg");
     expect(pool[0].size).toEqual({
-      w: "100",
-      h: "100",
-      wOperator: "=",
-      hOperator: "=",
-      wAny: false,
-      hAny: false,
+      width: { min: { value: 100, inclusive: true }, max: { value: 100, inclusive: true } },
+      height: { min: { value: 100, inclusive: true }, max: { value: 100, inclusive: true } },
     });
   });
 

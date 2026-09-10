@@ -2,6 +2,27 @@ import { describe, expect, it } from "vitest";
 import { parseSchemaToFields } from "./schema-parser";
 
 describe("parseSchemaToFields grouping", () => {
+  it("在字段解析层把旧 operator/value 尺寸规则集中规范化", () => {
+    const groups = parseSchemaToFields(JSON.stringify({
+      type: "object",
+      properties: {
+        hero: {
+          type: "string",
+          format: "image",
+          "ui:options": {
+            widthRule: { operator: ">", value: 670 },
+            heightRule: { operator: "≤", value: 890 },
+          },
+        },
+      },
+    }));
+
+    expect(groups[0].fields[0].uiOptions).toMatchObject({
+      widthRule: { min: { value: 670, inclusive: false } },
+      heightRule: { max: { value: 890, inclusive: true } },
+    });
+  });
+
   it("only creates a group section when ui:options.group is explicit", () => {
     const groups = parseSchemaToFields(JSON.stringify({
       type: "object",

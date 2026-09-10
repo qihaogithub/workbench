@@ -52,8 +52,24 @@ describe("formatSize", () => {
     expect(formatSize({
       ...baseItem,
       kind: "image",
-      size: { w: "100", h: "100", wOperator: "=", hOperator: "=" },
+      size: {
+        width: { min: { value: 100, inclusive: true }, max: { value: 100, inclusive: true } },
+        height: { min: { value: 100, inclusive: true }, max: { value: 100, inclusive: true } },
+      },
     })).toBe("W = 100px · H = 100px");
+  });
+
+  it("格式化开区间图片尺寸规则", () => {
+    expect(formatSize({
+      ...baseItem,
+      kind: "image",
+      size: {
+        height: {
+          min: { value: 670, inclusive: false },
+          max: { value: 890, inclusive: false },
+        },
+      },
+    })).toBe("不限 · H > 670px 且 H < 890px");
   });
 
   it("未设置尺寸规则时显示破折号", () => {

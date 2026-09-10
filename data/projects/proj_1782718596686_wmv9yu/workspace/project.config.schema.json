@@ -39,8 +39,24 @@
           "equals": "image"
         },
         "widthRule": {
-          "operator": "=",
-          "value": 670
+          "min": {
+            "value": 670,
+            "inclusive": true
+          },
+          "max": {
+            "value": 670,
+            "inclusive": true
+          }
+        },
+        "heightRule": {
+          "min": {
+            "value": 670,
+            "inclusive": true
+          },
+          "max": {
+            "value": 890,
+            "inclusive": true
+          }
         }
       }
     },

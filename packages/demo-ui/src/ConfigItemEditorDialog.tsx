@@ -1,7 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
-import type { ConfigColorFormat, ConfigDefinitionDraft, ConfigDefinitionKind, ImageDimensionOperator } from "@workbench/shared/demo/config-schema-definition";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import type { ConfigColorFormat, ConfigDefinitionDraft, ConfigDefinitionKind } from "@workbench/shared/demo/config-schema-definition";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,6 +22,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { ColorDefinitionFields } from "./ColorDefinitionFields";
+import { ImageDimensionRuleEditor } from "./ImageDimensionRuleEditor";
 
 export type ConfigItemEditorMode = "create" | "edit";
 export type ConfigItemEditorScope = "page" | "project";
@@ -103,16 +104,6 @@ function isImage(kind: ConfigDefinitionKind) {
   return kind === "image" || kind === "images";
 }
 
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-const DIMENSIONS = [
-  { axis: "W", key: "widthRule" },
-  { axis: "H", key: "heightRule" },
-] as const;
-const DIMENSION_OPERATORS: ImageDimensionOperator[] = ["=", ">", "≥", "<", "≤"];
-
 function planActionLabel(plan?: ConfigItemApplyPlanSnapshot) {
   switch (plan?.kind) {
     case "bind_and_apply": return "保存并应用";
@@ -133,6 +124,15 @@ export function ConfigItemEditorDialog({
   const plan = { ...PLAN_COPY[applyPlan?.kind ?? "schema_only"], ...applyPlan };
   const update = (patch: Partial<ConfigDefinitionDraft>) => onDraftChange({ ...draft, ...patch });
   const imageField = isImage(draft.kind);
+  const [dimensionValidity, setDimensionValidity] = useState({ width: true, height: true });
+  const updateDimensionValidity = useCallback((axis: "width" | "height", valid: boolean) => {
+    setDimensionValidity((current) => current[axis] === valid ? current : { ...current, [axis]: valid });
+  }, []);
+  const dimensionsValid = !imageField || (dimensionValidity.width && dimensionValidity.height);
+
+  useEffect(() => {
+    setDimensionValidity({ width: true, height: true });
+  }, [draft.key, draft.kind]);
   const canApply = !!onApply && plan.kind !== "unsupported";
   const kindOptions = allowedKinds
     ? KINDS.filter(([kind]) => allowedKinds.includes(kind))
@@ -210,20 +210,10 @@ export function ConfigItemEditorDialog({
             </label>
             <label className="block space-y-1.5 text-sm font-medium">文件大小上限（MB）<Input type="number" min="0" step="0.1" value={draft.maxSize === undefined ? "" : draft.maxSize / BYTES_PER_MB} onChange={(event) => update({ maxSize: event.target.value === "" ? undefined : Number(event.target.value) * BYTES_PER_MB })} disabled={readOnly} /></label>
             </div>
-            <div className="space-y-2"><p className="text-sm font-medium">尺寸规则</p>
+            <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
-              {DIMENSIONS.map((item) => {
-                const rule = draft[item.key];
-                const operator = rule?.operator ?? "=";
-                return <div key={item.key} className="grid grid-cols-[40px_78px_minmax(0,1fr)_24px] items-center gap-2">
-                  <span className="rounded-md bg-muted py-2 text-center text-sm font-semibold">{item.axis}</span>
-                  <Select value={operator} onValueChange={(nextOperator) => update({ [item.key]: { operator: nextOperator as ImageDimensionOperator, value: rule?.value ?? 0 } })} disabled={readOnly}>
-                    <SelectTrigger aria-label={`${item.axis} 比较符`}><SelectValue /></SelectTrigger><SelectContent>{DIMENSION_OPERATORS.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
-                  </Select>
-                  <Input aria-label={`${item.axis}${operator}具体数值`} type="number" min="0" value={rule?.value ?? ""} placeholder="输入数值" onChange={(event) => update({ [item.key]: event.target.value === "" ? undefined : { operator, value: Number(event.target.value) } })} disabled={readOnly} />
-                  <span className="text-xs text-muted-foreground">px</span>
-                </div>;
-              })}
+                <ImageDimensionRuleEditor axis="W" rule={draft.widthRule} onChange={(widthRule) => update({ widthRule })} onValidityChange={(valid) => updateDimensionValidity("width", valid)} readOnly={readOnly} />
+                <ImageDimensionRuleEditor axis="H" rule={draft.heightRule} onChange={(heightRule) => update({ heightRule })} onValidityChange={(valid) => updateDimensionValidity("height", valid)} readOnly={readOnly} />
               </div>
             </div>
           </div>}
@@ -242,8 +232,8 @@ export function ConfigItemEditorDialog({
         <DialogFooter className="shrink-0 gap-2 border-t px-6 py-4 sm:justify-between">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>取消</Button>
           <div className="flex gap-2">
-            {onSave && <Button type="button" variant={canApply ? "outline" : "default"} onClick={onSave} disabled={busy || readOnly || plan.kind === "unsupported"}>{busy ? "保存中…" : "保存字段"}</Button>}
-            {canApply && <Button type="button" onClick={onApply} disabled={busy || readOnly}>{planActionLabel(plan)}</Button>}
+            {onSave && <Button type="button" variant={canApply ? "outline" : "default"} onClick={onSave} disabled={busy || readOnly || plan.kind === "unsupported" || !dimensionsValid}>{busy ? "保存中…" : "保存字段"}</Button>}
+            {canApply && <Button type="button" onClick={onApply} disabled={busy || readOnly || !dimensionsValid}>{planActionLabel(plan)}</Button>}
           </div>
         </DialogFooter>
       </DialogContent>
@@ -252,5 +242,5 @@ export function ConfigItemEditorDialog({
 }
 
 export function hasConfigItemEditorConstraint(draft: ConfigDefinitionDraft) {
-  return [draft.widthRule?.value, draft.heightRule?.value].some(isFiniteNumber);
+  return Boolean(draft.widthRule || draft.heightRule);
 }

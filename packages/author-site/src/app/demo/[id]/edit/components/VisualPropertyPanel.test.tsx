@@ -321,8 +321,8 @@ describe("VisualPropertyPanel 配置项入口", () => {
       fieldKey: "coverImage",
       defaultValue: "/cover.png",
       scope: "page",
-      widthRule: { operator: "≥", value: 320 },
-      heightRule: { operator: "≤", value: 900 },
+      widthRule: { min: { value: 320, inclusive: true } },
+      heightRule: { max: { value: 900, inclusive: true } },
     };
 
     const onUpdateConfigMark = jest.fn();
@@ -331,16 +331,12 @@ describe("VisualPropertyPanel 配置项入口", () => {
 
     expect(screen.getByRole("dialog")).toHaveTextContent("格式限制");
     expect(screen.getByText("全部图片")).toBeInTheDocument();
-    expect(screen.getByLabelText("W≥具体数值")).toHaveValue(320);
-    expect(screen.getByLabelText("H≤具体数值")).toHaveValue(900);
+    expect(screen.getByLabelText("W下限具体数值")).toHaveValue(320);
+    expect(screen.getByLabelText("H上限具体数值")).toHaveValue(900);
     expect(screen.getByLabelText("上传默认图片")).toHaveAttribute("type", "file");
 
-    fireEvent.click(screen.getByLabelText("W 比较符"));
-    for (const operator of ["=", ">", "≥", "<", "≤"]) {
-      expect(screen.getByRole("option", { name: operator })).toBeInTheDocument();
-    }
-    fireEvent.click(screen.getByRole("option", { name: ">" }));
-    expect(onUpdateConfigMark).toHaveBeenLastCalledWith("config-mark-image", expect.objectContaining({ widthRule: { operator: ">", value: 320 } }));
+    fireEvent.change(screen.getByLabelText("W下限比较符"), { target: { value: ">" } });
+    expect(onUpdateConfigMark).toHaveBeenLastCalledWith("config-mark-image", expect.objectContaining({ widthRule: { min: { value: 320, inclusive: false } } }));
 
     fireEvent.click(screen.getByText("全部图片"));
     fireEvent.click(screen.getByRole("option", { name: "PNG" }));

@@ -132,8 +132,15 @@ export type {
 } from "./demo/page-requirements";
 export {
   applySchemaDefinitionCommand,
+  exactImageDimensionRule,
+  formatImageDimensionRule,
+  formatImageDimensionRuleCompact,
+  matchesImageDimension,
+  normalizeImageDimensionRule,
   readConfigDefinitionFieldAtPath,
   readConfigDefinitionFields,
+  validateImageDimensionRule,
+  validateImageDimensions,
 } from "./demo/config-schema-definition";
 export type {
   ConfigDefinitionDraft,
@@ -141,6 +148,9 @@ export type {
   ConfigDefinitionEnumWidget,
   ConfigColorFormat,
   ConfigColorPreset,
+  ImageDimensionBound,
+  ImageDimensionOperator,
+  ImageDimensionRule,
   SchemaDefinitionCommand,
   SchemaDefinitionDiff,
   SchemaDefinitionMutation,

@@ -262,14 +262,53 @@
       "workspaceRevision": 22,
       "workspaceRootHash": "343741b3f5815f033cb5f2e2432cfd8f531087ceaa269a5ccdb38db5bf8e9ee7",
       "note": "发布快照"
+    },
+    {
+      "versionId": "v24",
+      "type": "auto_checkpoint",
+      "savedAt": 1789028071415,
+      "savedBy": "qihao",
+      "sessionId": "session-1789027494637-2qnmweue7",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v24",
+      "fileCount": 11,
+      "workspaceId": "live-1785634371427-sc7gvpidi",
+      "workspaceRevision": 32,
+      "workspaceRootHash": "8bb2d6c53323a7d28c2c7060f8d93418e74397ec822bed791c920e725eea749d",
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v25",
+      "type": "auto_checkpoint",
+      "savedAt": 1789031922393,
+      "savedBy": "qihao",
+      "sessionId": "session-1789027494637-2qnmweue7",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v25",
+      "fileCount": 11,
+      "workspaceId": "live-1785634371427-sc7gvpidi",
+      "workspaceRevision": 36,
+      "workspaceRootHash": "6dd3fddbfcf4c006bfc967100faaf7eeee75044bc9d3d79bd3ff4125f42db20f",
+      "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v26",
+      "type": "auto_checkpoint",
+      "savedAt": 1789033690531,
+      "savedBy": "qihao",
+      "sessionId": "session-1789027494637-2qnmweue7",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1782718596686_wmv9yu/v26",
+      "fileCount": 11,
+      "workspaceId": "live-1785634371427-sc7gvpidi",
+      "workspaceRevision": 44,
+      "workspaceRootHash": "00b92b4e2366241753a79bc43d3430f99f536a8282d5e4b750d03fac3d51cb9e",
+      "note": "停止编辑后自动保存记录"
     }
   ],
   "createdAt": 1782718596693,
-  "updatedAt": 1789027772376,
+  "updatedAt": 1789033690531,
   "activeWorkspaceId": "live-1785634371427-sc7gvpidi",
-  "activeWorkspaceUpdatedAt": 1785922541962,
+  "activeWorkspaceUpdatedAt": 1789031922394,
   "canonicalSyncedWorkspaceId": "live-1785634371427-sc7gvpidi",
-  "canonicalSyncedRevision": 31,
-  "canonicalSyncedRootHash": "8bb2d6c53323a7d28c2c7060f8d93418e74397ec822bed791c920e725eea749d",
-  "canonicalSyncedAt": 1789027772376
+  "canonicalSyncedRevision": 44,
+  "canonicalSyncedRootHash": "00b92b4e2366241753a79bc43d3430f99f536a8282d5e4b750d03fac3d51cb9e",
+  "canonicalSyncedAt": 1789033690049
 }

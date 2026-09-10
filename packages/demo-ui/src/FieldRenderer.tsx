@@ -50,6 +50,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  formatImageDimensionRuleCompact,
+  normalizeImageDimensionRule,
+  type ImageDimensionRule,
+} from "@workbench/shared/demo/config-schema-definition";
 
 export interface PositionFieldEntry {
   instanceId: string;
@@ -820,15 +825,13 @@ export function FieldRenderer({
   );
 }
 
-type ImageRule = { operator?: string; value?: number };
-
-function readImageRule(options: Record<string, unknown> | undefined, key: "widthRule" | "heightRule"): ImageRule | undefined {
+function readImageRule(options: Record<string, unknown> | undefined, key: "widthRule" | "heightRule"): ImageDimensionRule | undefined {
   const value = options?.[key];
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const rule = value as Record<string, unknown>;
-  return typeof rule.value === "number" && Number.isFinite(rule.value) && typeof rule.operator === "string"
-    ? { operator: rule.operator, value: rule.value }
-    : undefined;
+  try {
+    return normalizeImageDimensionRule(value, key === "widthRule" ? "宽度规则" : "高度规则");
+  } catch {
+    return undefined;
+  }
 }
 
 export function formatImageAccept(options?: Record<string, unknown>): string {
@@ -844,7 +847,7 @@ export function formatImageAccept(options?: Record<string, unknown>): string {
 export function formatImageDimensions(options?: Record<string, unknown>): string {
   const width = readImageRule(options, "widthRule");
   const height = readImageRule(options, "heightRule");
-  const rules = [width && `W ${width.operator} ${width.value}px`, height && `H ${height.operator} ${height.value}px`].filter(Boolean);
+  const rules = [width && formatImageDimensionRuleCompact(width, "W"), height && formatImageDimensionRuleCompact(height, "H")].filter(Boolean);
   return rules.length ? rules.join(" · ") : "—";
 }
 
