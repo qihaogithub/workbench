@@ -6,7 +6,6 @@
  * - 匿名用户：在写入请求 body 中携带 anonymousId + displayName（存 localStorage）。
  *
  * 同时提供：
- * - recordProjectVisit：已登录用户打开项目时记录访问（供 @候选人列表使用）。
  * - getCommentWsUrl：评论实时通知 WebSocket 地址（agent-service /ws/comments）。
  */
 import type {
@@ -16,7 +15,7 @@ import type {
   MentionCandidate,
   UpdateCommentContentInput,
 } from "@workbench/demo-ui";
-import type { CommentReply, CommentThread, CommentTarget, ProjectVisitor } from "@workbench/shared";
+import type { CommentReply, CommentThread, CommentTarget } from "@workbench/shared";
 import { DATA_BASE, getAuthToken } from "./api";
 import { getBrowserAgentServiceUrl } from "./runtime-config";
 
@@ -84,7 +83,9 @@ async function commentRequest<T>(path: string, options: RequestInit = {}): Promi
     error?: { message?: string };
   };
   if (!res.ok || body.success === false) {
-    throw new Error(body.error?.message || `评论请求失败 (${res.status})`);
+    const error = new Error(body.error?.message || `评论请求失败 (${res.status})`) as Error & { status: number };
+    error.status = res.status;
+    throw error;
   }
   return body.data;
 }
@@ -199,33 +200,18 @@ export function createCommentApi(projectId: string): CommentApiAdapter {
       return uploadCommentImage(`${base}/assets`, file);
     },
 
-    async listMentionCandidates(): Promise<MentionCandidate[]> {
-      const data = await commentRequest<{ visitors: ProjectVisitor[] }>(
-        `/api/projects/${enc}/visitors`,
+    async searchMentionCandidates(query, options): Promise<MentionCandidate[]> {
+      const data = await commentRequest<{ participants: Array<{ id: string; name: string }> }>(
+        `/api/projects/${enc}/comment-participants?q=${encodeURIComponent(query.trim())}`,
+        { signal: options?.signal },
       );
-      return data.visitors.map((v) => ({
-        id: v.userId,
-        name: v.name,
+      return data.participants.map((participant) => ({
+        id: participant.id,
+        name: participant.name,
         type: "user" as const,
       }));
     },
   };
-}
-
-/**
- * 记录已登录用户访问项目（更新 visitors.json）。
- * 未登录时静默跳过。失败不抛出（不影响主流程）。
- */
-export async function recordProjectVisit(projectId: string): Promise<void> {
-  if (!getAuthToken()) return;
-  try {
-    await commentRequest<{ visitor: ProjectVisitor }>(
-      `/api/projects/${encodeURIComponent(projectId)}/visit`,
-      { method: "POST", body: "{}" },
-    );
-  } catch {
-    // 访问记录失败不影响浏览
-  }
 }
 
 /** 评论实时通知 WebSocket 地址（agent-service /ws/comments） */

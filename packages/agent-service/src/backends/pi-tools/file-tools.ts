@@ -181,42 +181,16 @@ export function createReadFileTool(
         const liveWorkspace = config.workingDir
           ? resolveLiveWorkspaceMutationContext(config.workingDir)
           : null;
-        let snapshot: Awaited<
+        const snapshot: Awaited<
           ReturnType<
             NonNullable<typeof liveWorkspace>["authority"]["getSnapshot"]
           >
-        > | null = null;
-        let driftRetryCount = 0;
-        for (;;) {
-          try {
-            snapshot = liveWorkspace
-              ? await liveWorkspace.authority.getSnapshot(
-                  liveWorkspace.projectId,
-                  liveWorkspace.workspaceId,
-                )
-              : null;
-            break;
-          } catch (err) {
-            if (
-              err instanceof WorkspaceMutationAuthorityError &&
-              err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
-              liveWorkspace &&
-              driftRetryCount === 0
-            ) {
-              driftRetryCount++;
-              logger.info(
-                { path: args.path },
-                "readFile: EXTERNAL_DRIFT detected, reconciling and retrying",
-              );
-              await liveWorkspace.authority.reconcileAdopt(
-                liveWorkspace.projectId,
-                liveWorkspace.workspaceId,
-              );
-              continue;
-            }
-            throw err;
-          }
-        }
+        > | null = liveWorkspace
+          ? await liveWorkspace.authority.getSnapshot(
+              liveWorkspace.projectId,
+              liveWorkspace.workspaceId,
+            )
+          : null;
         let content: string | undefined;
         let fromAuthority = false;
         let authorityRevision: number | undefined;
@@ -363,38 +337,12 @@ export function createWriteFileTool(
         const liveWorkspace = config.workingDir
           ? resolveLiveWorkspaceMutationContext(config.workingDir)
           : null;
-        let snapshot;
-        let snapshotDriftRetry = 0;
-        for (;;) {
-          try {
-            snapshot = liveWorkspace
-              ? await liveWorkspace.authority.getSnapshot(
-                  liveWorkspace.projectId,
-                  liveWorkspace.workspaceId,
-                )
-              : null;
-            break;
-          } catch (err) {
-            if (
-              err instanceof WorkspaceMutationAuthorityError &&
-              err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
-              liveWorkspace &&
-              snapshotDriftRetry === 0
-            ) {
-              snapshotDriftRetry++;
-              logger.info(
-                { path: args.path },
-                "writeFile getSnapshot: EXTERNAL_DRIFT, reconciling",
-              );
-              await liveWorkspace.authority.reconcileAdopt(
-                liveWorkspace.projectId,
-                liveWorkspace.workspaceId,
-              );
-              continue;
-            }
-            throw err;
-          }
-        }
+        const snapshot = liveWorkspace
+          ? await liveWorkspace.authority.getSnapshot(
+              liveWorkspace.projectId,
+              liveWorkspace.workspaceId,
+            )
+          : null;
         const existing = snapshot
           ? (snapshot.resources[args.path] ?? null)
           : await fs.promises.readFile(filePath, "utf-8").catch(() => null);
@@ -469,10 +417,7 @@ export function createWriteFileTool(
           }
           if (!collabWriteSucceeded) {
             // Authority path (non-collab resource or collab room unavailable)
-            let driftRetryCount = 0;
-            for (;;) {
-              try {
-                receipt = await liveWorkspace.authority.mutate({
+            receipt = await liveWorkspace.authority.mutate({
                   mutationId: crypto.randomUUID(),
                   projectId: liveWorkspace.projectId,
                   workspaceId: liveWorkspace.workspaceId,
@@ -496,31 +441,6 @@ export function createWriteFileTool(
                     },
                   ],
                 });
-                break;
-              } catch (err) {
-                if (
-                  err instanceof WorkspaceMutationAuthorityError &&
-                  err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
-                  driftRetryCount === 0
-                ) {
-                  driftRetryCount++;
-                  logger.info(
-                    { path: args.path },
-                    "writeFile: EXTERNAL_DRIFT detected, reconciling and retrying",
-                  );
-                  await liveWorkspace.authority.reconcileAdopt(
-                    liveWorkspace.projectId,
-                    liveWorkspace.workspaceId,
-                  );
-                  snapshot = await liveWorkspace.authority.getSnapshot(
-                    liveWorkspace.projectId,
-                    liveWorkspace.workspaceId,
-                  );
-                  continue;
-                }
-                throw err;
-              }
-            }
           }
         } else {
           await fs.promises.mkdir(dir, { recursive: true });
@@ -664,38 +584,12 @@ export function createListFilesTool(
           },
           "listFiles: resolved workspace context",
         );
-        let snapshot;
-        let driftRetryCount = 0;
-        for (;;) {
-          try {
-            snapshot = liveWorkspace
-              ? await liveWorkspace.authority.getSnapshot(
-                  liveWorkspace.projectId,
-                  liveWorkspace.workspaceId,
-                )
-              : null;
-            break;
-          } catch (err) {
-            if (
-              err instanceof WorkspaceMutationAuthorityError &&
-              err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
-              liveWorkspace &&
-              driftRetryCount === 0
-            ) {
-              driftRetryCount++;
-              logger.info(
-                { path: args.path || "." },
-                "listFiles: EXTERNAL_DRIFT detected, reconciling and retrying",
-              );
-              await liveWorkspace.authority.reconcileAdopt(
-                liveWorkspace.projectId,
-                liveWorkspace.workspaceId,
-              );
-              continue;
-            }
-            throw err;
-          }
-        }
+        const snapshot = liveWorkspace
+          ? await liveWorkspace.authority.getSnapshot(
+              liveWorkspace.projectId,
+              liveWorkspace.workspaceId,
+            )
+          : null;
 
         if (snapshot) {
           const prefix = args.path ? `${args.path.replace(/\/+$/, "")}/` : "";

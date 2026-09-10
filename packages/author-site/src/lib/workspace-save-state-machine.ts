@@ -12,6 +12,7 @@ export type SaveState =
   | "saving" // autosave mutation 正在飞行中
   | "autosaved" // 最近一次 autosave 已提交成功
   | "offline" // Authority 不可达，本地草稿已保留
+  | "blocked" // Authority 拒绝持久化，等待健康恢复或用户重试
   | "conflict" // 资源 hash 冲突，需要用户操作
   | "canonical-stale"; // 已保存但 canonical 同步异常
 
@@ -32,6 +33,7 @@ export interface SaveStateContext {
   isMutationInFlight: boolean;
   isConnected: boolean;
   hasConflict: boolean;
+  hasPersistenceBlock: boolean;
   isCanonicalStale: boolean;
   lastSaveError: Error | null;
 }
@@ -41,6 +43,7 @@ const SAVE_STATE_LABELS: Record<SaveState, string> = {
   saving: "保存中…",
   autosaved: "已自动保存",
   offline: "离线（本地草稿已保留）",
+  blocked: "保存被阻止（本地草稿已保留）",
   conflict: "存在冲突，需要处理",
   "canonical-stale": "已保存，项目同步异常",
 };
@@ -58,6 +61,7 @@ export const SAVE_STATES: readonly SaveState[] = [
   "offline",
   "conflict",
   "canonical-stale",
+  "blocked",
 ] as const;
 
 /**
@@ -113,6 +117,14 @@ const TRANSITIONS: TransitionTable = {
     DISCONNECT: "offline",
     CONFLICT_DETECTED: "conflict",
   },
+  blocked: {
+    // only an explicit retry should leave the blocked state; callers model it
+    // as SAVE_STARTED after a successful health preflight.
+    SAVE_STARTED: "saving",
+    DISCONNECT: "offline",
+    CONFLICT_DETECTED: "conflict",
+    START_EDIT: "blocked",
+  },
 };
 
 /**
@@ -132,12 +144,13 @@ export function transition(
  * 便捷：从上下文直接计算展示状态（无需维护状态机实例）。
  * 适用于不需要事件历史的场景，每次根据当前事实重新判定。
  *
- * 优先级：conflict > offline > saving > canonical-stale > autosaved > editing
+ * 优先级：conflict > blocked > offline > saving > canonical-stale > editing > autosaved
  */
 export function computeSaveStateFromContext(
   context: SaveStateContext,
 ): SaveState {
   if (context.hasConflict) return "conflict";
+  if (context.hasPersistenceBlock) return "blocked";
   if (!context.isConnected) return "offline";
   if (context.isMutationInFlight) return "saving";
   if (context.isCanonicalStale) return "canonical-stale";

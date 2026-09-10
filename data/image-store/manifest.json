@@ -11972,6 +11972,111 @@
       "projectRefs": [
         "proj_1788278430986_3gt1n0"
       ]
+    },
+    {
+      "id": "img_CaxgU-bGXwDQ7Q",
+      "sha256": "3ac1a52e000db1d83ef7a3b95914ccd502c10684e932be1c4918068aa8fec8e2",
+      "filename": "已获得卡片.png",
+      "mimeType": "image/png",
+      "sizeBytes": 2310,
+      "width": 196,
+      "height": 200,
+      "sourceType": "user_upload",
+      "createdAt": 1788930789910,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_NxbpvGbfNL_P4A",
+      "sha256": "67fc905d365ad03c264afb29dd51aba62a33cc725f9ce2f53ce83ead4d3c38ad",
+      "filename": "未获得卡片.png",
+      "mimeType": "image/png",
+      "sizeBytes": 2237,
+      "width": 196,
+      "height": 200,
+      "sourceType": "user_upload",
+      "createdAt": 1788930804681,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_WZMB4WSPd-qFGA",
+      "sha256": "b7b877529aa03eeacfc6218a9f89ecb8c91d3efa75f11a8cb0c83fcca941e079",
+      "filename": "Frame 3466271.png",
+      "mimeType": "image/png",
+      "sizeBytes": 6459,
+      "width": 750,
+      "height": 472,
+      "sourceType": "user_upload",
+      "createdAt": 1788930884929,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_mGAvyADUpsUgyA",
+      "sha256": "955c56c959f489617b7d49fa4b8ef045033995403d9cede41ea4638520c0e2eb",
+      "filename": "image_1788932020802_0.png",
+      "mimeType": "image/png",
+      "sizeBytes": 658834,
+      "width": 750,
+      "height": 1624,
+      "sourceType": "user_upload",
+      "createdAt": 1788932020806,
+      "createdBy": "ai-agent",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_P_9L7QAwRJyvag",
+      "sha256": "8e7f98cd984b0cac350c387f5e76a0bd641f64f913e9ca2f5c07eab092ce2e69",
+      "filename": "image_1788949566757_0.png",
+      "mimeType": "image/png",
+      "sizeBytes": 657695,
+      "width": 749,
+      "height": 1623,
+      "sourceType": "user_upload",
+      "createdAt": 1788949566777,
+      "createdBy": "ai-agent",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_IUa9X5OxKyN9wQ",
+      "sha256": "b9f586de7139ea2ffc447637481f010441b5827337a6ab3b4a7bc316b6ff2e35",
+      "filename": "image_1788949658436_0.png",
+      "mimeType": "image/png",
+      "sizeBytes": 105787,
+      "width": 750,
+      "height": 750,
+      "sourceType": "user_upload",
+      "createdAt": 1788949658444,
+      "createdBy": "ai-agent",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
+    },
+    {
+      "id": "img_rjTEGr2O-5i_iw",
+      "sha256": "f499f8926b043d438a86e6b1bc7ac31a95530ee347d65eec7ff6401ec2265989",
+      "filename": "L8M2-封面.jpg",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 510121,
+      "width": 4511,
+      "height": 3141,
+      "sourceType": "user_upload",
+      "createdAt": 1788960335211,
+      "createdBy": "a5862615-26bb-4688-924d-7fd68c132e21",
+      "projectRefs": [
+        "proj_1785135808250_r4cb4a"
+      ]
     }
   ]
 }

@@ -7,6 +7,8 @@ import {
   deleteCommentThread,
 } from "@/lib/comment-store";
 import { resolveCommentAuthor, canModify, canEditOrDeleteComment } from "@/lib/comment-auth";
+import { normalizeCommentMentions, registerCommentParticipant } from "@/lib/comment-participants";
+import { anonymousIpDigest } from "@/lib/dingtalk-comment-notifications";
 
 type RouteParams = { params: Promise<{ projectId: string; threadId: string }> };
 
@@ -53,17 +55,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    const updates: { resolved?: boolean; content?: string; mentions?: CommentMention[]; aiTaskStatus?: CommentAiTaskStatus; aiTaskAuthorization?: { userId: string; role: "admin" | "editor"; expiresAt: number } } = {};
+    const updates: { resolved?: boolean; content?: string; mentions?: CommentMention[]; aiTaskStatus?: CommentAiTaskStatus; aiTaskAuthorization?: { userId: string; role: "admin" | "editor"; expiresAt: number }; anonymousIpDigest?: string | null } = {};
     if (typeof body.resolved === "boolean") {
       updates.resolved = body.resolved;
     }
     if (typeof body.content === "string" && body.content.trim()) {
       const mentions = Array.isArray(body.mentions) ? body.mentions : [];
-      if (authorResult.author.isAnonymous && mentions.some((mention) => mention.type === "user")) {
-        return NextResponse.json(createApiError("VALIDATION_ERROR", "匿名用户不能 @其他用户"), { status: 400 });
-      }
+      if (authorResult.userId && authorResult.authSource === "cookie") registerCommentParticipant(projectId, authorResult.userId);
+      try { updates.mentions = normalizeCommentMentions(projectId, mentions, authorResult.author.isAnonymous ? 5 : 20); }
+      catch (error) { return NextResponse.json(createApiError("VALIDATION_ERROR", String(error).includes("TOO_MANY") ? "@人数超过限制" : "@对象无效"), { status: 400 }); }
       updates.content = body.content.trim();
-      updates.mentions = mentions;
+      updates.anonymousIpDigest = authorResult.author.isAnonymous ? anonymousIpDigest(request) : undefined;
       if (authorResult.userId && authorResult.role) {
         updates.aiTaskAuthorization = {
           userId: authorResult.userId,

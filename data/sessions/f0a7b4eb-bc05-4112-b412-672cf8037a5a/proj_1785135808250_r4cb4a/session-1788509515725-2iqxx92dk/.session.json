@@ -4,11 +4,12 @@
   "role": "editor",
   "demoId": "proj_1785135808250_r4cb4a",
   "workspaceId": "live-1785205322879-latagwnoh",
-  "status": "expired",
+  "status": "archived",
   "basedOnVersion": "v41",
   "workbenchSessionId": null,
   "createdAt": 1788509515725,
   "expiresAt": 1788517160411,
   "lastActivityAt": 1788509960411,
-  "title": "集卡抽奖移至视频下方"
+  "title": "集卡抽奖移至视频下方",
+  "archivedAt": 1788939283820
 }

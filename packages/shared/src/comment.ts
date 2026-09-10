@@ -16,9 +16,29 @@ export interface CommentAuthor {
 /** @提及目标 */
 export interface CommentMention {
   type: "user" | "agent";
-  /** userId 或 "agent" */
+  /** 普通用户为项目级 participantId；Agent 为 "agent"。 */
   id: string;
   name: string;
+}
+
+/** 钉钉工作通知的安全汇总，不包含收件人身份、taskId 或原始错误。 */
+export interface CommentDeliverySummary {
+  status: "pending" | "submitted" | "failed" | "suppressed";
+  total: number;
+  pending: number;
+  submitted: number;
+  failed: number;
+  suppressed: number;
+  /** 仅表示当前登录创作者可以发起重试，不是任务标识。 */
+  retryable?: boolean;
+}
+
+/** 对前端安全的项目评论参与者投影。 */
+export interface ProjectCommentParticipant {
+  /** 项目内随机且稳定的标识，不是本地用户或钉钉 userId。 */
+  id: string;
+  name: string;
+  lastParticipatedAt: number;
 }
 
 /** 线程回复 */
@@ -27,6 +47,10 @@ export interface CommentReply {
   content: string;
   author: CommentAuthor;
   mentions?: CommentMention[];
+  dingtalkDelivery?: CommentDeliverySummary;
+  /** 持久化的非敏感通知意图 ID，用于幂等补建 Outbox。 */
+  /** 仅持久化使用；API/WS 投影必须移除。participantId 用于幂等补建 Outbox。 */
+  notificationIntents?: Array<{ id: string; participantId: string }>;
   createdAt: number;
 }
 
@@ -132,6 +156,10 @@ export interface CommentThread {
   content: string;
   author: CommentAuthor;
   mentions?: CommentMention[];
+  dingtalkDelivery?: CommentDeliverySummary;
+  /** 持久化的非敏感通知意图 ID，用于幂等补建 Outbox。 */
+  /** 仅持久化使用；API/WS 投影必须移除。 */
+  notificationIntents?: Array<{ id: string; participantId: string }>;
   aiTaskStatus?: CommentAiTaskStatus;
   /** Private proposal identifier projected as status metadata, never as a
    * write authorization. Present only while an Agent document proposal waits
@@ -157,7 +185,13 @@ export type CommentWsEvent =
   | { type: "comment:replied"; threadId: string; reply: CommentReply }
   | { type: "comment:resolved"; threadId: string; resolved: boolean }
   | { type: "comment:deleted"; threadId: string }
-  | { type: "comment:ai-status"; threadId: string; aiTaskStatus: CommentAiTaskStatus };
+  | { type: "comment:ai-status"; threadId: string; aiTaskStatus: CommentAiTaskStatus }
+  | {
+      type: "comment:dingtalk-status";
+      threadId: string;
+      replyId?: string;
+      delivery: CommentDeliverySummary;
+    };
 
 /** 项目访问者记录（@候选人来源） */
 export interface ProjectVisitor {

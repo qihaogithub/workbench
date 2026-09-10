@@ -89,6 +89,56 @@ describe("ProjectAdminService", () => {
     expect(detail.data?.pages).toEqual([]);
   });
 
+  it("校验引用页时从源项目 canonical workspace 读取页面文件", () => {
+    const source = service.createProject({ name: "引用源项目" });
+    const sourceProjectId = source.data?.id ?? "";
+    const sourceEdit = service.beginEdit(sourceProjectId);
+    const sourceEditId = (sourceEdit.data as EditTransaction).editId;
+    expect(
+      service.createPage({
+        editId: sourceEditId,
+        pageId: "source-page",
+        name: "源页面",
+        code: "export default function Demo(){ return <main>source</main>; }",
+      }).ok,
+    ).toBe(true);
+    expect(service.commitEdit(sourceEditId, "创建引用源页").ok).toBe(true);
+
+    const target = service.createProject({ name: "引用目标项目" });
+    const targetProjectId = target.data?.id ?? "";
+    const targetEdit = service.beginEdit(targetProjectId);
+    const transaction = targetEdit.data as EditTransaction;
+    fs.writeFileSync(
+      path.join(transaction.workspacePath, "workspace-tree.json"),
+      JSON.stringify(
+        {
+          folders: [],
+          pages: [
+            {
+              id: "reference-page",
+              name: "引用页",
+              order: 0,
+              parentId: null,
+              runtimeType: "high-fidelity-react",
+              reference: {
+                sourceProjectId,
+                sourcePageId: "source-page",
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const validation = service.editValidate(transaction.editId);
+
+    expect(validation.ok).toBe(true);
+    expect(validation.data).toEqual({ ok: true, issues: [] });
+  });
+
   it("历史项目缺少分类时默认归入未分类", () => {
     const created = service.createProject({ name: "旧项目" });
     const projectId = created.data?.id ?? "";

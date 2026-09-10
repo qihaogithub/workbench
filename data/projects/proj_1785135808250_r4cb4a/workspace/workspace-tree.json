@@ -83,38 +83,6 @@
       "order": 0,
       "parentId": null,
       "runtimeType": "high-fidelity-react"
-    },
-    {
-      "id": "page_g5ky",
-      "name": "挑战成功",
-      "routeKey": "page-3",
-      "order": 1,
-      "parentId": null,
-      "runtimeType": "prototype-html-css"
-    },
-    {
-      "id": "page_kisa",
-      "name": "答对",
-      "order": 8,
-      "parentId": null,
-      "runtimeType": "prototype-html-css",
-      "reference": {
-        "sourceProjectId": "proj_1788141806566_0aps89",
-        "sourcePageId": "page_t7cj"
-      },
-      "routeKey": "page-4"
-    },
-    {
-      "id": "nn_g9ct",
-      "name": "N对N填空题",
-      "order": 9,
-      "parentId": null,
-      "runtimeType": "high-fidelity-react",
-      "reference": {
-        "sourceProjectId": "proj_1788141806566_0aps89",
-        "sourcePageId": "clipboard-import_e05e9d"
-      },
-      "routeKey": "nn"
     }
   ]
 }

@@ -118,6 +118,19 @@ describe("Workspace Authority routes", () => {
       });
       expect(invalid.statusCode).toBe(400);
       expect(invalid.json().error.code).toBe("INVALID_REQUEST");
+
+      const recoveryDenied = await app.inject({
+        method: "POST",
+        url: "/api/workspace-recovery/projects/project-1/workspaces/workspace-1/rebuild",
+        payload: {
+          sessionId: "session-1",
+          sourceVersionId: "v1",
+          idempotencyKey: "route-test",
+          apply: false,
+        },
+      });
+      expect(recoveryDenied.statusCode).toBe(403);
+      expect(recoveryDenied.json().error.message).toContain("仅管理员");
     } finally {
       await app.close();
     }

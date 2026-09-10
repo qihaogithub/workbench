@@ -88,7 +88,7 @@ test("workspaceAuthorityStatus JSON 输出 ready 状态和 warnings", async () =
   }
 });
 
-test("workspaceAuthorityStatus 明确提示缺失备份漂移只能显式 adopt", async () => {
+test("workspaceAuthorityStatus 明确提示缺失备份漂移需显式 adopt 或重建", async () => {
   const originalFetch = global.fetch;
   global.fetch = (async () => new Response(JSON.stringify({
     success: true,
@@ -109,7 +109,7 @@ test("workspaceAuthorityStatus 明确提示缺失备份漂移只能显式 adopt"
     const parsed = JSON.parse(output.join("\n")) as { warnings: string[] };
     assert.deepEqual(parsed.warnings, [
       "external drift detected",
-      "external drift with missing committed backups: restore is blocked; explicit reconcile-adopt is required to establish a new baseline",
+      "external drift with missing committed backups: restore is blocked; use explicit adopt only to accept disk state, otherwise rebuild from a trusted version",
       "committed backups are incomplete",
     ]);
   } finally {

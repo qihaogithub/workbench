@@ -3,6 +3,8 @@ import type { CommentAnchor, CommentMention, CommentTarget, DocumentCommentAncho
 import { createApiSuccess, createApiError } from "@/lib/fs-utils";
 import { listComments, createCommentThread } from "@/lib/comment-store";
 import { resolveCommentAuthor } from "@/lib/comment-auth";
+import { registerCommentParticipant, normalizeCommentMentions } from "@/lib/comment-participants";
+import { anonymousIpDigest } from "@/lib/dingtalk-comment-notifications";
 
 /**
  * GET /api/projects/[projectId]/comments?pageId=&resolved=
@@ -123,14 +125,11 @@ export async function POST(
       );
     }
 
-    // 匿名用户不能 @人
     const mentions = Array.isArray(body.mentions) ? body.mentions : undefined;
-    if (authorResult.author.isAnonymous && mentions?.some((m) => m.type === "user")) {
-      return NextResponse.json(
-        createApiError("VALIDATION_ERROR", "匿名用户不能 @其他用户"),
-        { status: 400 },
-      );
-    }
+    if (authorResult.userId && authorResult.authSource === "cookie") registerCommentParticipant(projectId, authorResult.userId);
+    let normalizedMentions: CommentMention[] | undefined;
+    try { normalizedMentions = normalizeCommentMentions(projectId, mentions, authorResult.author.isAnonymous ? 5 : 20); }
+    catch (error) { return NextResponse.json(createApiError("VALIDATION_ERROR", String(error).includes("TOO_MANY") ? "@人数超过限制" : "@对象无效"), { status: 400 }); }
 
     const thread = await createCommentThread({
       projectId,
@@ -140,10 +139,11 @@ export async function POST(
       documentAnchor: body.documentAnchor,
       content: body.content.trim(),
       author: authorResult.author,
-      mentions,
+      mentions: normalizedMentions,
       aiTaskAuthorization: authorResult.userId && authorResult.role
         ? { userId: authorResult.userId, role: authorResult.role, expiresAt: Date.now() + 2 * 60 * 60 * 1000 }
         : undefined,
+      anonymousIpDigest: authorResult.author.isAnonymous ? anonymousIpDigest(request) : undefined,
     });
 
     return NextResponse.json(createApiSuccess({ thread }), { status: 201 });

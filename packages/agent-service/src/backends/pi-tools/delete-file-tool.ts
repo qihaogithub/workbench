@@ -6,10 +6,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { AgentConfig } from "../../core/types";
 import { logger } from "../../utils/logger";
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from "./permissions";
-import {
-  resolveLiveWorkspaceMutationContext,
-  WorkspaceMutationAuthorityError,
-} from "../../workspace/workspace-mutation-authority";
+import { resolveLiveWorkspaceMutationContext } from "../../workspace/workspace-mutation-authority";
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 import { formatAuthorityCommitSummary } from "./authority-result-summary";
 import { createManagedDocumentProposalResult } from "./document-proposal-tool";
@@ -88,38 +85,12 @@ export function createDeleteFileTool(
           ? resolveLiveWorkspaceMutationContext(config.workingDir)
           : null;
 
-        let snapshot;
-        let snapshotDriftRetry = 0;
-        for (;;) {
-          try {
-            snapshot = liveWorkspace
-              ? await liveWorkspace.authority.getSnapshot(
-                  liveWorkspace.projectId,
-                  liveWorkspace.workspaceId,
-                )
-              : null;
-            break;
-          } catch (err) {
-            if (
-              err instanceof WorkspaceMutationAuthorityError &&
-              err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
-              liveWorkspace &&
-              snapshotDriftRetry === 0
-            ) {
-              snapshotDriftRetry++;
-              logger.info(
-                { path: relativePath },
-                "deleteFile getSnapshot: EXTERNAL_DRIFT, reconciling",
-              );
-              await liveWorkspace.authority.reconcileAdopt(
-                liveWorkspace.projectId,
-                liveWorkspace.workspaceId,
-              );
-              continue;
-            }
-            throw err;
-          }
-        }
+        const snapshot = liveWorkspace
+          ? await liveWorkspace.authority.getSnapshot(
+              liveWorkspace.projectId,
+              liveWorkspace.workspaceId,
+            )
+          : null;
 
         // 检查文件是否存在
         const existingContent = snapshot
@@ -150,10 +121,7 @@ export function createDeleteFileTool(
 
         let receipt = null;
         if (liveWorkspace) {
-          let driftRetryCount = 0;
-          for (;;) {
-            try {
-              receipt = await liveWorkspace.authority.mutate({
+          receipt = await liveWorkspace.authority.mutate({
                 mutationId: crypto.randomUUID(),
                 projectId: liveWorkspace.projectId,
                 workspaceId: liveWorkspace.workspaceId,
@@ -172,31 +140,6 @@ export function createDeleteFileTool(
                   },
                 ],
               });
-              break;
-            } catch (err) {
-              if (
-                err instanceof WorkspaceMutationAuthorityError &&
-                err.code === "WORKSPACE_EXTERNAL_DRIFT" &&
-                driftRetryCount === 0
-              ) {
-                driftRetryCount++;
-                logger.info(
-                  { path: relativePath },
-                  "deleteFile: EXTERNAL_DRIFT detected, reconciling and retrying",
-                );
-                await liveWorkspace.authority.reconcileAdopt(
-                  liveWorkspace.projectId,
-                  liveWorkspace.workspaceId,
-                );
-                snapshot = await liveWorkspace.authority.getSnapshot(
-                  liveWorkspace.projectId,
-                  liveWorkspace.workspaceId,
-                );
-                continue;
-              }
-              throw err;
-            }
-          }
         } else {
           await fs.promises.unlink(filePath);
         }

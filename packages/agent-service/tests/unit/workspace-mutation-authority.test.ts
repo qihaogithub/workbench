@@ -636,6 +636,24 @@ describe("WorkspaceMutationAuthority", () => {
     })).rejects.toMatchObject({ code: "WORKSPACE_WRITE_LEASE_UNAVAILABLE" });
   });
 
+  it("项目 recovery 锁存在时阻断新 mutation", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const dataDir = path.join(path.dirname(workspacePath), "data");
+    const lockPath = path.join(
+      dataDir,
+      "workspace-recovery",
+      "locks",
+      "project-1.lock",
+    );
+    fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+    fs.writeFileSync(lockPath, "recovery-test", "utf-8");
+
+    await expect(authority.mutate({
+      mutationId: "recovery-blocked", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
+      actor: "ai", reason: "test", operations: [{ type: "put_text", path: "demos/home/index.tsx", content: "after", expectedHash: hash("before") }],
+    })).rejects.toMatchObject({ code: "WORKSPACE_RECOVERY_IN_PROGRESS" });
+  });
+
   it("snapshot 只返回当前 committed 文本资源与相同 revision", async () => {
     const { authority } = createAuthority();
     const receipt = await authority.mutate({
@@ -652,6 +670,10 @@ describe("WorkspaceMutationAuthority", () => {
     await authority.bootstrap("project-1", "workspace-1");
     fs.writeFileSync(path.join(workspacePath, "demos", "home", "index.tsx"), "external", "utf-8");
     await expect(authority.getSnapshot("project-1", "workspace-1")).rejects.toMatchObject({ code: "WORKSPACE_EXTERNAL_DRIFT" });
+    expect(authority.getHealth("project-1", "workspace-1")).toMatchObject({
+      condition: "drift_requires_decision",
+      recommendedAction: "decide_restore_or_adopt",
+    });
     const reconciled = await authority.reconcileAdopt("project-1", "workspace-1");
     expect(reconciled.revision).toBe(2);
     expect((await authority.getSnapshot("project-1", "workspace-1")).resources["demos/home/index.tsx"]).toBe("external");
@@ -690,6 +712,11 @@ describe("WorkspaceMutationAuthority", () => {
     });
     expect(fs.readFileSync(path.join(workspacePath, "demos/home/index.tsx"), "utf-8")).toBe("external");
     expect(authority.getHealth("project-1", "workspace-1").missingBackupCount).toBe(1);
+    expect(authority.getHealth("project-1", "workspace-1")).toMatchObject({
+      condition: "unrecoverable",
+      recommendedAction: "rebuild",
+      missingBackupHashCount: 1,
+    });
   });
 
   it("显式 reconcile adopt 可为缺失备份且已漂移的工作区重建新基线", async () => {
@@ -746,6 +773,32 @@ describe("WorkspaceMutationAuthority", () => {
       "utf8",
     );
     expect(diagnostics).toContain("workspace.backup_rehydrated");
+  });
+
+  it("health 区分共享 hash 的缺失路径数与缺失 hash 数，并建议安全 rehydrate", async () => {
+    const { authority, workspacePath } = createAuthority();
+    fs.mkdirSync(path.join(workspacePath, "demos", "other"), { recursive: true });
+    fs.writeFileSync(path.join(workspacePath, "demos", "other", "index.tsx"), "before", "utf-8");
+    const state = await authority.bootstrap("project-1", "workspace-1");
+    const dataDir = path.join(path.dirname(workspacePath), "data");
+    fs.rmSync(path.join(dataDir, "workspace-authority", "workspace-1", "backups", `${state.resourceHashes["demos/home/index.tsx"]}.bin`));
+
+    expect(authority.getHealth("project-1", "workspace-1")).toMatchObject({
+      ready: false,
+      condition: "backup_repairable",
+      recommendedAction: "repair_backups",
+      missingBackupCount: 2,
+      missingBackupHashCount: 1,
+    });
+
+    await authority.getSnapshot("project-1", "workspace-1");
+    expect(authority.getHealth("project-1", "workspace-1")).toMatchObject({
+      ready: true,
+      condition: "healthy",
+      recommendedAction: "none",
+      missingBackupCount: 0,
+      missingBackupHashCount: 0,
+    });
   });
 
   it("health 只读返回 ready、journal 和 external drift 状态", async () => {

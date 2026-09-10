@@ -247,40 +247,11 @@ async function executeMutation(
   throw lastError;
 }
 
-/**
- * Server-side client for the only live Workspace writer. Author-site routes
- * must use this instead of changing the Workspace directory directly.
- *
- * When the Authority rejects with WORKSPACE_EXTERNAL_DRIFT (disk files
- * diverged from the committed state), this function automatically calls
- * reconcile/adopt once and retries the mutation. The retry is safe because
- * reconcile/adopt only updates the Authority hash ledger to match disk —
- * the actual file contents (and expectedHash values in the request) remain
- * unchanged.
- */
+/** Server-side client for the only live Workspace writer. */
 export async function commitWorkspaceMutation(
   request: WorkspaceMutationRequest,
 ): Promise<WorkspaceMutationReceipt> {
-  try {
-    return await executeMutation(request);
-  } catch (error) {
-    if (
-      !(error instanceof WorkspaceAuthorityClientError) ||
-      error.code !== "WORKSPACE_EXTERNAL_DRIFT" ||
-      !request.sessionId
-    ) {
-      throw error;
-    }
-
-    await reconcileWorkspaceAuthority({
-      projectId: request.projectId,
-      workspaceId: request.workspaceId,
-      sessionId: request.sessionId,
-      mode: "adopt",
-    });
-
-    return await executeMutation(request);
-  }
+  return executeMutation(request);
 }
 
 /** Commits only frozen, server-compiled document proposal operations. */

@@ -208,6 +208,15 @@ export {
   resolvePreviewStageSize,
 } from "./preview-stage-resolver";
 export type { PagePreviewRendererKind } from "./preview-stage-resolver";
+export {
+  buildCanvasPageNavigation,
+} from "./canvas-page-navigation";
+export type {
+  CanvasPageNavigation,
+  CanvasPageNavigationGroup,
+  CanvasPageNavigationNode,
+  CanvasPageNavigationPage,
+} from "./canvas-page-navigation";
 export { PreviewStageToolbar } from "./PreviewStageToolbar";
 export type { PreviewStageToolbarProps } from "./PreviewStageToolbar";
 export { PreviewModeSwitcher } from "./PreviewModeSwitcher";

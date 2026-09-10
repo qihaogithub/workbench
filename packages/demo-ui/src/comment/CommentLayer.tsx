@@ -142,8 +142,10 @@ function buildVisualNodeInfoFromElement(
     "structure",
   ];
   if (text && el.children.length === 0) caps.push("text");
-  if (el instanceof HTMLImageElement || el.getAttribute("src")) caps.push("image");
-  if (el instanceof HTMLAnchorElement || el.getAttribute("href")) caps.push("link");
+  if (el instanceof HTMLImageElement || el.getAttribute("src"))
+    caps.push("image");
+  if (el instanceof HTMLAnchorElement || el.getAttribute("href"))
+    caps.push("link");
   if (className) caps.push("className");
   return {
     nodeId: domPath,
@@ -207,6 +209,7 @@ export function CommentLayer({
   onDeleteThread,
   onDeleteReply,
   onRetryAiTask,
+  onRetryDingtalkNotifications,
   showPins = true,
   canvasCreateDraft,
   onCanvasCreateDraftChange,
@@ -225,7 +228,9 @@ export function CommentLayer({
   /* ---------------- 受控 / 内部状态解析 ---------------- */
   const commentModeControlled = commentModeProp !== undefined;
   const [internalCommentMode, setInternalCommentMode] = useState(false);
-  const commentMode = commentModeControlled ? commentModeProp : internalCommentMode;
+  const commentMode = commentModeControlled
+    ? commentModeProp
+    : internalCommentMode;
   const updateCommentMode = useCallback(
     (next: boolean) => {
       if (commentModeControlled) onCommentModeChange?.(next);
@@ -235,8 +240,12 @@ export function CommentLayer({
   );
 
   const activeThreadControlled = activeThreadIdProp !== undefined;
-  const [internalActiveThreadId, setInternalActiveThreadId] = useState<string | null>(null);
-  const activeThreadId = activeThreadControlled ? activeThreadIdProp : internalActiveThreadId;
+  const [internalActiveThreadId, setInternalActiveThreadId] = useState<
+    string | null
+  >(null);
+  const activeThreadId = activeThreadControlled
+    ? activeThreadIdProp
+    : internalActiveThreadId;
   const updateActiveThreadId = useCallback(
     (next: string | null) => {
       if (activeThreadControlled) onActiveThreadChange?.(next);
@@ -261,37 +270,43 @@ export function CommentLayer({
   });
   const threads = useExternalData ? threadsProp : internalComments.threads;
   const createComment = useExternalData
-    ? onCreateComment ?? internalComments.createComment
+    ? (onCreateComment ?? internalComments.createComment)
     : internalComments.createComment;
   const addReply = useExternalData
-    ? onAddReply ?? internalComments.addReply
+    ? (onAddReply ?? internalComments.addReply)
     : internalComments.addReply;
   const updateComment = useExternalData
-    ? onUpdateComment ?? internalComments.updateComment
+    ? (onUpdateComment ?? internalComments.updateComment)
     : internalComments.updateComment;
   const updateReply = useExternalData
-    ? onUpdateReply ?? internalComments.updateReply
+    ? (onUpdateReply ?? internalComments.updateReply)
     : internalComments.updateReply;
   const setResolved = useExternalData
-    ? onSetResolved ?? internalComments.setResolved
+    ? (onSetResolved ?? internalComments.setResolved)
     : internalComments.setResolved;
   const deleteThread = useExternalData
-    ? onDeleteThread ?? internalComments.deleteThread
+    ? (onDeleteThread ?? internalComments.deleteThread)
     : internalComments.deleteThread;
   const deleteReply = useExternalData
-    ? onDeleteReply ?? internalComments.deleteReply
+    ? (onDeleteReply ?? internalComments.deleteReply)
     : internalComments.deleteReply;
   const retryAiTask = useExternalData
-    ? onRetryAiTask ?? internalComments.retryAiTask
+    ? (onRetryAiTask ?? internalComments.retryAiTask)
     : internalComments.retryAiTask;
+  const retryDingtalkNotifications = useExternalData
+    ? (onRetryDingtalkNotifications ??
+      internalComments.retryDingtalkNotifications)
+    : internalComments.retryDingtalkNotifications;
 
   /* ---------------- @候选人 ---------------- */
-  const [fetchedCandidates, setFetchedCandidates] = useState<MentionCandidate[]>([]);
+  const [fetchedCandidates, setFetchedCandidates] = useState<
+    MentionCandidate[]
+  >([]);
   useEffect(() => {
     if (mentionCandidates) return;
     let cancelled = false;
     api
-      .listMentionCandidates()
+      .listMentionCandidates?.()
       .then((list) => {
         if (!cancelled) setFetchedCandidates(list);
       })
@@ -318,7 +333,9 @@ export function CommentLayer({
     const detect = () => {
       const frame = container.querySelector("iframe");
       setIframeEl((prev) => (prev === frame ? prev : frame));
-      const protoHost = container.querySelector<HTMLElement>("[data-prototype-preview]");
+      const protoHost = container.querySelector<HTMLElement>(
+        "[data-prototype-preview]",
+      );
       setProtoHostEl((prev) => (prev === protoHost ? prev : protoHost));
     };
     detect();
@@ -341,12 +358,7 @@ export function CommentLayer({
     // CanvasViewport 在子树中先提交 transform，随后本层在 layout effect 触发一次
     // 重渲染，从而读取包含最新平移/缩放的页面 getBoundingClientRect()。
     setLayoutVersion((version) => version + 1);
-  }, [
-    canvasViewport?.x,
-    canvasViewport?.y,
-    canvasViewport?.zoom,
-    disabled,
-  ]);
+  }, [canvasViewport?.x, canvasViewport?.y, canvasViewport?.zoom, disabled]);
 
   /* ---------------- iframe 消息监听 ---------------- */
   const handleCommentClick = useCallback(
@@ -390,6 +402,72 @@ export function CommentLayer({
     [iframeEl],
   );
 
+  // Canvas pages normally install their own transparent comment hit target. Keep
+  // a delegated fallback here as well: viewer canvas content can be virtualized
+  // or rendered through a layer that temporarily omits that target. This keeps
+  // “添加评论” usable without changing normal canvas interaction semantics.
+  const handleCanvasCommentPointerDownCapture = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (
+        event.button !== 0 ||
+        !canvasViewport ||
+        !commentModeRef.current ||
+        createDraftRef.current ||
+        canvasCreateDraft
+      ) {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      const page = target.closest<HTMLElement>("[data-page-id]");
+      const container = areaRef.current;
+      if (!page || !container) return;
+      const pageId = page.dataset.pageId;
+      if (!pageId) return;
+      const rect = page.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      event.preventDefault();
+      // CanvasViewport uses pointer-down capture for the hand tool. Handle the
+      // comment gesture first so panning cannot swallow the page annotation.
+      event.stopPropagation();
+      const containerRect = container.getBoundingClientRect();
+      const draft = {
+        anchor: {
+          domPath: "canvas-page",
+          tagName: "canvas-page",
+          componentName: page.getAttribute("aria-label") ?? undefined,
+          snapshot: { attrs: { "data-page-id": pageId } },
+        },
+        pin: {
+          xRatio: Math.min(
+            1,
+            Math.max(0, (event.clientX - rect.left) / rect.width),
+          ),
+          yRatio: Math.min(
+            1,
+            Math.max(0, (event.clientY - rect.top) / rect.height),
+          ),
+        },
+        left: event.clientX - containerRect.left,
+        top: event.clientY - containerRect.top + 14,
+      };
+      if (onCanvasCreateDraftChange) {
+        onCanvasCreateDraftChange({
+          input: {
+            target: { kind: "page", pageId },
+            anchor: draft.anchor,
+            pin: draft.pin,
+          },
+          clientX: event.clientX,
+          clientY: event.clientY,
+        });
+      } else {
+        setCreateDraft(draft);
+      }
+    },
+    [canvasCreateDraft, canvasViewport, onCanvasCreateDraftChange],
+  );
+
   /** 原型页（无 iframe，Shadow DOM 直接渲染）：捕获点击元素并创建评论草稿 */
   const handlePrototypeCommentClick = useCallback(
     (event: MouseEvent, target: HTMLElement) => {
@@ -398,7 +476,8 @@ export function CommentLayer({
       const container = areaRef.current;
       const host = protoHostEl;
       if (!container || !host?.shadowRoot) return;
-      const root = host.shadowRoot.querySelector<HTMLElement>(".prototype-root");
+      const root =
+        host.shadowRoot.querySelector<HTMLElement>(".prototype-root");
       if (!root || !root.contains(target)) return;
 
       event.preventDefault();
@@ -436,7 +515,8 @@ export function CommentLayer({
       const container = areaRef.current;
       if (!container) return;
       const data = event.data;
-      if (!data || typeof data !== "object" || typeof data.type !== "string") return;
+      if (!data || typeof data !== "object" || typeof data.type !== "string")
+        return;
       if (data.type !== "COMMENT_VIEW_STATE" && data.type !== "COMMENT_CLICK") {
         return;
       }
@@ -555,7 +635,10 @@ export function CommentLayer({
       hovered = el;
       hovered?.setAttribute("data-comment-hover", "true");
     };
-    const resolveTarget = (event: Event, allowRoot: boolean): HTMLElement | null => {
+    const resolveTarget = (
+      event: Event,
+      allowRoot: boolean,
+    ): HTMLElement | null => {
       const root = shadow.querySelector<HTMLElement>(".prototype-root");
       if (!root) return null;
       for (const item of event.composedPath()) {
@@ -567,7 +650,8 @@ export function CommentLayer({
       }
       return null;
     };
-    const onPointerOver = (event: Event) => setHovered(resolveTarget(event, false));
+    const onPointerOver = (event: Event) =>
+      setHovered(resolveTarget(event, false));
     const onPointerLeave = () => setHovered(null);
     const onClick = (event: Event) => {
       const mouseEvent = event as MouseEvent;
@@ -712,7 +796,9 @@ export function CommentLayer({
     () => threads.find((t) => t.id === activeThreadId) ?? null,
     [threads, activeThreadId],
   );
-  const activeThreadPos = activeThread ? pinPositions.get(activeThread.id) : undefined;
+  const activeThreadPos = activeThread
+    ? pinPositions.get(activeThread.id)
+    : undefined;
   const canvasPopoverPosition = useMemo(() => {
     const container = areaRef.current;
     if (!canvasCreateDraft || !container) return null;
@@ -743,18 +829,25 @@ export function CommentLayer({
   const unresolvedCount = threads.filter((t) => !t.resolved).length;
 
   if (disabled) {
-    return <div className={cn("relative h-full w-full", className)}>{children}</div>;
+    return (
+      <div className={cn("relative h-full w-full", className)}>{children}</div>
+    );
   }
 
   return (
     <div className={cn("flex h-full w-full", className)}>
-      <div ref={areaRef} className="relative min-w-0 flex-1 overflow-hidden">
+      <div
+        ref={areaRef}
+        className="relative min-w-0 flex-1 overflow-hidden"
+        onPointerDownCapture={handleCanvasCommentPointerDownCapture}
+      >
         {children}
 
         {canvasCreateDraft && canvasPopoverPosition && (
           <CommentCreatePopover
             draft={canvasCreateDraft.input}
             mentionCandidates={candidates}
+            searchMentionCandidates={api.searchMentionCandidates}
             canMentionAgent={canMentionAgent}
             left={canvasPopoverPosition.left}
             top={canvasPopoverPosition.top}
@@ -768,35 +861,44 @@ export function CommentLayer({
           />
         )}
 
-        {showPins && <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
-          {threads.map((thread, index) => {
-            const pos = pinPositions.get(thread.id);
-            if (!pos) return null;
-            return (
-              <div
-                key={thread.id}
-                className="pointer-events-auto absolute"
-                style={{ left: 0, top: 0 }}
-              >
-                <CommentPin
-                  thread={thread}
-                  index={index + 1}
-                  left={pos.left}
-                  top={pos.top}
-                  active={activeThreadId === thread.id}
-                  onClick={() =>
-                    updateActiveThreadId(activeThreadId === thread.id ? null : thread.id)
-                  }
-                />
-              </div>
-            );
-          })}
-        </div>}
+        {showPins && (
+          <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+            {threads.map((thread, index) => {
+              const pos = pinPositions.get(thread.id);
+              if (!pos) return null;
+              return (
+                <div
+                  key={thread.id}
+                  className="pointer-events-auto absolute"
+                  style={{ left: 0, top: 0 }}
+                >
+                  <CommentPin
+                    thread={thread}
+                    index={index + 1}
+                    left={pos.left}
+                    top={pos.top}
+                    active={activeThreadId === thread.id}
+                    onClick={() =>
+                      updateActiveThreadId(
+                        activeThreadId === thread.id ? null : thread.id,
+                      )
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {createDraft && (
           <CommentCreatePopover
-            draft={{ target: { kind: "page", pageId }, anchor: createDraft.anchor, pin: createDraft.pin }}
+            draft={{
+              target: { kind: "page", pageId },
+              anchor: createDraft.anchor,
+              pin: createDraft.pin,
+            }}
             mentionCandidates={candidates}
+            searchMentionCandidates={api.searchMentionCandidates}
             canMentionAgent={canMentionAgent}
             left={createDraft.left}
             top={createDraft.top}
@@ -811,6 +913,7 @@ export function CommentLayer({
             thread={activeThread}
             currentUser={currentUser}
             mentionCandidates={candidates}
+            searchMentionCandidates={api.searchMentionCandidates}
             canMentionAgent={canMentionAgent}
             left={activeThreadPos.left}
             top={activeThreadPos.top + 20}
@@ -824,6 +927,7 @@ export function CommentLayer({
             onDeleteThread={deleteThread}
             onDeleteReply={deleteReply}
             onRetryAiTask={retryAiTask}
+            onRetryDingtalkNotifications={retryDingtalkNotifications}
           />
         )}
 

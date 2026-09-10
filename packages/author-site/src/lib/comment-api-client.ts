@@ -17,7 +17,12 @@ import type {
   MentionCandidate,
   UpdateCommentContentInput,
 } from "@workbench/demo-ui/comment";
-import type { CommentReply, CommentThread, CommentTarget, ProjectVisitor } from "@workbench/shared";
+import type {
+  CommentReply,
+  CommentThread,
+  CommentTarget,
+  ProjectCommentParticipant,
+} from "@workbench/shared";
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -25,7 +30,10 @@ interface ApiEnvelope<T> {
   error?: { code: string; message?: string };
 }
 
-async function commentRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function commentRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...((options.headers as Record<string, string>) || {}),
@@ -40,7 +48,11 @@ async function commentRequest<T>(path: string, options: RequestInit = {}): Promi
     error?: { message?: string };
   };
   if (!res.ok || body.success === false) {
-    throw new Error(body.error?.message || `评论请求失败 (${res.status})`);
+    const error = new Error(
+      body.error?.message || `评论请求失败 (${res.status})`,
+    ) as Error & { status: number };
+    error.status = res.status;
+    throw error;
   }
   return body.data;
 }
@@ -54,7 +66,12 @@ async function uploadCommentImage(path: string, file: File) {
     credentials: "same-origin",
     cache: "no-store",
   });
-  const body = (await res.json().catch(() => ({}))) as ApiEnvelope<{ url: string; imageId: string; filename?: string; kind: "image" }>;
+  const body = (await res.json().catch(() => ({}))) as ApiEnvelope<{
+    url: string;
+    imageId: string;
+    filename?: string;
+    kind: "image";
+  }>;
   if (!res.ok || body.success === false || !body.data?.url) {
     throw new Error(body.error?.message || `图片上传失败 (${res.status})`);
   }
@@ -68,14 +85,17 @@ export function createAuthorCommentApi(projectId: string): CommentApiAdapter {
 
   return {
     async listComments(target?: CommentTarget): Promise<CommentThread[]> {
-      const qs = target?.kind === "page"
-        ? `?pageId=${encodeURIComponent(target.pageId)}`
-        : target?.kind === "document"
-          ? `?resourceId=${encodeURIComponent(target.resourceId)}`
-          : target?.kind === "config"
-            ? `?configScope=${encodeURIComponent(target.scope)}${target.pageId ? `&pageId=${encodeURIComponent(target.pageId)}` : ""}&fieldKey=${encodeURIComponent(target.fieldKey)}`
-          : "";
-      const data = await commentRequest<{ threads: CommentThread[] }>(`${base}${qs}`);
+      const qs =
+        target?.kind === "page"
+          ? `?pageId=${encodeURIComponent(target.pageId)}`
+          : target?.kind === "document"
+            ? `?resourceId=${encodeURIComponent(target.resourceId)}`
+            : target?.kind === "config"
+              ? `?configScope=${encodeURIComponent(target.scope)}${target.pageId ? `&pageId=${encodeURIComponent(target.pageId)}` : ""}&fieldKey=${encodeURIComponent(target.fieldKey)}`
+              : "";
+      const data = await commentRequest<{ threads: CommentThread[] }>(
+        `${base}${qs}`,
+      );
       return data.threads;
     },
 
@@ -87,7 +107,10 @@ export function createAuthorCommentApi(projectId: string): CommentApiAdapter {
       return data.thread;
     },
 
-    async addReply(threadId: string, input: AddReplyInput): Promise<CommentReply> {
+    async addReply(
+      threadId: string,
+      input: AddReplyInput,
+    ): Promise<CommentReply> {
       const data = await commentRequest<{ reply: CommentReply }>(
         `${base}/${encodeURIComponent(threadId)}/replies`,
         { method: "POST", body: JSON.stringify(input) },
@@ -95,17 +118,32 @@ export function createAuthorCommentApi(projectId: string): CommentApiAdapter {
       return data.reply;
     },
 
-    async updateComment(threadId: string, input: UpdateCommentContentInput): Promise<CommentThread> {
-      const data = await commentRequest<{ thread: CommentThread }>(`${base}/${encodeURIComponent(threadId)}`, {
-        method: "PATCH", body: JSON.stringify(input),
-      });
+    async updateComment(
+      threadId: string,
+      input: UpdateCommentContentInput,
+    ): Promise<CommentThread> {
+      const data = await commentRequest<{ thread: CommentThread }>(
+        `${base}/${encodeURIComponent(threadId)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(input),
+        },
+      );
       return data.thread;
     },
 
-    async updateReply(threadId: string, replyId: string, input: UpdateCommentContentInput): Promise<CommentReply> {
-      const data = await commentRequest<{ reply: CommentReply }>(`${base}/${encodeURIComponent(threadId)}/replies/${encodeURIComponent(replyId)}`, {
-        method: "PATCH", body: JSON.stringify(input),
-      });
+    async updateReply(
+      threadId: string,
+      replyId: string,
+      input: UpdateCommentContentInput,
+    ): Promise<CommentReply> {
+      const data = await commentRequest<{ reply: CommentReply }>(
+        `${base}/${encodeURIComponent(threadId)}/replies/${encodeURIComponent(replyId)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(input),
+        },
+      );
       return data.reply;
     },
 
@@ -142,14 +180,56 @@ export function createAuthorCommentApi(projectId: string): CommentApiAdapter {
     },
 
     async listMentionCandidates(): Promise<MentionCandidate[]> {
-      const data = await commentRequest<{ visitors: ProjectVisitor[] }>(
-        `/api/projects/${enc}/visitors`,
-      );
-      return data.visitors.map((v) => ({
-        id: v.userId,
-        name: v.name,
+      // Ensure the current cookie-authenticated creator is represented before
+      // loading the project-local candidate list. This keeps the adapter
+      // correct even when the edit page's user context has not hydrated yet.
+      await commentRequest<{ participant: ProjectCommentParticipant }>(
+        `/api/projects/${enc}/comment-participants`,
+        { method: "POST", body: "{}" },
+      ).catch(() => undefined);
+      const data = await commentRequest<{
+        participants: ProjectCommentParticipant[];
+      }>(`/api/projects/${enc}/comment-participants`);
+      return data.participants.map((participant) => ({
+        id: participant.id,
+        name: participant.name,
         type: "user" as const,
       }));
     },
+
+    async searchMentionCandidates(query, options): Promise<MentionCandidate[]> {
+      const data = await commentRequest<{
+        participants: ProjectCommentParticipant[];
+      }>(
+        `/api/projects/${enc}/comment-participants?q=${encodeURIComponent(query)}`,
+        { signal: options?.signal },
+      );
+      return data.participants.map((participant) => ({
+        id: participant.id,
+        name: participant.name,
+        type: "user" as const,
+      }));
+    },
+
+    async retryDingtalkNotifications(threadId, replyId): Promise<void> {
+      await commentRequest<{ dingtalkDelivery: unknown }>(
+        `${base}/${encodeURIComponent(threadId)}/notifications/retry`,
+        { method: "POST", body: JSON.stringify({ replyId }) },
+      );
+    },
   };
+}
+
+/** 创作端编辑页打开时幂等登记钉钉绑定参与者。 */
+export async function registerAuthorCommentParticipant(
+  projectId: string,
+): Promise<void> {
+  try {
+    await commentRequest<{ participant: ProjectCommentParticipant }>(
+      `/api/projects/${encodeURIComponent(projectId)}/comment-participants`,
+      { method: "POST", body: "{}" },
+    );
+  } catch {
+    // 未绑定钉钉的创作者仍可正常编辑，只是不进入 @ 候选。
+  }
 }

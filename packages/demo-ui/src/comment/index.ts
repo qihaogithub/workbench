@@ -38,6 +38,9 @@ export type {
   MentionCandidate,
   CommentImageUploadResult,
   CommentImageUploadHandler,
+  MentionSearchOptions,
+  MentionCandidateSearch,
+  CommentDeliverySummary,
 } from "./types";
 export type { CommentPinProps } from "./CommentPin";
 export type { CommentThreadPopoverProps } from "./CommentThreadPopover";

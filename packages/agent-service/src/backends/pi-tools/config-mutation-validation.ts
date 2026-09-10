@@ -68,6 +68,18 @@ function schemaForValues(resourcePath: string, resources: Record<string, string>
 function matchesType(value: unknown, type: unknown): boolean {
   if (Array.isArray(type)) return type.some((candidate) => matchesType(value, candidate));
   if (typeof type !== "string") return true;
+  // Workbench extends JSON Schema with UI field types. `position` is stored as
+  // an object value even though its schema type is intentionally not
+  // `object`, so treating the literal UI type as a JavaScript typeof value
+  // makes every persisted position fail Authority validation.
+  if (type === "position") {
+    const position = asObject(value);
+    return position !== undefined
+      && typeof position.x === "number"
+      && Number.isFinite(position.x)
+      && typeof position.y === "number"
+      && Number.isFinite(position.y);
+  }
   if (type === "object") return asObject(value) !== undefined;
   if (type === "array") return Array.isArray(value);
   if (type === "integer") return typeof value === "number" && Number.isInteger(value);

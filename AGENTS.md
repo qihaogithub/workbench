@@ -114,6 +114,7 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 - 若 CLI 返回缺失、不可用或事件缺口，再降级读取 `data/editor-diagnostics/*.jsonl`，并在结论中说明使用了兜底数据。
 - 预览错误优先按 `preview` 分组判断失败来自编译、iframe 加载、运行时错误还是自动修复；自动保存/复原问题优先同时看 `collab`、`autosave` 和 `ai` 分组。
 - 如果排查中发现诊断事件缺字段、命令不可用、fallback 误判或导出包缺口，应同步维护 `OPS/CLI`、`OPS/automations/diagnostics/` 和 `docs/项目文档/创作端/11-诊断与日志/`，不要只在当前 bug 文档里记录。
+- Workspace Authority 同时出现 external drift 与 committed backup 缺失时，普通 mutation、读取或 AI 工具禁止自动 adopt。先用 `workspace-recovery rebuild ... --from-version ...` dry-run 验证可信版本；只有管理员明确选择后才能 adopt 当前磁盘或以 `--apply` 重建，恢复包不受普通 retention 删除。
 
 ## 计划与问题沉淀文档
 

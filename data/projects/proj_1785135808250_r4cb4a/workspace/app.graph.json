@@ -2,29 +2,45 @@
   "version": 1,
   "entry": "page-2",
   "pages": {
+    "page-10": {
+      "pageId": "page_swfq",
+      "title": "开场引入-视频"
+    },
     "page-2": {
-      "pageId": "page_da9l",
-      "title": "排行榜"
+      "pageId": "闯关活动页-进行中_ec853d",
+      "title": "闯关活动页（进行中）"
     },
     "page-3": {
-      "pageId": "page_g5wy",
-      "title": "完读任务"
-    },
-    "page-4": {
-      "pageId": "page_j2zv",
-      "title": "完读任务-已完成"
+      "pageId": "page_g5ky",
+      "title": "挑战成功"
     },
     "page": {
       "pageId": "page_yw72",
-      "title": "闯关开场"
+      "title": "开场引入-动画"
+    },
+    "page-8": {
+      "pageId": "page_pwcf",
+      "title": "查看卡片"
+    },
+    "spine": {
+      "pageId": "spine_dqxs",
+      "title": "获得卡片-spine"
+    },
+    "page-7": {
+      "pageId": "page_dous",
+      "title": "分享闯关"
+    },
+    "page-6": {
+      "pageId": "page_duak",
+      "title": "规则页面"
     },
     "page-5": {
       "pageId": "page_xix9",
       "title": "闯关通关动画"
     },
-    "page-6": {
-      "pageId": "page_pqyt",
-      "title": "闯关活动"
+    "nn": {
+      "pageId": "nn_g9ct",
+      "title": "N对N填空题"
     }
   },
   "actions": [],

@@ -27,6 +27,7 @@
     "./LayerTreeMenu": "./src/LayerTreeMenu.tsx",
     "./canvas-kernel": "./src/canvas-kernel.ts",
     "./canvas-layout": "./src/canvas-layout.ts",
+    "./canvas-page-navigation": "./src/canvas-page-navigation.ts",
     "./canvas-utils": "./src/canvas-utils.ts",
     "./useCanvasDocumentMarkdown": "./src/useCanvasDocumentMarkdown.ts"
   },

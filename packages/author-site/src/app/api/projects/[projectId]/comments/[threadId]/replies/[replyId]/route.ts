@@ -3,6 +3,8 @@ import { createApiSuccess, createApiError } from "@/lib/fs-utils";
 import { getCommentThread, deleteReply, updateReply } from "@/lib/comment-store";
 import type { CommentMention } from "@workbench/shared";
 import { resolveCommentAuthor, canEditOrDeleteComment } from "@/lib/comment-auth";
+import { normalizeCommentMentions, registerCommentParticipant } from "@/lib/comment-participants";
+import { anonymousIpDigest } from "@/lib/dingtalk-comment-notifications";
 
 type RouteParams = {
   params: Promise<{ projectId: string; threadId: string; replyId: string }>;
@@ -30,15 +32,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (!authorResult) return NextResponse.json(createApiError("VALIDATION_ERROR", "未登录用户需提供 anonymousId"), { status: 400 });
     if (!canEditOrDeleteComment(authorResult, reply.author.id)) return NextResponse.json(createApiError("FORBIDDEN", "无权修改此回复"), { status: 403 });
     const mentions = Array.isArray(body.mentions) ? body.mentions : [];
-    if (authorResult.author.isAnonymous && mentions.some((mention) => mention.type === "user")) {
-      return NextResponse.json(createApiError("VALIDATION_ERROR", "匿名用户不能 @其他用户"), { status: 400 });
-    }
+      if (authorResult.userId && authorResult.authSource === "cookie") registerCommentParticipant(projectId, authorResult.userId);
+      try { body.mentions = normalizeCommentMentions(projectId, mentions, authorResult.author.isAnonymous ? 5 : 20); }
+      catch (error) { return NextResponse.json(createApiError("VALIDATION_ERROR", String(error).includes("TOO_MANY") ? "@人数超过限制" : "@对象无效"), { status: 400 }); }
     const updated = await updateReply(projectId, threadId, replyId, {
       content: body.content.trim(),
-      mentions,
+      mentions: body.mentions,
       aiTaskAuthorization: authorResult.userId && authorResult.role
         ? { userId: authorResult.userId, role: authorResult.role, expiresAt: Date.now() + 2 * 60 * 60 * 1000 }
         : undefined,
+      anonymousIpDigest: authorResult.author.isAnonymous ? anonymousIpDigest(request) : undefined,
     });
     return NextResponse.json(createApiSuccess({ reply: updated!.reply }));
   } catch (error) {

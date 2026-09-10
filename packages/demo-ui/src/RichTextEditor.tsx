@@ -37,6 +37,10 @@ export interface RichTextEditorProps {
   onSubmit?: () => void;
   autoFocus?: boolean;
   mentionCandidates?: MarkdownMentionCandidate[];
+  searchMentionCandidates?: (
+    query: string,
+    options?: { signal?: AbortSignal },
+  ) => Promise<MarkdownMentionCandidate[]>;
   mentions?: CommentMention[];
   onMentionsChange?: (mentions: CommentMention[]) => void;
   canMentionAgent?: boolean;
@@ -63,6 +67,7 @@ export function RichTextEditor({
   onSubmit,
   autoFocus,
   mentionCandidates,
+  searchMentionCandidates,
   mentions,
   onMentionsChange,
   canMentionAgent,
@@ -85,6 +90,7 @@ export function RichTextEditor({
       onSubmit={onSubmit}
       autoFocus={autoFocus}
       mentionCandidates={mentionCandidates}
+      searchMentionCandidates={searchMentionCandidates}
       mentions={mentions}
       onMentionsChange={onMentionsChange}
       canMentionAgent={canMentionAgent}

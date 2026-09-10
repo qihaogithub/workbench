@@ -243,6 +243,8 @@ export interface PageConfigPanelProps {
   onProjectDefinitionChange?: (mutation: SchemaDefinitionMutation) => void | Promise<void>;
   /** 字段批注数据与写入能力；浏览端可传入 readOnly 控制器。 */
   configComments?: ConfigCommentController;
+  /** 浏览端深链受控打开的配置项批注。 */
+  configCommentDeepLinkTarget?: ConfigCommentTarget | null;
   /** 兼容未接入共享气泡的宿主，打开字段批注入口。 */
   onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
   onPageConfigChange?: (pageId: string, data: Record<string, unknown>, meta?: ConfigChangeMeta) => void;
@@ -478,6 +480,7 @@ export function PageConfigPanel({
   onProjectSchemaChange,
   onProjectDefinitionChange,
   configComments,
+  configCommentDeepLinkTarget,
   onAddConfigComment,
   onPageConfigChange,
   onPageSchemaChange,
@@ -692,10 +695,13 @@ export function PageConfigPanel({
         : loadedPageDesignSpecEntries;
   useEffect(() => {
     setActiveDesignSpec(null);
-    setActiveConfigComment(null);
+    setActiveConfigComment(configCommentDeepLinkTarget ? {
+      target: configCommentDeepLinkTarget,
+      fieldTitle: configCommentDeepLinkTarget.fieldTitleSnapshot || configCommentDeepLinkTarget.fieldKey,
+    } : null);
     designSpecTriggerRef.current = null;
     configCommentTriggerRef.current = null;
-  }, [effectiveDetailPageId, configCategoryFilter]);
+  }, [effectiveDetailPageId, configCategoryFilter, configCommentDeepLinkTarget]);
   useEffect(() => {
     if (!activeDesignSpec && !activeConfigComment) return;
     const handlePointerDown = (event: PointerEvent) => {

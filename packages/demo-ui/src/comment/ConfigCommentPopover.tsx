@@ -22,6 +22,7 @@ import { cn } from "../utils";
 import { renderNoteMarkdown, stripMarkdown } from "../note-html";
 import { uploadNoteFile } from "../note-upload";
 import { CommentMarkdownEditor } from "./CommentMarkdownEditor";
+import { CommentDeliveryStatus } from "./CommentThreadPopover";
 import { COMMENT_VISUAL_TOKENS, commentAvatarColor } from "./comment-theme";
 import type { ConfigCommentController, MentionCandidate } from "./types";
 
@@ -127,6 +128,7 @@ export function ConfigCommentPopover({
   uploadCommentImage,
   mediaBaseUrl,
   mentionCandidates = [],
+  searchMentionCandidates,
   canMentionAgent = false,
   readOnly = false,
   onCreateComment,
@@ -136,6 +138,7 @@ export function ConfigCommentPopover({
   onSetResolved,
   onDeleteThread,
   onDeleteReply,
+  onRetryDingtalkNotifications,
 }: ConfigCommentPopoverProps) {
   const [newDraft, setNewDraft] = useState("");
   const [newMentions, setNewMentions] = useState<CommentMention[]>([]);
@@ -797,6 +800,7 @@ export function ConfigCommentPopover({
                       mentions={editingMentions}
                       onMentionsChange={setEditingMentions}
                       mentionCandidates={candidates}
+                      searchMentionCandidates={searchMentionCandidates}
                       canMentionAgent={canMentionAgent}
                       placeholder="修改批注…"
                       autoFocus
@@ -845,6 +849,10 @@ export function ConfigCommentPopover({
                     className="text-sm text-foreground"
                   />
                 )}
+                <CommentDeliveryStatus
+                  summary={thread.dingtalkDelivery}
+                  onRetry={!readOnly && onRetryDingtalkNotifications ? () => onRetryDingtalkNotifications(thread.id) : undefined}
+                />
 
                 {thread.replies.length > 0 && (
                   <div className="mt-3 space-y-2 border-t border-[#4d4d4d] pt-2">
@@ -907,6 +915,7 @@ export function ConfigCommentPopover({
                               mentions={editingReplyMentions}
                               onMentionsChange={setEditingReplyMentions}
                               mentionCandidates={candidates}
+                              searchMentionCandidates={searchMentionCandidates}
                               canMentionAgent={canMentionAgent}
                               placeholder="修改回复…"
                               autoFocus
@@ -945,6 +954,10 @@ export function ConfigCommentPopover({
                             className="text-xs text-foreground"
                           />
                         )}
+                        <CommentDeliveryStatus
+                          summary={reply.dingtalkDelivery}
+                          onRetry={!readOnly && onRetryDingtalkNotifications ? () => onRetryDingtalkNotifications(thread.id, reply.id) : undefined}
+                        />
                       </div>
                     ))}
                   </div>
@@ -969,6 +982,7 @@ export function ConfigCommentPopover({
                           }))
                         }
                         mentionCandidates={candidates}
+                        searchMentionCandidates={searchMentionCandidates}
                         canMentionAgent={canMentionAgent}
                         placeholder="回复此批注…"
                         autoFocus
@@ -1013,6 +1027,7 @@ export function ConfigCommentPopover({
               mentions={newMentions}
               onMentionsChange={setNewMentions}
               mentionCandidates={candidates}
+              searchMentionCandidates={searchMentionCandidates}
               canMentionAgent={canMentionAgent}
               placeholder="添加批注…"
               onSubmit={() => void handleCreate()}

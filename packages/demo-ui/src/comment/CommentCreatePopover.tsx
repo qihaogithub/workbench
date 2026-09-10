@@ -11,11 +11,13 @@ import type {
   CommentImageUploadHandler,
   CreateCommentInput,
   MentionCandidate,
+  MentionCandidateSearch,
 } from "./types";
 
 export interface CommentCreatePopoverProps {
   draft: Omit<CreateCommentInput, "content" | "mentions">;
   mentionCandidates: MentionCandidate[];
+  searchMentionCandidates?: MentionCandidateSearch;
   canMentionAgent?: boolean;
   left: number;
   top: number;
@@ -26,6 +28,7 @@ export interface CommentCreatePopoverProps {
 export function CommentCreatePopover({
   draft,
   mentionCandidates,
+  searchMentionCandidates,
   canMentionAgent,
   left,
   top,
@@ -98,6 +101,7 @@ export function CommentCreatePopover({
         mentions={mentions}
         onMentionsChange={setMentions}
         candidates={candidates}
+        searchMentionCandidates={searchMentionCandidates}
         autoFocus
         placeholder="输入评论…"
         uploadCommentImage={uploadCommentImage}
