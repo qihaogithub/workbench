@@ -18,7 +18,11 @@ import { Popover } from "./ui/popover";
 import type { ProjectReference } from "./chat/inline-tag-input";
 import type { StreamService } from "./chat/services/stream-service";
 import type { ActiveViewContext } from "./lib/active-view-context";
-import type { AgentMode, ViewerContext } from "@workbench/agent-client";
+import type {
+  AgentMode,
+  ViewerContext,
+  PreviewObservationHandler,
+} from "@workbench/agent-client";
 import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
 import { X, FileText, ArrowDown } from "lucide-react";
 
@@ -37,7 +41,10 @@ export interface VisualPropertyAutoSend {
   hiddenPrompt: string;
 }
 
-export type TriggerAutoSend = string | AutoRepairTrigger | VisualPropertyAutoSend;
+export type TriggerAutoSend =
+  | string
+  | AutoRepairTrigger
+  | VisualPropertyAutoSend;
 
 function QueuedMessagesTray({
   messages,
@@ -77,7 +84,9 @@ function QueuedMessagesTray({
                 {[
                   imageCount > 0 ? `${imageCount} 张图片` : "",
                   fileCount > 0 ? `${fileCount} 个文件` : "",
-                ].filter(Boolean).join("，")}
+                ]
+                  .filter(Boolean)
+                  .join("，")}
               </div>
             )}
             <div className="mt-2 flex items-center justify-end gap-2 text-xs text-muted-foreground">
@@ -117,7 +126,10 @@ interface AIChatProps {
   activeViewContext?: ActiveViewContext;
   workspaceId?: string;
   onCodeUpdate?: (code: string, source?: "ai-realtime" | "ai-finish") => void;
-  onSchemaUpdate?: (schema: string, source?: "ai-realtime" | "ai-finish") => void;
+  onSchemaUpdate?: (
+    schema: string,
+    source?: "ai-realtime" | "ai-finish",
+  ) => void;
   onFilesChange?: (
     files: Array<{ path: string; action: "created" | "modified" | "deleted" }>,
   ) => void;
@@ -152,6 +164,8 @@ interface AIChatProps {
   beforeSend?: () => Promise<void> | void;
   /** 外部 StreamService 引用，用于控制台数据转发等场景 */
   externalStreamServiceRef?: React.MutableRefObject<StreamService | null>;
+  /** 当前活动预览的受限观察处理器；仅通过 originating connection 提供给 Agent。 */
+  previewObservationHandlerRef?: React.RefObject<PreviewObservationHandler | null>;
   /** 由宿主接管历史入口；viewer-site 使用项目级本地历史。 */
   onHistoryOpen?: () => void;
   /** 宿主自定义历史菜单内容，渲染在共享 Popover 根节点内。 */
@@ -159,7 +173,9 @@ interface AIChatProps {
     close: () => void;
     width: number | null;
   }) => React.ReactNode;
-  selectedElement?: import("./chat/element-selection-chip").ChatElementRef | null;
+  selectedElement?:
+    | import("./chat/element-selection-chip").ChatElementRef
+    | null;
   onRemoveElement?: () => void;
   /** 画布多选页面引用 */
   selectedPages?: import("./chat/element-selection-chip").ChatPageRef[];
@@ -200,6 +216,7 @@ export function AIChat({
   onDiagnosticEvent,
   beforeSend,
   externalStreamServiceRef,
+  previewObservationHandlerRef,
   onHistoryOpen,
   historyContent,
   selectedElement,
@@ -311,6 +328,7 @@ export function AIChat({
     onDiagnosticEvent,
     beforeSend,
     externalStreamServiceRef,
+    previewObservationHandlerRef,
   });
 
   const [memoryUpdateFiles, setMemoryUpdateFiles] = useState<string[]>([]);
@@ -445,7 +463,9 @@ export function AIChat({
   const queuedMessages = messages.filter((message) => message.queueStatus);
 
   const supportsHistory =
-    mode !== "viewer-readonly" || Boolean(onHistoryOpen) || Boolean(historyContent);
+    mode !== "viewer-readonly" ||
+    Boolean(onHistoryOpen) ||
+    Boolean(historyContent);
   const supportsHistoryPopover =
     mode !== "viewer-readonly" || Boolean(historyContent);
 
@@ -478,154 +498,153 @@ export function AIChat({
         open={supportsHistoryPopover ? historyPopoverOpen : false}
         onOpenChange={setHistoryPopoverOpen}
       >
-      <Conversation className="flex-1 min-h-0 relative">
-        <ConversationContent ref={scrollContainerRef} onScroll={handleScroll}>
-          <ChatMessages
-            messages={messages}
-            currentMessage={currentMessage}
-            isStreaming={isStreaming}
-            contextCompactionNotice={contextCompactionNotice}
-            onRegenerate={handleRegenerate}
-            onExternalAuthConnected={handleRegenerate}
-            onRollback={handleRollback}
-            externalAuthSessionId={agentSessionId}
-            onEditResend={handleEditResend}
-            messagesRef={messagesRef}
-            setMessages={setMessages}
-            handleSend={handleSend}
-            onUserChoiceResponse={handleUserChoiceResponse}
-          />
-          {pendingPermissionRequest && (
-            <PermissionDialog
-              request={pendingPermissionRequest}
-              onRespond={handlePermissionResponse}
-              onCancel={handlePermissionCancel}
-              variant="inline"
+        <Conversation className="flex-1 min-h-0 relative">
+          <ConversationContent ref={scrollContainerRef} onScroll={handleScroll}>
+            <ChatMessages
+              messages={messages}
+              currentMessage={currentMessage}
+              isStreaming={isStreaming}
+              contextCompactionNotice={contextCompactionNotice}
+              onRegenerate={handleRegenerate}
+              onExternalAuthConnected={handleRegenerate}
+              onRollback={handleRollback}
+              externalAuthSessionId={agentSessionId}
+              onEditResend={handleEditResend}
+              messagesRef={messagesRef}
+              setMessages={setMessages}
+              handleSend={handleSend}
+              onUserChoiceResponse={handleUserChoiceResponse}
             />
-          )}
-        </ConversationContent>
-        {isUserScrolling && isStreaming && (
-          <button
-            onClick={scrollToBottom}
-            className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-[#2a2a2a]/85 hover:bg-[#3a3a3a]/90 text-white p-2 rounded-full shadow-lg z-10 transition-colors"
-            aria-label="回到底部"
-          >
-            <ArrowDown className="h-4 w-4" />
-          </button>
-        )}
-      </Conversation>
-
-      {memoryUpdateFiles.length > 0 && (
-        <div className="flex flex-col gap-1 px-4">
-          {memoryUpdateFiles.map((filePath) => (
-            <div
-              key={filePath}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/20 rounded-md text-sm"
+            {pendingPermissionRequest && (
+              <PermissionDialog
+                request={pendingPermissionRequest}
+                onRespond={handlePermissionResponse}
+                onCancel={handlePermissionCancel}
+                variant="inline"
+              />
+            )}
+          </ConversationContent>
+          {isUserScrolling && isStreaming && (
+            <button
+              onClick={scrollToBottom}
+              className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-[#2a2a2a]/85 hover:bg-[#3a3a3a]/90 text-white p-2 rounded-full shadow-lg z-10 transition-colors"
+              aria-label="回到底部"
             >
-              <FileText className="h-4 w-4 text-blue-400 flex-shrink-0" />
-              <span className="flex-1 text-blue-300 min-w-0 truncate">
-                AI 更新了项目记忆
-                <span className="text-blue-400/60 ml-1 font-mono text-xs">
-                  {filePath}
+              <ArrowDown className="h-4 w-4" />
+            </button>
+          )}
+        </Conversation>
+
+        {memoryUpdateFiles.length > 0 && (
+          <div className="flex flex-col gap-1 px-4">
+            {memoryUpdateFiles.map((filePath) => (
+              <div
+                key={filePath}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 border border-blue-500/20 rounded-md text-sm"
+              >
+                <FileText className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                <span className="flex-1 text-blue-300 min-w-0 truncate">
+                  AI 更新了项目记忆
+                  <span className="text-blue-400/60 ml-1 font-mono text-xs">
+                    {filePath}
+                  </span>
                 </span>
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs h-7 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
-                onClick={() => {
-                  onMemoryUpdate?.(filePath);
-                  setMemoryUpdateFiles((prev) =>
-                    prev.filter((f) => f !== filePath),
-                  );
-                }}
-              >
-                查看变更
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs h-7 text-muted-foreground hover:text-foreground"
-                onClick={() =>
-                  setMemoryUpdateFiles((prev) =>
-                    prev.filter((f) => f !== filePath),
-                  )
-                }
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-7 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
+                  onClick={() => {
+                    onMemoryUpdate?.(filePath);
+                    setMemoryUpdateFiles((prev) =>
+                      prev.filter((f) => f !== filePath),
+                    );
+                  }}
+                >
+                  查看变更
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-7 text-muted-foreground hover:text-foreground"
+                  onClick={() =>
+                    setMemoryUpdateFiles((prev) =>
+                      prev.filter((f) => f !== filePath),
+                    )
+                  }
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {isStreaming && silenceSeconds != null && silenceSeconds >= 60 && (
-        <div className="flex items-center gap-1.5 px-4 pb-1 text-xs text-muted-foreground">
-          <span
-            className={`inline-block h-1.5 w-1.5 rounded-full ${
-              silenceSeconds >= 180
-                ? "bg-red-500 animate-pulse"
-                : "bg-yellow-500/70"
-            }`}
-          />
-          <span>已运行 {silenceSeconds} 秒</span>
-        </div>
-      )}
+        {isStreaming && silenceSeconds != null && silenceSeconds >= 60 && (
+          <div className="flex items-center gap-1.5 px-4 pb-1 text-xs text-muted-foreground">
+            <span
+              className={`inline-block h-1.5 w-1.5 rounded-full ${
+                silenceSeconds >= 180
+                  ? "bg-red-500 animate-pulse"
+                  : "bg-yellow-500/70"
+              }`}
+            />
+            <span>已运行 {silenceSeconds} 秒</span>
+          </div>
+        )}
 
-      <ChatPlan plan={plan} isStreaming={isStreaming} />
+        <ChatPlan plan={plan} isStreaming={isStreaming} />
 
-      {errorBanner}
+        {errorBanner}
 
-      <QueuedMessagesTray
-        messages={queuedMessages}
-        onCancelQueuedMessage={handleCancelQueuedMessage}
-      />
-
-      <ChatInput
-        onSubmit={handleSend}
-        onCancel={handleCancelStream}
-        isStreaming={isStreaming}
-        agentSessionId={agentSessionId}
-        projectId={projectId}
-        onHistoryClick={handleHistoryClick}
-        historyPopoverEnabled={supportsHistoryPopover}
-        onModelChange={handleModelChange}
-        onDepthChange={handleDepthChange}
-        currentModelId={modelState.currentModelId}
-        currentDepth={modelState.currentDepth}
-        availableDepths={currentAvailableDepths}
-        models={modelState.models}
-        canSwitch={modelState.canSwitch}
-        isModelLoading={modelState.isLoading}
-        supportsFiles
-        supportsHistory={supportsHistory}
-        selectedElement={selectedElement}
-        onRemoveElement={onRemoveElement}
-        selectedPages={selectedPages}
-        onRemovePages={onRemovePages}
-        projects={projects}
-        onDiagnosticEvent={onDiagnosticEvent}
-      />
-
-      {mode !== "viewer-readonly" ? (
-        <HistoryDialog
-          open={historyPopoverOpen}
-          onOpenChange={setHistoryPopoverOpen}
-          popoverWidth={historyPopoverWidth}
-          projectId={projectId || sessionId}
-          workspaceId={workspaceId}
-          currentSessionId={currentSessionId}
-          onSelectSession={onSelectSession || (() => {})}
-          onNewSession={onNewSession || (() => {})}
+        <QueuedMessagesTray
+          messages={queuedMessages}
+          onCancelQueuedMessage={handleCancelQueuedMessage}
         />
-      ) : historyContent ? (
-        historyContent({
-          close: () => setHistoryPopoverOpen(false),
-          width: historyPopoverWidth,
-        })
-      ) : null}
-      </Popover>
 
+        <ChatInput
+          onSubmit={handleSend}
+          onCancel={handleCancelStream}
+          isStreaming={isStreaming}
+          agentSessionId={agentSessionId}
+          projectId={projectId}
+          onHistoryClick={handleHistoryClick}
+          historyPopoverEnabled={supportsHistoryPopover}
+          onModelChange={handleModelChange}
+          onDepthChange={handleDepthChange}
+          currentModelId={modelState.currentModelId}
+          currentDepth={modelState.currentDepth}
+          availableDepths={currentAvailableDepths}
+          models={modelState.models}
+          canSwitch={modelState.canSwitch}
+          isModelLoading={modelState.isLoading}
+          supportsFiles
+          supportsHistory={supportsHistory}
+          selectedElement={selectedElement}
+          onRemoveElement={onRemoveElement}
+          selectedPages={selectedPages}
+          onRemovePages={onRemovePages}
+          projects={projects}
+          onDiagnosticEvent={onDiagnosticEvent}
+        />
+
+        {mode !== "viewer-readonly" ? (
+          <HistoryDialog
+            open={historyPopoverOpen}
+            onOpenChange={setHistoryPopoverOpen}
+            popoverWidth={historyPopoverWidth}
+            projectId={projectId || sessionId}
+            workspaceId={workspaceId}
+            currentSessionId={currentSessionId}
+            onSelectSession={onSelectSession || (() => {})}
+            onNewSession={onNewSession || (() => {})}
+          />
+        ) : historyContent ? (
+          historyContent({
+            close: () => setHistoryPopoverOpen(false),
+            width: historyPopoverWidth,
+          })
+        ) : null}
+      </Popover>
     </div>
   );
 }

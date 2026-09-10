@@ -1,19 +1,19 @@
 {
   "workspaceId": "live-1786594072566-fy4o1s4dm",
   "projectId": "proj_1786594072551_rjhs3q",
-  "revision": 18,
-  "rootHash": "f1ebcae175607406d2fc2a19bf2d8adb42b2414a6e1a8390e27da227bc6b88e7",
+  "revision": 19,
+  "rootHash": "c8ab6143b2b0f501eeeb7610b80ecd7acfcb3867df06ff0b9a222293e7bc4ead",
   "resourceHashes": {
     ".canvas-layout.json": "a3f98581829cc5a6e02d1ff10ddf6358a5800274b6939f925852ec98c2cbbad4",
-    "demos/1132f6_jia4/config.schema.json": "917ce8ff6f6b637fb046b61d5be25a96efc83af87b8aab6356e5b126ec836729",
+    "demos/1132f6_jia4/config.schema.json": "45eeb0284e04e761bc852513af1c4ebd8587c5f3171e3a75a429e7de7a27b19f",
     "demos/1132f6_jia4/index.tsx": "8c999ffaeb26eaab71d248ca0508249d5a9226089ceea2955153b08ff1779904",
     "demos/1132f6_jia4/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/1132f6_jia4/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
-    "demos/page_irux/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_irux/config.schema.json": "e60e8ef12ce527b4b4d0bbea8cfe06d51ab000e478bb13fb5576b216a8e0a209",
     "demos/page_irux/index.tsx": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_irux/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_irux/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
-    "demos/page_sio0/config.schema.json": "917ce8ff6f6b637fb046b61d5be25a96efc83af87b8aab6356e5b126ec836729",
+    "demos/page_sio0/config.schema.json": "45eeb0284e04e761bc852513af1c4ebd8587c5f3171e3a75a429e7de7a27b19f",
     "demos/page_sio0/index.tsx": "8c999ffaeb26eaab71d248ca0508249d5a9226089ceea2955153b08ff1779904",
     "demos/page_sio0/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_sio0/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
@@ -42,5 +42,5 @@
     "43ab0ce9-eb88-4fcd-8d6b-4ac1faad0e63": "cc911cb6c67f25a5d14732b398b1b62fd2c6fa828e832b7579573f1cafd64312",
     "80758f5b-0224-44a6-94fe-58ce2266c191": "61e19e2dff9fc1db5004c7a8770294f67a907dc4bbc96176d1edf18b56b0321d"
   },
-  "updatedAt": 1786594087565
+  "updatedAt": 1789005936522
 }

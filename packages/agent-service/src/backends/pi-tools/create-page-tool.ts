@@ -12,7 +12,6 @@ import {
   resolveLiveWorkspaceMutationContext,
   WorkspaceMutationAuthorityError,
 } from "../../workspace/workspace-mutation-authority";
-import { getHocuspocusCollabServer } from "../../collab/hocuspocus-server";
 import { logger } from "../../utils/logger";
 import {
   WORKSPACE_TREE_FILENAME,
@@ -175,32 +174,7 @@ function buildTree(tree: WorkspaceTree, args: CreatePageParams): WorkspaceTree {
   return { ...tree, pages: [...tree.pages, page] };
 }
 
-/**
- * A page tree is also a live Yjs resource.  The Authority transaction is the
- * publication boundary, but a connected room may still retain the tree from
- * before that transaction.  Push the committed tree into that room straight
- * away so its next flush cannot overwrite the just-created page with stale
- * content.
- */
-async function syncCommittedTreeToCollab(
-  liveWorkspace: NonNullable<ReturnType<typeof resolveLiveWorkspaceMutationContext>>,
-  sessionId: string | undefined,
-  tree: WorkspaceTree,
-): Promise<void> {
-  if (!sessionId) return;
-  await getHocuspocusCollabServer().writeToResource(
-    {
-      projectId: liveWorkspace.projectId,
-      workspaceId: liveWorkspace.workspaceId,
-      sessionId,
-      resourcePath: WORKSPACE_TREE_FILENAME,
-      kind: "workspace-tree",
-    },
-    JSON.stringify(tree, null, 2),
-  );
-}
-
-function pageOperations(args: CreatePageParams, tree: WorkspaceTree): WorkspaceMutationRequest["operations"] {
+function pageOperations(args: CreatePageParams, tree: WorkspaceTree, treeContent: string): WorkspaceMutationRequest["operations"] {
   const prefix = `demos/${args.pageId}`;
   const operations: WorkspaceMutationRequest["operations"] = [
     {
@@ -227,6 +201,7 @@ function pageOperations(args: CreatePageParams, tree: WorkspaceTree): WorkspaceM
       type: "put_text" as const,
       path: WORKSPACE_TREE_FILENAME,
       content: JSON.stringify(buildTree(tree, args), null, 2),
+      expectedHash: crypto.createHash("sha256").update(treeContent).digest("hex"),
     },
   ];
   return operations;
@@ -295,7 +270,7 @@ export function createCreatePageTool(config: AgentConfig): AgentTool<typeof Crea
           content: JSON.stringify(nextTree),
         });
         if (!mutationDecision.allowed) return aiMutationDeniedResult(mutationDecision, WORKSPACE_TREE_FILENAME);
-        const operations = pageOperations(args, tree);
+        const operations = pageOperations(args, tree, treeContent);
         let receipt: unknown = null;
         if (liveWorkspace) {
           receipt = await liveWorkspace.authority.mutate({
@@ -303,23 +278,12 @@ export function createCreatePageTool(config: AgentConfig): AgentTool<typeof Crea
             projectId: liveWorkspace.projectId,
             workspaceId: liveWorkspace.workspaceId,
             sessionId: config.sessionId,
+            ...(config.runId ? { runId: config.runId } : {}),
             baseRevision: snapshot!.state.revision,
-            actor: "ai",
+            actor: config.mutationActor ?? "ai",
             reason: "agent_create_page",
             operations,
           });
-          try {
-            await syncCommittedTreeToCollab(liveWorkspace, config.sessionId, nextTree);
-          } catch (error) {
-            // The Authority receipt has already published a complete page.
-            // Do not turn a best-effort collaboration fan-out failure into a
-            // false tool failure; the editor's Authority polling still
-            // converges the projection.
-            logger.warn(
-              { pageId: args.pageId, error: error instanceof Error ? error.message : String(error) },
-              "Created page but could not synchronize workspace tree to collaboration room",
-            );
-          }
         } else {
           await createPageInFilesystem(workingDir, args, tree);
         }

@@ -26,16 +26,8 @@ export function useConsoleBuffer(
       bufferRef.current = bufferRef.current.slice(-MAX_ENTRIES);
     }
 
-    // Forward to agent-service via StreamService
-    const ws = (streamServiceRef.current as any)?.ws;
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(
-        JSON.stringify({
-          type: "console_data",
-          entries,
-        }),
-      );
-    }
+    // Forward to agent-service via StreamService's typed auxiliary channel.
+    streamServiceRef.current?.forwardConsoleEntries(entries);
   }, [streamServiceRef]);
 
   const handleConsoleEntry = useCallback(

@@ -78,7 +78,10 @@ import {
 } from "@workbench/shared";
 import type { ConfigDefinitionDraft } from "@workbench/shared/demo/config-schema-definition";
 import { applyTextPatches, type TextPatch } from "@workbench/prototype-core";
-import { createAuthorCommentApi, registerAuthorCommentParticipant } from "@/lib/comment-api-client";
+import {
+  createAuthorCommentApi,
+  registerAuthorCommentParticipant,
+} from "@/lib/comment-api-client";
 import {
   CommentUnreadDot,
   countUnresolvedCommentThreads,
@@ -168,12 +171,14 @@ import type {
 } from "@workbench/ai-chat-shared/ai-chat";
 import type { ChatMessage } from "@workbench/ai-chat-shared/message";
 import type { StreamService } from "@workbench/ai-chat-shared/stream-service";
+import type { PreviewObservationHandler } from "@workbench/agent-client";
 import type {
   ChatElementRef,
   ChatPageRef,
 } from "@workbench/ai-chat-shared/element-selection";
 import { getAgentClient } from "@/lib/agent-client";
 import { useConsoleBuffer } from "@/components/demo/useConsoleBuffer";
+import { PreviewObservationRegistry } from "@workbench/demo-ui/preview-observation-registry";
 import { useEditorDiagnostics } from "@/components/demo/useEditorDiagnostics";
 import { ResizablePanelGroup, ResizablePanel } from "@/components/ui/resizable";
 import {
@@ -260,9 +265,7 @@ import {
   resolveSinglePreviewResourceHistoryTarget,
   type SinglePreviewTarget,
 } from "./single-preview-history";
-import {
-  buildSinglePreviewNavigation,
-} from "./single-preview-navigation";
+import { buildSinglePreviewNavigation } from "./single-preview-navigation";
 import {
   getAnnotationsFromCanvasState,
   getCanvasDocumentEntries,
@@ -916,10 +919,14 @@ function getWorkspaceSyncErrorDetails(error: unknown): {
   };
 }
 
-function isFatalWorkspaceSyncError(details: ReturnType<typeof getWorkspaceSyncErrorDetails>): boolean {
-  return details.errorCode === "WORKSPACE_AUTHORITY_BACKUP_MISSING" ||
+function isFatalWorkspaceSyncError(
+  details: ReturnType<typeof getWorkspaceSyncErrorDetails>,
+): boolean {
+  return (
+    details.errorCode === "WORKSPACE_AUTHORITY_BACKUP_MISSING" ||
     details.errorCode === "WORKSPACE_AUTHORITY_BACKUP_UNTRUSTED" ||
-    details.errorCode === "WORKSPACE_EXTERNAL_DRIFT";
+    details.errorCode === "WORKSPACE_EXTERNAL_DRIFT"
+  );
 }
 
 function serializeCanvasLayout(projectId: string, state: CanvasState): string {
@@ -1106,8 +1113,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [projectConfigValues, setProjectConfigValues] = useState<
     Record<string, unknown>
   >({});
-  const [projectVisibilityRules, setProjectVisibilityRules] =
-    useState<VisibilityRulesDocument | undefined>(undefined);
+  const [projectVisibilityRules, setProjectVisibilityRules] = useState<
+    VisibilityRulesDocument | undefined
+  >(undefined);
   const [whiteboardTarget, setWhiteboardTarget] =
     useState<WhiteboardCommitTarget | null>(null);
   const projectConfigValuesRef = useRef(projectConfigValues);
@@ -1124,8 +1132,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   >({});
   const [referencePageDesignSpecEntries, setReferencePageDesignSpecEntries] =
     useState<Record<string, ReferencedDesignSpecEntry[]>>({});
-  const [referencePagePageDesignSpecEntries, setReferencePagePageDesignSpecEntries] =
-    useState<Record<string, ReferencedPageDesignSpecEntry[]>>({});
+  const [
+    referencePagePageDesignSpecEntries,
+    setReferencePagePageDesignSpecEntries,
+  ] = useState<Record<string, ReferencedPageDesignSpecEntry[]>>({});
   const [referencePageProjectSchemas, setReferencePageProjectSchemas] =
     useState<Record<string, string>>({});
   const pageSchemaMapRef = useRef(pageSchemaMap);
@@ -1142,7 +1152,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   } | null>(null);
   const [configDefinitionFocus, setConfigDefinitionFocus] =
     useState<ConfigDefinitionFocus | null>(null);
-  const [configDefinitionPageId, setConfigDefinitionPageId] = useState<string | null>(null);
+  const [configDefinitionPageId, setConfigDefinitionPageId] = useState<
+    string | null
+  >(null);
   const [pageCodes, setPageCodes] = useState<Record<string, string>>({});
   const pageCodesRef = useRef(pageCodes);
   pageCodesRef.current = pageCodes;
@@ -1363,6 +1375,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const pendingAuthorityProjectionRevisionRef = useRef(0);
   const authorityProjectionChainRef = useRef<Promise<void>>(Promise.resolve());
   const aiPreviewOverlayActiveRef = useRef(false);
+  const trackerCommittedRevisionRef = useRef(0);
+
+  useEffect(() => {
+    const revision = authorityState.committedRevision;
+    if (revision <= 0 || revision <= trackerCommittedRevisionRef.current) {
+      return;
+    }
+    trackerCommittedRevisionRef.current = revision;
+    // Authority polling gives us the committed revision; resource-level
+    // invalidation is handled by the tracker where the mutation event is
+    // available. The active preview is the conservative fallback here.
+    previewTrackerRef.current.onCommitted({
+      revision,
+      resources: [{ path: "__authority_revision__", action: "modified" }],
+    });
+  }, [authorityState.committedRevision]);
 
   const markWorkspaceChanged = useCallback(() => {
     setHasUnsavedChanges(true);
@@ -1447,7 +1475,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     [demoId, sessionId],
   );
 
-  const pageRequirementsReferenceContext = useMemo<MarkdownReferenceContext | undefined>(() => {
+  const pageRequirementsReferenceContext = useMemo<
+    MarkdownReferenceContext | undefined
+  >(() => {
     if (!workspaceId || !activeDemoId) return undefined;
     return {
       source: {
@@ -1888,7 +1918,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     [configWriteContextPageId, demoId, sessionId, toast],
   );
   const pageConfigPersistTimersRef = useRef<
-    Record<string, { timer: ReturnType<typeof setTimeout>; values: Record<string, unknown> }>
+    Record<
+      string,
+      { timer: ReturnType<typeof setTimeout>; values: Record<string, unknown> }
+    >
   >({});
   const persistPageConfigValues = useCallback(
     (pageId: string, values: Record<string, unknown>, delayMs = 500) => {
@@ -1897,11 +1930,14 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       if (timers[pageId]) clearTimeout(timers[pageId].timer);
       const timer = setTimeout(async () => {
         try {
-          const response = await fetch(`/api/sessions/${sessionId}/files/${pageId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ configValues: values }),
-          });
+          const response = await fetch(
+            `/api/sessions/${sessionId}/files/${pageId}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ configValues: values }),
+            },
+          );
           if (!response.ok) {
             throw new Error(`保存配置失败（${response.status}）`);
           }
@@ -1934,11 +1970,17 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       nextValues: Record<string, unknown>,
     ) => {
       if (!sessionId) throw new Error("Session 未创建，无法保存配置定义");
-      const response = await fetch(`/api/sessions/${sessionId}/files/${pageId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schema: nextSchema, configValues: nextValues }),
-      });
+      const response = await fetch(
+        `/api/sessions/${sessionId}/files/${pageId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            schema: nextSchema,
+            configValues: nextValues,
+          }),
+        },
+      );
       if (response.ok) return;
       const result = await response.json().catch(() => null);
       throw new Error(
@@ -1981,13 +2023,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       projectConfigValuesRef.current = nextValues;
       setProjectConfigValues(nextValues);
       if (shouldPersist) void persistProjectConfigValues(nextValues);
-      const projectKeys = new Set(getSchemaPropertyKeys(projectConfigSchemaRef.current));
-      const applyProjectValues = (previous: Record<string, Record<string, unknown>>) => {
+      const projectKeys = new Set(
+        getSchemaPropertyKeys(projectConfigSchemaRef.current),
+      );
+      const applyProjectValues = (
+        previous: Record<string, Record<string, unknown>>,
+      ) => {
         const next: Record<string, Record<string, unknown>> = {};
-        const pageIds = new Set([...Object.keys(previous), ...demoPagesRef.current.map((page) => page.id)]);
+        const pageIds = new Set([
+          ...Object.keys(previous),
+          ...demoPagesRef.current.map((page) => page.id),
+        ]);
         for (const pageId of pageIds) {
           const pageValues = previous[pageId] ?? {};
-          const pageOnlyValues = Object.fromEntries(Object.entries(pageValues).filter(([key]) => !projectKeys.has(key)));
+          const pageOnlyValues = Object.fromEntries(
+            Object.entries(pageValues).filter(([key]) => !projectKeys.has(key)),
+          );
           next[pageId] = { ...pageOnlyValues, ...nextValues };
         }
         return next;
@@ -2180,8 +2231,15 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       setKbDocDialogMode("read");
       setKbDocDialogOpen(true);
     };
-    window.addEventListener("knowledge-open-document", handleOpenKnowledgeDocument);
-    return () => window.removeEventListener("knowledge-open-document", handleOpenKnowledgeDocument);
+    window.addEventListener(
+      "knowledge-open-document",
+      handleOpenKnowledgeDocument,
+    );
+    return () =>
+      window.removeEventListener(
+        "knowledge-open-document",
+        handleOpenKnowledgeDocument,
+      );
   }, [knowledgeItems]);
 
   const upsertKnowledgeItem = useCallback((item: KnowledgeItem) => {
@@ -2274,7 +2332,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const readCanvasKnowledgeDocument = useCallback(
     async (document: CanvasKnowledgeDocument): Promise<string> => {
       if (!demoId) return "";
-      const query = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : "";
+      const query = sessionId
+        ? `?sessionId=${encodeURIComponent(sessionId)}`
+        : "";
       const res = await fetch(
         `/api/projects/${encodeURIComponent(demoId)}/documents/${encodeURIComponent(document.id)}${query}`,
       );
@@ -2442,6 +2502,22 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   // Console buffer for forwarding iframe console logs to agent-service
   const streamServiceRef = useRef<StreamService | null>(null);
+  const previewObservationRegistryRef = useRef(
+    new PreviewObservationRegistry(),
+  );
+  const previewObservationHandlerRef = useRef<PreviewObservationHandler | null>(
+    (() => {
+      const handler = ((input: Parameters<PreviewObservationHandler>[0]) =>
+        previewObservationRegistryRef.current.observe(
+          input as Parameters<PreviewObservationRegistry["observe"]>[0],
+        )) as unknown as PreviewObservationHandler;
+      handler.getPreviewRegistration = () => {
+        const identity = previewObservationRegistryRef.current.identity;
+        return identity ? { identity } : null;
+      };
+      return handler;
+    })(),
+  );
   const autoPreviewRepairCountsRef = useRef<Map<string, number>>(
     new globalThis.Map(),
   );
@@ -2489,7 +2565,10 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   // 配置项批注与页面评论共用项目级订阅。按页面筛选会导致右侧配置栏
   // 无法读取其它页面以及项目级配置项的线程，并且会为每个字段引入额外请求。
   // 页面/画布评论仍在下方通过 filterPageCommentThreads 派生，不改变现有侧栏语义。
-  const commentQueryTarget = useMemo<CommentTarget | undefined>(() => undefined, []);
+  const commentQueryTarget = useMemo<CommentTarget | undefined>(
+    () => undefined,
+    [],
+  );
   const commentsData = useComments({
     projectId: demoId,
     target: commentQueryTarget,
@@ -2497,7 +2576,9 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     wsUrl: commentWsUrl,
     enabled: Boolean(activeDemoId),
   });
-  const [commentMentionCandidates, setCommentMentionCandidates] = useState<MentionCandidate[]>([]);
+  const [commentMentionCandidates, setCommentMentionCandidates] = useState<
+    MentionCandidate[]
+  >([]);
   useEffect(() => {
     if (!activeDemoId || !currentUserId) return;
     void registerAuthorCommentParticipant(demoId);
@@ -2566,8 +2647,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       const isReference = Boolean(page.reference);
       const isTemplate = Boolean(page.isTemplatePage);
       const canEditValue =
-        canEditConfigRole &&
-        (!isTemplate || currentUserRole === "admin");
+        canEditConfigRole && (!isTemplate || currentUserRole === "admin");
       const canEditDefinition = canEditValue && !isReference;
       const reason = isReference
         ? "reference"
@@ -2624,9 +2704,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   );
   const isProjectCommentScope = previewMode === "canvas";
   const unresolvedCommentCount = countUnresolvedCommentThreads(
-    isProjectCommentScope
-      ? canvasCommentThreads
-      : activePageCommentThreads,
+    isProjectCommentScope ? canvasCommentThreads : activePageCommentThreads,
   );
   const commentTabLabel =
     unresolvedCommentCount > 0
@@ -3042,6 +3120,17 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
 
   const handlePreviewError = useCallback(
     (error: PreviewDiagnosticError) => {
+      // A high-fidelity runtime error can arrive before the iframe emits
+      // LOADED. PreviewPanel registers the error fallback root with the same
+      // render identity; forward that registration immediately so the
+      // originating Agent connection can observe the known failed runtime.
+      const failedPreviewIdentity =
+        previewObservationRegistryRef.current.identity;
+      if (failedPreviewIdentity) {
+        streamServiceRef.current?.registerPreview({
+          identity: failedPreviewIdentity,
+        });
+      }
       const pageId =
         previewMode === "canvas"
           ? (canvasEditingPageId ?? activeDemoId)
@@ -3769,6 +3858,74 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     >
   >({});
   const pendingSnapshotPageIdRef = useRef<string | null>(null);
+  const lastHandledPreviewLoadRef = useRef<string | null>(null);
+  const handleSinglePreviewContentLoaded = useCallback(
+    (details?: {
+      requestId?: number;
+      previewInstanceId?: string;
+      renderGeneration?: number;
+      revision?: number;
+    }) => {
+      const runtimeType = demoPagesRef.current.find(
+        (page) => page.id === activeDemoIdRef.current,
+      )?.runtimeType;
+      const previewIdentity = previewObservationRegistryRef.current.identity;
+      const loadKey = previewIdentity
+        ? `${previewIdentity.previewInstanceId}:${previewIdentity.pageId}:${previewIdentity.renderGeneration}:${previewIdentity.revision}`
+        : `${activeDemoIdRef.current}:${details?.renderGeneration ?? "na"}:${details?.revision ?? authorityState.committedRevision}`;
+      if (lastHandledPreviewLoadRef.current === loadKey) return;
+      lastHandledPreviewLoadRef.current = loadKey;
+
+      recordDiagnosticEvent({
+        category: "preview",
+        name: "preview.content_loaded",
+        details: {
+          pageId: activeDemoIdRef.current,
+          mode: "single",
+          requestId: details?.requestId,
+          previewInstanceId: details?.previewInstanceId,
+          renderGeneration: details?.renderGeneration,
+          revision: details?.revision,
+        },
+      });
+      setSinglePreviewLoaded((current) => (current ? current : true));
+      if (previewIdentity) {
+        streamServiceRef.current?.registerPreview({
+          identity: previewIdentity,
+        });
+      }
+      const ackRevision = details?.revision ?? authorityState.committedRevision;
+      if (ackRevision > 0) {
+        const trackerState =
+          previewTrackerRef.current.getSurfaceState("active-preview");
+        if (ackRevision > trackerState.committedRevision) {
+          // The render can finish before the committed-revision effect runs.
+          // Seed the same conservative baseline before accepting this
+          // identity-bound ACK.
+          previewTrackerRef.current.onCommitted({
+            revision: ackRevision,
+            resources: [{ path: "__authority_revision__", action: "modified" }],
+          });
+        }
+        const ack = previewTrackerRef.current.ackPreview(
+          ackRevision,
+          "active-preview",
+        );
+        if (ack) authorityState.ackPreview(ackRevision, "applied");
+      }
+      // Static prototype snapshots are only consumed by the high-fidelity
+      // renderer. Prototype HTML already owns its DOM snapshot and must not
+      // trigger a parent state update on every content-loaded callback.
+      if (
+        runtimeType !== "prototype-html-css" &&
+        runtimeType !== "sketch-scene"
+      ) {
+        pendingSnapshotPageIdRef.current = activeDemoIdRef.current;
+        setStaticPrototypeRequestKey((key) => key + 1);
+      }
+    },
+    [authorityState.committedRevision, recordDiagnosticEvent],
+  );
   const hasPendingVisualPropertyWork =
     visualPendingPropertyChanges.length > 0 ||
     visualPendingConfigMarks.length > 0 ||
@@ -4188,10 +4345,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
       const nextJson = parsed ? JSON.stringify(parsed) : "";
       return currentJson === nextJson ? current : parsed;
     });
-  }, [
-    visibilityRulesCollab.status,
-    visibilityRulesCollab.value,
-  ]);
+  }, [visibilityRulesCollab.status, visibilityRulesCollab.value]);
 
   const syncWorkspaceFileToCollab = useCallback(
     async (
@@ -4768,7 +4922,9 @@ ${context.details}
         setPageCodes(codes);
         setPagePrototypeMap(prototypes);
         setPageSketchMap(sketches);
-        setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemasToApply));
+        setPageSchemaMap((prev) =>
+          mergeLoadedPageSchemas(prev, schemasToApply),
+        );
 
         const size = getPreviewSize(loadedSchema);
         setPreviewSize(size);
@@ -4867,7 +5023,11 @@ ${context.details}
   }, []);
 
   const handlePageConfigPanelChange = useCallback(
-    (pageId: string, data: Record<string, unknown>, meta?: ConfigChangeMeta) => {
+    (
+      pageId: string,
+      data: Record<string, unknown>,
+      meta?: ConfigChangeMeta,
+    ) => {
       const pageMeta = demoPagesRef.current.find((page) => page.id === pageId);
       const isReferencePage = Boolean(pageMeta?.reference);
       const schema = pageSchemaMapRef.current[pageId];
@@ -4883,8 +5043,7 @@ ${context.details}
         delete pageConfigPersistTimersRef.current[pageId];
       }
       const shouldPersist =
-        !isReferencePage &&
-        (!committed || Boolean(pendingPersist));
+        !isReferencePage && (!committed || Boolean(pendingPersist));
       replacePageConfigValues(
         pageId,
         nextPageConfig,
@@ -4898,9 +5057,21 @@ ${context.details}
         recordCommand({
           label: "页面配置变更",
           undo: () =>
-            replacePageConfigValues(pageId, before, 0, !isReferencePage, !isReferencePage),
+            replacePageConfigValues(
+              pageId,
+              before,
+              0,
+              !isReferencePage,
+              !isReferencePage,
+            ),
           redo: () =>
-            replacePageConfigValues(pageId, after, 0, !isReferencePage, !isReferencePage),
+            replacePageConfigValues(
+              pageId,
+              after,
+              0,
+              !isReferencePage,
+              !isReferencePage,
+            ),
         });
       }
     },
@@ -4919,22 +5090,25 @@ ${context.details}
     [],
   );
 
-  const launchWhiteboard = useCallback((target: ImageConfigTarget) => {
-    if (
-      (target.scope !== "page" && target.scope !== "project") ||
-      !target.fieldPath
-    )
-      return;
-    setWhiteboardTarget({
-      scope: target.scope,
-      ...(target.pageId ? { pageId: target.pageId } : {}),
-      contextPageId: target.pageId ?? configWriteContextPageId,
-      fieldPath: target.fieldPath,
-      ...(target.listItem ? { listItem: target.listItem } : {}),
-      ...(target.currentValue ? { currentValue: target.currentValue } : {}),
-      ...(target.onCommit ? { onCommit: target.onCommit } : {}),
-    });
-  }, [configWriteContextPageId]);
+  const launchWhiteboard = useCallback(
+    (target: ImageConfigTarget) => {
+      if (
+        (target.scope !== "page" && target.scope !== "project") ||
+        !target.fieldPath
+      )
+        return;
+      setWhiteboardTarget({
+        scope: target.scope,
+        ...(target.pageId ? { pageId: target.pageId } : {}),
+        contextPageId: target.pageId ?? configWriteContextPageId,
+        fieldPath: target.fieldPath,
+        ...(target.listItem ? { listItem: target.listItem } : {}),
+        ...(target.currentValue ? { currentValue: target.currentValue } : {}),
+        ...(target.onCommit ? { onCommit: target.onCommit } : {}),
+      });
+    },
+    [configWriteContextPageId],
+  );
 
   handlePageConfigPanelChangeRef.current = handlePageConfigPanelChange;
 
@@ -5018,19 +5192,35 @@ ${context.details}
       replaceProjectConfigValues(
         nextProjectConfigValues,
         !isReferencePage &&
-          (meta?.persistence !== "committed" || projectConfigPersistPendingCountRef.current > 0),
+          (meta?.persistence !== "committed" ||
+            projectConfigPersistPendingCountRef.current > 0),
         !isReferencePage,
       );
       if (!areConfigValuesEqual(before, nextProjectConfigValues)) {
         const after = { ...nextProjectConfigValues };
         recordCommand({
           label: "项目配置变更",
-          undo: () => replaceProjectConfigValues(before, !isReferencePage, !isReferencePage),
-          redo: () => replaceProjectConfigValues(after, !isReferencePage, !isReferencePage),
+          undo: () =>
+            replaceProjectConfigValues(
+              before,
+              !isReferencePage,
+              !isReferencePage,
+            ),
+          redo: () =>
+            replaceProjectConfigValues(
+              after,
+              !isReferencePage,
+              !isReferencePage,
+            ),
         });
       }
     },
-    [configPanelDetailPageId, previewMode, recordCommand, replaceProjectConfigValues],
+    [
+      configPanelDetailPageId,
+      previewMode,
+      recordCommand,
+      replaceProjectConfigValues,
+    ],
   );
 
   handleProjectConfigPanelChangeRef.current = handleProjectConfigPanelChange;
@@ -5100,8 +5290,7 @@ ${context.details}
       } catch (error) {
         toast({
           title: "配置定义尚未保存",
-          description:
-            error instanceof Error ? error.message : "请稍后重试。",
+          description: error instanceof Error ? error.message : "请稍后重试。",
           variant: "destructive",
         });
         throw error;
@@ -5657,7 +5846,9 @@ ${context.details}
           ...pageSchemaMapRef.current,
           ...schemasToApply,
         };
-        setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, schemasToApply));
+        setPageSchemaMap((prev) =>
+          mergeLoadedPageSchemas(prev, schemasToApply),
+        );
         setConfigDataMap((prev) => {
           const next = { ...prev };
           for (const [pageId, defaults] of Object.entries(nextDefaults)) {
@@ -5724,9 +5915,7 @@ ${context.details}
             | undefined;
           const nextCode = data.code ?? "";
           const nextSchema =
-            pendingPageSchemaOverridesRef.current[pageId] ??
-            data.schema ??
-            "";
+            pendingPageSchemaOverridesRef.current[pageId] ?? data.schema ?? "";
           pageCodesRef.current = {
             ...pageCodesRef.current,
             [pageId]: nextCode,
@@ -5875,11 +6064,10 @@ ${context.details}
       if (previewMode === "canvas" && thread?.target.kind === "page") {
         setCanvasEditingPageId(thread.target.pageId);
         setRightPanelTab("comments");
-        void handleConfigPanelPageSelect(
-          thread.target.pageId,
-          undefined,
-          { focusCanvas: false, openConfigDetail: false },
-        );
+        void handleConfigPanelPageSelect(thread.target.pageId, undefined, {
+          focusCanvas: false,
+          openConfigDetail: false,
+        });
       }
       setActiveCommentThreadId(threadId);
       setCommentModeActive(false);
@@ -5904,18 +6092,31 @@ ${context.details}
     },
     [handleConfigPanelPageSelect, setCanvasEditingPageId],
   );
-  const [documentReferenceFocus, setDocumentReferenceFocus] = useState<AuthorDocumentReference | null>(null);
-  const [referenceConfigTreeFocus, setReferenceConfigTreeFocus] = useState<{ pageId: string; fieldKey: string; page: { id: string; name: string; schema: string } } | undefined>();
-  const handleMarkdownReferenceClick = useCallback<MarkdownReferenceClickHandler>(
-    ({ target }) => {
-      try {
-        openAuthorReference(demoId, target);
-      } catch (error) {
-        toast({ title: "无法打开引用", description: error instanceof Error ? error.message : "无效引用", variant: "destructive" });
+  const [documentReferenceFocus, setDocumentReferenceFocus] =
+    useState<AuthorDocumentReference | null>(null);
+  const [referenceConfigTreeFocus, setReferenceConfigTreeFocus] = useState<
+    | {
+        pageId: string;
+        fieldKey: string;
+        page: { id: string; name: string; schema: string };
       }
-    },
-    [demoId, toast],
-  );
+    | undefined
+  >();
+  const handleMarkdownReferenceClick =
+    useCallback<MarkdownReferenceClickHandler>(
+      ({ target }) => {
+        try {
+          openAuthorReference(demoId, target);
+        } catch (error) {
+          toast({
+            title: "无法打开引用",
+            description: error instanceof Error ? error.message : "无效引用",
+            variant: "destructive",
+          });
+        }
+      },
+      [demoId, toast],
+    );
   const ensureConfigDefinitionPageLoaded = useCallback(
     async (pageId: string) => {
       if (
@@ -5952,9 +6153,10 @@ ${context.details}
   );
   const handleDesignSpecConfigDefinitionEdit = useCallback(
     async (target: ConfigDefinitionFocus) => {
-      const targetPageId = target.scope === "page"
-        ? target.pageId
-        : activeDemoIdRef.current || demoPages[0]?.id;
+      const targetPageId =
+        target.scope === "page"
+          ? target.pageId
+          : activeDemoIdRef.current || demoPages[0]?.id;
       if (!targetPageId) {
         toast({
           title: "无法编辑配置项",
@@ -5989,50 +6191,99 @@ ${context.details}
     },
     [demoPages, ensureConfigDefinitionPageLoaded, toast],
   );
-  const referenceNavigationContextRef = useRef({ demoPages, ensureConfigDefinitionPageLoaded, getPageConfigCapabilities, setPreviewMode, toast });
-  referenceNavigationContextRef.current = { demoPages, ensureConfigDefinitionPageLoaded, getPageConfigCapabilities, setPreviewMode, toast };
-  const referenceNavigationReady = !isLoading && !isInitialPageLoading && Boolean(sessionId && workspaceId);
+  const referenceNavigationContextRef = useRef({
+    demoPages,
+    ensureConfigDefinitionPageLoaded,
+    getPageConfigCapabilities,
+    setPreviewMode,
+    toast,
+  });
+  referenceNavigationContextRef.current = {
+    demoPages,
+    ensureConfigDefinitionPageLoaded,
+    getPageConfigCapabilities,
+    setPreviewMode,
+    toast,
+  };
+  const referenceNavigationReady =
+    !isLoading && !isInitialPageLoading && Boolean(sessionId && workspaceId);
   useAuthorReferenceDeepLink({
     ready: referenceNavigationReady,
     projectId: demoId,
     sessionId,
     workspaceId,
     navigate: async (target, signal) => {
-        if (target.kind === "project") {
-          // The project target is intentionally a no-op after the current
-          // project candidate has revalidated the permission-bearing URI.
-          return;
-        } else if (target.kind === "document") {
-          setDocumentReferenceFocus(target);
-          referenceNavigationContextRef.current.setPreviewMode("document");
-        } else {
-          if (!referenceNavigationContextRef.current.demoPages.some((page) => page.id === target.pageId)) throw new Error("引用页面不存在");
-          if (target.kind === "config" && !(await referenceNavigationContextRef.current.ensureConfigDefinitionPageLoaded(target.pageId))) {
-            throw new Error("配置定义加载失败，请刷新重试");
-          }
-          if (signal.aborted) return;
-          referenceNavigationContextRef.current.setPreviewMode("single");
-          setRightPanelTab("config");
-          await handleConfigPanelPageSelectRef.current(target.pageId, undefined, { openConfigDetail: true });
-          if (signal.aborted) return;
-          if (activeDemoIdRef.current !== target.pageId) throw new Error("引用页面加载失败，请刷新重试");
-          if (target.kind === "config") {
-            const targetSchema = pageSchemaMapRef.current[target.pageId] ?? (activeDemoIdRef.current === target.pageId ? schemaRef.current : "");
-            const definition = resolveReferenceConfigDefinition(targetSchema, target.pageId, target.fieldPath);
-            const focus = { pageId: target.pageId, fieldKey: target.fieldPath };
-            const page = referenceNavigationContextRef.current.demoPages.find((entry) => entry.id === target.pageId);
-            if (!page) throw new Error("引用页面不存在");
-            if (!definition.draft || !referenceNavigationContextRef.current.getPageConfigCapabilities(page).page.canEditDefinition) {
-              setReferenceConfigTreeFocus({ ...focus, page: { id: page.id, name: page.name, schema: targetSchema } });
-            } else {
-              setReferenceConfigTreeFocus(undefined);
-              setConfigDefinitionPageId(target.pageId);
-              setConfigDefinitionFocus({ scope: "page", ...focus });
-            }
+      if (target.kind === "project") {
+        // The project target is intentionally a no-op after the current
+        // project candidate has revalidated the permission-bearing URI.
+        return;
+      } else if (target.kind === "document") {
+        setDocumentReferenceFocus(target);
+        referenceNavigationContextRef.current.setPreviewMode("document");
+      } else {
+        if (
+          !referenceNavigationContextRef.current.demoPages.some(
+            (page) => page.id === target.pageId,
+          )
+        )
+          throw new Error("引用页面不存在");
+        if (
+          target.kind === "config" &&
+          !(await referenceNavigationContextRef.current.ensureConfigDefinitionPageLoaded(
+            target.pageId,
+          ))
+        ) {
+          throw new Error("配置定义加载失败，请刷新重试");
+        }
+        if (signal.aborted) return;
+        referenceNavigationContextRef.current.setPreviewMode("single");
+        setRightPanelTab("config");
+        await handleConfigPanelPageSelectRef.current(target.pageId, undefined, {
+          openConfigDetail: true,
+        });
+        if (signal.aborted) return;
+        if (activeDemoIdRef.current !== target.pageId)
+          throw new Error("引用页面加载失败，请刷新重试");
+        if (target.kind === "config") {
+          const targetSchema =
+            pageSchemaMapRef.current[target.pageId] ??
+            (activeDemoIdRef.current === target.pageId
+              ? schemaRef.current
+              : "");
+          const definition = resolveReferenceConfigDefinition(
+            targetSchema,
+            target.pageId,
+            target.fieldPath,
+          );
+          const focus = { pageId: target.pageId, fieldKey: target.fieldPath };
+          const page = referenceNavigationContextRef.current.demoPages.find(
+            (entry) => entry.id === target.pageId,
+          );
+          if (!page) throw new Error("引用页面不存在");
+          if (
+            !definition.draft ||
+            !referenceNavigationContextRef.current.getPageConfigCapabilities(
+              page,
+            ).page.canEditDefinition
+          ) {
+            setReferenceConfigTreeFocus({
+              ...focus,
+              page: { id: page.id, name: page.name, schema: targetSchema },
+            });
+          } else {
+            setReferenceConfigTreeFocus(undefined);
+            setConfigDefinitionPageId(target.pageId);
+            setConfigDefinitionFocus({ scope: "page", ...focus });
           }
         }
+      }
     },
-    onError: (error) => toast({ title: "无法打开引用", description: error instanceof Error ? error.message : "请刷新重试", variant: "destructive" }),
+    onError: (error) =>
+      toast({
+        title: "无法打开引用",
+        description: error instanceof Error ? error.message : "请刷新重试",
+        variant: "destructive",
+      }),
   });
 
   const handlePreviewHtmlFilesDrop = useCallback(
@@ -6788,7 +7039,9 @@ ${context.details}
         setProjectVisibilityRules(parseVisibilityRules(multi.visibilityRules));
         replaceCollabText(
           visibilityRulesCollab.ytext,
-          multi.visibilityRules ? JSON.stringify(multi.visibilityRules, null, 2) + "\n" : "",
+          multi.visibilityRules
+            ? JSON.stringify(multi.visibilityRules, null, 2) + "\n"
+            : "",
         );
         replaceCollabText(
           projectSchemaCollab.ytext,
@@ -6914,7 +7167,9 @@ ${context.details}
           }
           return merged;
         });
-        setPageSchemaMap((prev) => mergeLoadedPageSchemas(prev, initialSchemasToApply));
+        setPageSchemaMap((prev) =>
+          mergeLoadedPageSchemas(prev, initialSchemasToApply),
+        );
         setPagePreviewSizeMap(previewSizeMap);
 
         if (!authoritySnapshot) markWorkspaceChanged();
@@ -6944,9 +7199,7 @@ ${context.details}
                 target.configValues !== undefined
                   ? allDefaults[nextActiveId]
                   : undefined,
-              source: authoritySnapshot
-                ? "authority-committed"
-                : "ai-finish",
+              source: authoritySnapshot ? "authority-committed" : "ai-finish",
               syncCollab: false,
             });
           } else {
@@ -7337,11 +7590,12 @@ ${context.details}
     const error = new Error(
       `Workspace Authority 不可写（${health.condition}）`,
     ) as Error & { code?: string; status?: number };
-    error.code = health.missingBackupCount > 0
-      ? "WORKSPACE_AUTHORITY_BACKUP_MISSING"
-      : health.externalDrift
-        ? "WORKSPACE_EXTERNAL_DRIFT"
-        : "WORKSPACE_AUTHORITY_NOT_READY";
+    error.code =
+      health.missingBackupCount > 0
+        ? "WORKSPACE_AUTHORITY_BACKUP_MISSING"
+        : health.externalDrift
+          ? "WORKSPACE_EXTERNAL_DRIFT"
+          : "WORKSPACE_AUTHORITY_NOT_READY";
     error.status = 503;
     throw error;
   }, [demoId, sessionId, workspaceId]);
@@ -7986,26 +8240,27 @@ ${context.details}
   const visibilityResolution = useMemo(() => {
     const regionIds: Record<string, string[]> = {};
     for (const page of demoPages) {
-      const content = [
-        pageCodes[page.id],
-        pagePrototypeMap[page.id]?.html,
-      ]
+      const content = [pageCodes[page.id], pagePrototypeMap[page.id]?.html]
         .filter((value): value is string => typeof value === "string")
         .join("\n");
       regionIds[page.id] = extractDeclaredRegionIds([content]);
     }
     const rawRules = visibilityRulesCollab.value.trim();
-    return resolveVisibility({
-      // A non-empty collab payload is authoritative even when malformed so
-      // the preview surfaces validation issues instead of silently treating it
-      // as an absent rules file. Before collab sync, use the bootstrap value.
-      rules: rawRules ? rawRules : projectVisibilityRules,
-      projectConfigValues,
-      projectSchema: projectConfigSchema,
-      pageIds: demoPages.map((page) => page.id),
-      pageSchemas: pageSchemaMap,
-      regionIds,
-    }, undefined, { roles: [currentUserRole || "guest"] });
+    return resolveVisibility(
+      {
+        // A non-empty collab payload is authoritative even when malformed so
+        // the preview surfaces validation issues instead of silently treating it
+        // as an absent rules file. Before collab sync, use the bootstrap value.
+        rules: rawRules ? rawRules : projectVisibilityRules,
+        projectConfigValues,
+        projectSchema: projectConfigSchema,
+        pageIds: demoPages.map((page) => page.id),
+        pageSchemas: pageSchemaMap,
+        regionIds,
+      },
+      undefined,
+      { roles: [currentUserRole || "guest"] },
+    );
   }, [
     demoPages,
     pageCodes,
@@ -8110,21 +8365,27 @@ ${context.details}
         configData: configDataMap[page.id],
         schema: pageSchemaMap[page.id],
         visibilityStatus: visibilityResolution.pages[page.id]
-            ? {
-                visible: visibilityResolution.pages[page.id].visible,
-                enabled: visibilityResolution.pages[page.id].enabled,
-                unavailable: visibilityResolution.pages[page.id].unavailable,
-                message: visibilityResolution.pages[page.id].message,
-                fallbackPageId: visibilityResolution.pages[page.id].fallbackPageId,
-                fallbackMessage: visibilityResolution.pages[page.id].fallbackMessage,
-                alternativeRegion: visibilityResolution.pages[page.id].alternativeRegion,
-                reasons: visibilityResolution.pages[page.id].reasons,
-              }
+          ? {
+              visible: visibilityResolution.pages[page.id].visible,
+              enabled: visibilityResolution.pages[page.id].enabled,
+              unavailable: visibilityResolution.pages[page.id].unavailable,
+              message: visibilityResolution.pages[page.id].message,
+              fallbackPageId:
+                visibilityResolution.pages[page.id].fallbackPageId,
+              fallbackMessage:
+                visibilityResolution.pages[page.id].fallbackMessage,
+              alternativeRegion:
+                visibilityResolution.pages[page.id].alternativeRegion,
+              reasons: visibilityResolution.pages[page.id].reasons,
+            }
           : undefined,
         visibilityRegions: Object.fromEntries(
           Object.entries(visibilityResolution.regions)
             .filter(([key]) => key.startsWith(`${page.id}:`))
-            .map(([key, state]) => [key, { visible: state.visible, enabled: state.enabled }]),
+            .map(([key, state]) => [
+              key,
+              { visible: state.visible, enabled: state.enabled },
+            ]),
         ),
         configCount,
         presentation,
@@ -8888,7 +9149,10 @@ ${context.details}
       title: visualConfigTitle,
       kind: selectedVisualConfigCandidate?.kind ?? "text",
       default: visualConfigDefaultValue,
-      colorFormat: selectedVisualConfigCandidate?.kind === "color" ? visualConfigColorFormat : undefined,
+      colorFormat:
+        selectedVisualConfigCandidate?.kind === "color"
+          ? visualConfigColorFormat
+          : undefined,
       group: visualConfigCategory || undefined,
     }),
     [
@@ -8905,7 +9169,9 @@ ${context.details}
       handleVisualConfigTitleChange(draft.title);
       setVisualConfigDefaultValue(
         draft.kind === "color"
-          ? (typeof draft.default === "string" || draft.default === null ? draft.default : null)
+          ? typeof draft.default === "string" || draft.default === null
+            ? draft.default
+            : null
           : typeof draft.default === "string"
             ? draft.default
             : String(draft.default ?? ""),
@@ -9093,8 +9359,7 @@ ${context.details}
   );
 
   const toolbarCenter =
-    previewMode === "single" &&
-    demoPages.length > 0 ? (
+    previewMode === "single" && demoPages.length > 0 ? (
       <div className="flex items-center gap-1.5">
         <Button
           type="button"
@@ -9491,6 +9756,9 @@ ${context.details}
                       externalIsStreaming={aiIsStreaming}
                       externalStreamContent={aiStreamContent}
                       externalCurrentMessage={aiCurrentMessage}
+                      previewObservationHandlerRef={
+                        previewObservationHandlerRef
+                      }
                       onMessagesChange={setAiMessages}
                       onIsStreamingChange={handleAiStreamingChange}
                       onStreamContentChange={setAiStreamContent}
@@ -9518,7 +9786,8 @@ ${context.details}
                             });
                             return;
                           }
-                          const nextConversationId = data.data.sessionId as string;
+                          const nextConversationId = data.data
+                            .sessionId as string;
                           const loadGeneration =
                             ++conversationLoadGenerationRef.current;
                           const ensureConversationRes = await fetch(
@@ -9640,7 +9909,10 @@ ${context.details}
                           }
                           const sessionData = await sessionRes.json();
                           if (!sessionData.success || !sessionData.data) {
-                            toast({ title: "会话不存在", variant: "destructive" });
+                            toast({
+                              title: "会话不存在",
+                              variant: "destructive",
+                            });
                             return;
                           }
 
@@ -9692,9 +9964,7 @@ ${context.details}
                           setAiMessages(
                             sanitizeHydratedMessages(
                               conversationData.data.messages.map(
-                                (message: {
-                                  displayParts?: unknown[];
-                                }) => ({
+                                (message: { displayParts?: unknown[] }) => ({
                                   ...message,
                                   parts: message.displayParts || [],
                                 }),
@@ -10128,9 +10398,12 @@ ${context.details}
                       sessionId={sessionId}
                       onReferenceClick={handleMarkdownReferenceClick}
                       referenceFocus={documentReferenceFocus}
-                      onReferenceFocusConsumed={() => setDocumentReferenceFocus(null)}
+                      onReferenceFocusConsumed={() =>
+                        setDocumentReferenceFocus(null)
+                      }
                       userRole={
-                        currentUserRole === "admin" || currentUserRole === "editor"
+                        currentUserRole === "admin" ||
+                        currentUserRole === "editor"
                           ? currentUserRole
                           : ""
                       }
@@ -10147,7 +10420,9 @@ ${context.details}
                         window.dispatchEvent(new Event("knowledge-updated"));
                       }}
                       designSpecFocus={designSpecFocus}
-                      onEditConfigDefinition={handleDesignSpecConfigDefinitionEdit}
+                      onEditConfigDefinition={
+                        handleDesignSpecConfigDefinitionEdit
+                      }
                     />
                   ) : (
                     <>
@@ -10172,7 +10447,11 @@ ${context.details}
               `}</style>
                       <CommentLayer
                         projectId={demoId}
-                        pageId={previewMode === "canvas" ? (canvasEditingPageId ?? activeDemoId) : activeDemoId}
+                        pageId={
+                          previewMode === "canvas"
+                            ? (canvasEditingPageId ?? activeDemoId)
+                            : activeDemoId
+                        }
                         api={commentApi}
                         wsUrl={commentWsUrl}
                         currentUser={commentUser}
@@ -10199,27 +10478,44 @@ ${context.details}
                         }
                         canvasCreateDraft={canvasCommentDraft}
                         onCanvasCreateDraftChange={setCanvasCommentDraft}
-                        canvasViewport={previewMode === "canvas" ? canvasState.viewport : undefined}
+                        canvasViewport={
+                          previewMode === "canvas"
+                            ? canvasState.viewport
+                            : undefined
+                        }
                       >
                         <HtmlFileDropZone
                           onFilesDrop={handlePreviewHtmlFilesDrop}
                         >
-                          {!visibilityResolution.valid && visibilityResolution.issues.length > 0 && (
-                            <div
-                              role="alert"
-                              className="pointer-events-none absolute left-2 right-2 top-2 z-30 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-sm"
-                            >
-                              <div className="font-medium">配置联动规则存在问题，预览暂不应用该规则</div>
-                              <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                                {visibilityResolution.issues.slice(0, 3).map((issue, index) => (
-                                  <li key={`${issue.code}-${issue.ruleId ?? ""}-${index}`}>{issue.message}</li>
-                                ))}
-                              </ul>
-                              {visibilityResolution.issues.length > 3 && (
-                                <div className="mt-1 text-amber-800">还有 {visibilityResolution.issues.length - 3} 项问题。</div>
-                              )}
-                            </div>
-                          )}
+                          {!visibilityResolution.valid &&
+                            visibilityResolution.issues.length > 0 && (
+                              <div
+                                role="alert"
+                                className="pointer-events-none absolute left-2 right-2 top-2 z-30 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-sm"
+                              >
+                                <div className="font-medium">
+                                  配置联动规则存在问题，预览暂不应用该规则
+                                </div>
+                                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                                  {visibilityResolution.issues
+                                    .slice(0, 3)
+                                    .map((issue, index) => (
+                                      <li
+                                        key={`${issue.code}-${issue.ruleId ?? ""}-${index}`}
+                                      >
+                                        {issue.message}
+                                      </li>
+                                    ))}
+                                </ul>
+                                {visibilityResolution.issues.length > 3 && (
+                                  <div className="mt-1 text-amber-800">
+                                    还有{" "}
+                                    {visibilityResolution.issues.length - 3}{" "}
+                                    项问题。
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           <PreviewStage
                             pages={previewStagePages}
                             activePageId={activeDemoId}
@@ -10387,6 +10683,12 @@ ${context.details}
                               ) : undefined
                             }
                             singlePageProps={{
+                              previewObservationRegistry:
+                                previewObservationRegistryRef.current,
+                              previewObservationContext: workspaceId
+                                ? { projectId: demoId, workspaceId }
+                                : undefined,
+                              previewRevision: authorityState.committedRevision,
                               emptyState: (
                                 <div className="flex h-full min-h-[320px] items-center justify-center rounded-md border border-dashed bg-muted/20 px-6 text-center">
                                   <div className="max-w-sm">
@@ -10409,6 +10711,15 @@ ${context.details}
                                 prototype: {
                                   sessionId,
                                   demoId: activeDemoId,
+                                  previewRevision:
+                                    authorityState.committedRevision,
+                                  onContentLoaded:
+                                    handleSinglePreviewContentLoaded,
+                                  previewObservationRegistry:
+                                    previewObservationRegistryRef.current,
+                                  previewObservationContext: workspaceId
+                                    ? { projectId: demoId, workspaceId }
+                                    : undefined,
                                   allowScroll: true,
                                   visualEditMode: visualEditActive,
                                   visualAnnotationMode,
@@ -10464,12 +10775,11 @@ ${context.details}
                                   visualHoverNodeId: visualEditActive
                                     ? visualPanelHoverNodeId
                                     : null,
-                                  selectedVisualNodeId:
-                                    visualEditActive
-                                      ? selectedVisualNode?.domPath ||
-                                        selectedVisualNode?.nodeId ||
-                                        null
-                                      : null,
+                                  selectedVisualNodeId: visualEditActive
+                                    ? selectedVisualNode?.domPath ||
+                                      selectedVisualNode?.nodeId ||
+                                      null
+                                    : null,
                                   hiddenVisualNodeIds,
                                   visualLayerTreeNodes,
                                   visualPropertyChanges,
@@ -10490,47 +10800,30 @@ ${context.details}
                                 highFidelity: {
                                   sessionId,
                                   demoId: activeDemoId,
+                                  previewRevision:
+                                    authorityState.committedRevision,
+                                  previewObservationRegistry:
+                                    previewObservationRegistryRef.current,
+                                  previewObservationContext: workspaceId
+                                    ? { projectId: demoId, workspaceId }
+                                    : undefined,
                                   placeholderScreenshotUrl:
                                     activePreviewScreenshotUrl,
                                   onConsoleEntry: handleDiagnosticConsoleEntry,
                                   onError: handlePreviewError,
                                   isAutoRepairing,
-                                  onContentLoaded: (details) => {
-                                    recordDiagnosticEvent({
-                                      category: "preview",
-                                      name: "preview.content_loaded",
-                                      details: {
-                                        pageId: activeDemoId,
-                                        mode: "single",
-                                        requestId: details?.requestId,
-                                      },
-                                    });
-                                    setSinglePreviewLoaded((current) =>
-                                      current ? current : true,
-                                    );
-                                    const ackRevision =
-                                      workspaceFlushRevisionRef.current;
-                                    previewTrackerRef.current.ackPreview(
-                                      ackRevision,
-                                      "active-preview",
-                                    );
-                                    pendingSnapshotPageIdRef.current =
-                                      activeDemoIdRef.current;
-                                    setStaticPrototypeRequestKey(
-                                      (key) => key + 1,
-                                    );
-                                  },
+                                  onContentLoaded:
+                                    handleSinglePreviewContentLoaded,
                                   onPositionableSizes: handlePositionableSizes,
                                   visualEditMode: visualEditActive,
                                   visualHoverNodeId: visualEditActive
                                     ? visualPanelHoverNodeId
                                     : null,
-                                  selectedVisualNodeId:
-                                    visualEditActive
-                                      ? selectedVisualNode?.domPath ||
-                                        selectedVisualNode?.nodeId ||
-                                        null
-                                      : null,
+                                  selectedVisualNodeId: visualEditActive
+                                    ? selectedVisualNode?.domPath ||
+                                      selectedVisualNode?.nodeId ||
+                                      null
+                                    : null,
                                   hiddenVisualNodeIds,
                                   visualLayerTreeNodes,
                                   visualPropertyChanges,
@@ -10767,8 +11060,13 @@ ${context.details}
 
               {isConfigPanelVisible && (
                 <ResizablePanel className="relative flex flex-col overflow-hidden border-l bg-card">
-                  {previewMode === "single" && referenceConfigTreeFocus?.pageId === activeDemoId ? (
-                    <ConfigDefinitionTree page={referenceConfigTreeFocus.page} fieldKey={referenceConfigTreeFocus.fieldKey} onClose={() => setReferenceConfigTreeFocus(undefined)} />
+                  {previewMode === "single" &&
+                  referenceConfigTreeFocus?.pageId === activeDemoId ? (
+                    <ConfigDefinitionTree
+                      page={referenceConfigTreeFocus.page}
+                      fieldKey={referenceConfigTreeFocus.fieldKey}
+                      onClose={() => setReferenceConfigTreeFocus(undefined)}
+                    />
                   ) : previewMode === "document" ? (
                     <>
                       <DocumentModeRightPanel
@@ -10777,7 +11075,9 @@ ${context.details}
                         currentUserId={currentUserId || undefined}
                         currentUser={commentUser}
                         mentionCandidates={commentMentionCandidates}
-                        searchMentionCandidates={commentApi.searchMentionCandidates}
+                        searchMentionCandidates={
+                          commentApi.searchMentionCandidates
+                        }
                         canMentionAgent={true}
                         activeThreadId={activeCommentThreadId}
                         onSelectThread={(id) => {
@@ -10805,22 +11105,25 @@ ${context.details}
                                 (configDefinitionPageId ?? activeDemoId),
                             );
                             return page
-                              ? [{
-                                  id: page.id,
-                                  name: page.name,
-                                  order: page.order,
-                                  reference: page.reference,
-                                  isTemplatePage: page.isTemplatePage,
-                                  schema:
-                                    pageSchemaMap[page.id] ||
-                                    (page.id === activeDemoId
-                                      ? schema
-                                      : undefined),
-                                  configData: configDataMap[page.id],
-                                  projectConfigSchema:
-                                    referencePageProjectSchemas[page.id],
-                                  configItemCapabilities: getPageConfigCapabilities(page),
-                                }]
+                              ? [
+                                  {
+                                    id: page.id,
+                                    name: page.name,
+                                    order: page.order,
+                                    reference: page.reference,
+                                    isTemplatePage: page.isTemplatePage,
+                                    schema:
+                                      pageSchemaMap[page.id] ||
+                                      (page.id === activeDemoId
+                                        ? schema
+                                        : undefined),
+                                    configData: configDataMap[page.id],
+                                    projectConfigSchema:
+                                      referencePageProjectSchemas[page.id],
+                                    configItemCapabilities:
+                                      getPageConfigCapabilities(page),
+                                  },
+                                ]
                               : [];
                           })()}
                           activePageId={configDefinitionPageId ?? activeDemoId}
@@ -10958,7 +11261,8 @@ ${context.details}
                               configData: configDataMap[page.id],
                               projectConfigSchema:
                                 referencePageProjectSchemas[page.id],
-                              configItemCapabilities: getPageConfigCapabilities(page),
+                              configItemCapabilities:
+                                getPageConfigCapabilities(page),
                               designSpecEntries:
                                 referencePageDesignSpecEntries[page.id],
                               pageDesignSpecEntries:
@@ -11016,9 +11320,7 @@ ${context.details}
                                 ? undefined
                                 : handleSaveAsDefaults
                             }
-                            onRestoreDefaults={
-                              handleRestoreDefaults
-                            }
+                            onRestoreDefaults={handleRestoreDefaults}
                             onProjectSaveAsDefaults={
                               projectConfigContextPage?.reference
                                 ? undefined
@@ -11151,7 +11453,8 @@ ${context.details}
                               configData: configDataMap[page.id],
                               projectConfigSchema:
                                 referencePageProjectSchemas[page.id],
-                              configItemCapabilities: getPageConfigCapabilities(page),
+                              configItemCapabilities:
+                                getPageConfigCapabilities(page),
                               designSpecEntries:
                                 referencePageDesignSpecEntries[page.id],
                               pageDesignSpecEntries:
@@ -11219,9 +11522,7 @@ ${context.details}
                                 ? undefined
                                 : handleSaveAsDefaults
                             }
-                            onRestoreDefaults={
-                              handleRestoreDefaults
-                            }
+                            onRestoreDefaults={handleRestoreDefaults}
                             onProjectSaveAsDefaults={
                               projectConfigContextPage?.reference
                                 ? undefined
@@ -11291,7 +11592,7 @@ ${context.details}
                         value="comments"
                         className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
                       >
-                          <CommentPanel
+                        <CommentPanel
                           threads={canvasCommentThreads}
                           currentUserId={currentUserId || undefined}
                           activeThreadId={activeCommentThreadId}
@@ -11399,7 +11700,11 @@ ${context.details}
               value={visualConfigDefaultValue}
               label="选择默认颜色"
               presets={visualConfigDraft.colorPresets}
-              onChange={(value) => setVisualConfigDefaultValue(value == null ? null : String(value))}
+              onChange={(value) =>
+                setVisualConfigDefaultValue(
+                  value == null ? null : String(value),
+                )
+              }
               className="w-full"
             />
           ) : (
@@ -11413,7 +11718,11 @@ ${context.details}
             />
           )
         }
-        allowedColorFormats={visualConfigDraft.kind === "color" ? ["color", "color-opacity"] : undefined}
+        allowedColorFormats={
+          visualConfigDraft.kind === "color"
+            ? ["color", "color-opacity"]
+            : undefined
+        }
         onApply={handleApplyVisualConfig}
       />
 
@@ -11440,7 +11749,8 @@ ${context.details}
           wsCodeDialogData.editable &&
           (!/^\/?project\.config\.(?:schema|values)\.json$/.test(
             wsCodeDialogData.filePath.replace(/^\/+/, ""),
-          ) || projectConfigCollabWritable)
+          ) ||
+            projectConfigCollabWritable)
         }
         projectId={demoId}
         workspaceId={workspaceId}

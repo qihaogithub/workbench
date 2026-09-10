@@ -1,10 +1,10 @@
 {
   "workspaceId": "live-1786592532691-m3htsodgt",
   "projectId": "proj_1786592532197_5xx8xm",
-  "revision": 2,
-  "rootHash": "5187641f5296350302ff4b2f24d08b4f9fd0c2094e3da77805ecba882e24702f",
+  "revision": 3,
+  "rootHash": "eb86b40a5b278f8d5a019540e90c63b7c4afd3eab8847383752b13166cb0773b",
   "resourceHashes": {
-    "demos/page_k8hq/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_k8hq/config.schema.json": "e60e8ef12ce527b4b4d0bbea8cfe06d51ab000e478bb13fb5576b216a8e0a209",
     "demos/page_k8hq/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_k8hq/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
     "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
@@ -14,5 +14,5 @@
   "mutationPayloads": {
     "4383b033-609d-4e43-b6b0-dab9b4e1ec6d": "6d251faa3ba7da3a719619cf26fea15819899754c7b17464c702bcbfc29f3dd8"
   },
-  "updatedAt": 1786592533627
+  "updatedAt": 1789005931919
 }

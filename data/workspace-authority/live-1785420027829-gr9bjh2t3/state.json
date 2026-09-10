@@ -1,8 +1,8 @@
 {
   "workspaceId": "live-1785420027829-gr9bjh2t3",
   "projectId": "proj_1784874964275_p0k4ho",
-  "revision": 58,
-  "rootHash": "24c9bb6439bfa875c03432cac33954dde1318b0e8bf5e01dddc1a2f2318bcdfe",
+  "revision": 59,
+  "rootHash": "891d704449a0b75baf744f84964136121d57d3fe3b677c2a1594b7a849b6e933",
   "resourceHashes": {
     ".canvas-layout.json": "7d0d51553fe7f0f9f486a47bc2841ec67f728359a099606f815d87c048d95b69",
     "assets/images/345cff787d4e-image-module-1.png": "345cff787d4ead5b8bacc2bd43da0265104262f65e9393ccbaf1cd1ff8c47b85",
@@ -14,7 +14,7 @@
     "assets/images/b0b1a87384e6-progress-bg-bottom.png": "b0b1a87384e6d7181be09cc40e67449be8168eeab47d1c340d4d3e4ef75e8176",
     "assets/images/e42da6dcf611-progress-bg-top.png": "e42da6dcf611db3d2d1ebd5003af86f95e24fee7486b3dede9f7bb8da4bf83d5",
     "assets/images/ef6aa004c215-video-cover.png": "ef6aa004c2158bdab3634f29f20bdc9a259c09d6cdd4424df4a2ecde70397e1d",
-    "demos/course-complete_a7k3/config.schema.json": "17a30343a0c5225e5332433096f5772765a1d5e1c88cd724fa8d657974ec2597",
+    "demos/course-complete_a7k3/config.schema.json": "4c6dd99862a4eecb48afff2358e3ffd521c3306c5fcf1d0e79334533b86b2139",
     "demos/course-complete_a7k3/index.tsx": "f4c94005c7eddc725e152f0e03444450345c494b3920b8d2c3accdb94c405470",
     "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
     "memory.md": "be9d5bc5fbc43f707d4a778e5f83cc72b70e282d6e5da78f90b851be918d5e1d",
@@ -76,5 +76,5 @@
     "b7f2a755-3be4-498f-8881-d3345e713e68": "6342ee9463d53fe32c5a38e01b216e0a1adb56e00374e4815887cd962dc8ea77",
     "3905dbd5-8c2f-4e67-bc43-742ae2bc3304": "a252a18c8af65119c798ac7c6e663ade7c64a93e29c09158249a76de015e5806"
   },
-  "updatedAt": 1785731032153
+  "updatedAt": 1789005905390
 }

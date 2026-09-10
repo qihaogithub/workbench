@@ -15,6 +15,25 @@ import type {
   MessageAcceptedAck,
 } from "./types";
 
+import type {
+  ObservePreviewInput,
+  PreviewObservationCapability,
+  PreviewObservationResult,
+  PreviewRenderIdentity,
+} from "./preview-observation-types";
+
+export interface PreviewRegistration {
+  identity: PreviewRenderIdentity;
+  capabilities?: PreviewObservationCapability[];
+}
+
+export type PreviewObservationHandler = ((
+  input: ObservePreviewInput,
+) => PreviewObservationResult | Promise<PreviewObservationResult>) & {
+  /** Optional provider used to re-register an already-mounted preview on reconnect. */
+  getPreviewRegistration?: () => PreviewRegistration | null;
+};
+
 export interface AgentClientConfig {
   baseUrl: string;
   apiKey?: string;
@@ -117,17 +136,28 @@ export class AgentClient {
       payload = undefined;
     }
     if (!response.ok) {
-      const body = payload as { error?: { code?: string; message?: string } } | undefined;
+      const body = payload as
+        | { error?: { code?: string; message?: string } }
+        | undefined;
       throw new ConversationHttpError(
         response.status,
         body?.error?.code || `HTTP_${response.status}`,
-        body?.error?.message || `Conversation request failed (${response.status})`,
+        body?.error?.message ||
+          `Conversation request failed (${response.status})`,
       );
     }
     if (!payload || typeof payload !== "object") {
-      throw new ConversationHttpError(response.status, "INVALID_RESPONSE", "Invalid conversation response");
+      throw new ConversationHttpError(
+        response.status,
+        "INVALID_RESPONSE",
+        "Invalid conversation response",
+      );
     }
-    const envelope = payload as { success?: boolean; data?: T; error?: { code?: string; message?: string } };
+    const envelope = payload as {
+      success?: boolean;
+      data?: T;
+      error?: { code?: string; message?: string };
+    };
     if (envelope.success === false || !("data" in envelope)) {
       throw new ConversationHttpError(
         response.status,
@@ -145,15 +175,27 @@ export class AgentClient {
     return Array.isArray(data) ? data : [];
   }
 
-  async loadConversation(conversationId: string, afterSequence = 0): Promise<ConversationProjection> {
-    const query = afterSequence > 0 ? `?afterSequence=${encodeURIComponent(String(afterSequence))}` : "";
+  async loadConversation(
+    conversationId: string,
+    afterSequence = 0,
+  ): Promise<ConversationProjection> {
+    const query =
+      afterSequence > 0
+        ? `?afterSequence=${encodeURIComponent(String(afterSequence))}`
+        : "";
     return this.requestConversation<ConversationProjection>(
       `/api/conversations/${encodeURIComponent(conversationId)}${query}`,
     );
   }
 
-  async loadMessages(conversationId: string, afterSequence = 0): Promise<ConversationProjection> {
-    const query = afterSequence > 0 ? `?afterSequence=${encodeURIComponent(String(afterSequence))}` : "";
+  async loadMessages(
+    conversationId: string,
+    afterSequence = 0,
+  ): Promise<ConversationProjection> {
+    const query =
+      afterSequence > 0
+        ? `?afterSequence=${encodeURIComponent(String(afterSequence))}`
+        : "";
     return this.requestConversation<ConversationProjection>(
       `/api/conversations/${encodeURIComponent(conversationId)}/messages${query}`,
     );
@@ -191,7 +233,10 @@ export class AgentClient {
     );
   }
 
-  async retryRun(conversationId: string, userMessageId: string): Promise<MessageAcceptedAck> {
+  async retryRun(
+    conversationId: string,
+    userMessageId: string,
+  ): Promise<MessageAcceptedAck> {
     return this.requestConversation<MessageAcceptedAck>(
       `/api/conversations/${encodeURIComponent(conversationId)}/retry`,
       { method: "POST", body: JSON.stringify({ userMessageId }) },
@@ -209,17 +254,22 @@ export class AgentClient {
     );
   }
 
-  async updateConversationTitle(conversationId: string, title: string): Promise<ConversationRecord> {
+  async updateConversationTitle(
+    conversationId: string,
+    title: string,
+  ): Promise<ConversationRecord> {
     return this.requestConversation<ConversationRecord>(
       `/api/conversations/${encodeURIComponent(conversationId)}/title`,
       { method: "PATCH", body: JSON.stringify({ title }) },
     );
   }
 
-  async exportConversation(conversationId: string): Promise<ConversationProjection & { exportedAt: string }> {
-    return this.requestConversation<ConversationProjection & { exportedAt: string }>(
-      `/api/conversations/${encodeURIComponent(conversationId)}/export`,
-    );
+  async exportConversation(
+    conversationId: string,
+  ): Promise<ConversationProjection & { exportedAt: string }> {
+    return this.requestConversation<
+      ConversationProjection & { exportedAt: string }
+    >(`/api/conversations/${encodeURIComponent(conversationId)}/export`);
   }
 
   async deleteConversation(conversationId: string): Promise<void> {
@@ -465,8 +515,7 @@ export class AgentClient {
 
   stream(sessionId: string): AgentStream {
     const wsUrl = this.baseUrl.replace(/^http/, "ws");
-    const query =
-      this.mode === "viewer-readonly" ? `?mode=${this.mode}` : "";
+    const query = this.mode === "viewer-readonly" ? `?mode=${this.mode}` : "";
     return new AgentStream(
       `${wsUrl}/api/agent/${sessionId}/stream${query}`,
       this.mode,
@@ -485,7 +534,8 @@ export class ConversationHttpError extends Error {
   ) {
     super(message);
     this.name = "ConversationHttpError";
-    this.retryable = retryable ?? (status === 408 || status === 429 || status >= 500);
+    this.retryable =
+      retryable ?? (status === 408 || status === 429 || status >= 500);
   }
 }
 
@@ -504,7 +554,8 @@ export interface StreamEvent {
     | "run_summary"
     | "permission_request"
     | "user_choice_request"
-    | "models";
+    | "models"
+    | "preview_observe_request";
   id?: string;
   content?: string;
   done?: boolean;
@@ -571,8 +622,11 @@ export interface StreamEvent {
   runId?: string;
   assistantMessageId?: string;
   conversationRevision?: number;
+  previewRequestId?: string;
+  previewObservation?: ObservePreviewInput;
+  previewRegistration?: PreviewRegistration;
+  previewResult?: PreviewObservationResult;
 }
-
 
 export interface ToolCapabilities {
   toolVersion: number;
@@ -590,6 +644,7 @@ export class AgentStream {
   private eventHandlers: Map<string, Set<(event: StreamEvent) => void>> =
     new Map();
   private autoReconnect = true;
+  private previewObservationHandler: PreviewObservationHandler | null = null;
 
   constructor(url: string, mode: import("./types").AgentMode = "workbench") {
     this.url = url;
@@ -602,12 +657,59 @@ export class AgentStream {
 
     this.ws.onopen = () => {
       this.reconnectAttempts = 0;
+      const registration =
+        this.previewObservationHandler?.getPreviewRegistration?.();
+      if (registration) this.registerPreview(registration);
       this.emit("status", { type: "status", status: "connected" });
     };
 
     this.ws.onmessage = (event: MessageEvent) => {
       try {
         const data: StreamEvent = JSON.parse(event.data);
+        if (data.type === "preview_observe_request") {
+          const requestId = data.previewRequestId;
+          const input = data.previewObservation;
+          const handler = this.previewObservationHandler;
+          if (!requestId || !input || !handler) return;
+          Promise.resolve(handler(input))
+            .then((result) => {
+              // The observation response is the authoritative snapshot for
+              // this connection. Register it before sending the response so
+              // the service can bind subsequent requests to the same render
+              // identity, including after a reconnect or preview rebuild.
+              if (result.identity) {
+                this.registerPreview({
+                  identity: result.identity,
+                  capabilities: result.capabilities,
+                });
+              } else if (result.availability === "stale") {
+                // A stale response intentionally omits the old identity. Pull
+                // the handler's latest snapshot before a model retry so the
+                // next Broker request is bound to the current render instead
+                // of repeatedly replaying the identity that just raced.
+                const latestRegistration = handler.getPreviewRegistration?.();
+                if (latestRegistration)
+                  this.registerPreview(latestRegistration);
+              }
+              this.sendPreviewObservationResult(requestId, result);
+            })
+            .catch((error) => {
+              this.sendPreviewObservationResult(requestId, {
+                availability: "unavailable",
+                readiness: "partial",
+                capabilities: [],
+                assertions: [],
+                assertionStatus: "not-requested",
+                evidence: { kind: "runtime-structure", precision: "layout" },
+                reasons: [
+                  error instanceof Error
+                    ? error.message.slice(0, 256)
+                    : "preview-observation-failed",
+                ],
+              });
+            });
+          return;
+        }
         this.emit(data.type, data);
       } catch {
         this.emit("error", {
@@ -671,20 +773,24 @@ export class AgentStream {
           ...options,
           conversation: {
             ...options?.conversation,
-            conversationId: options?.conversationId || options?.conversation?.conversationId,
+            conversationId:
+              options?.conversationId || options?.conversation?.conversationId,
             messageId: options?.messageId || id,
             runId: options?.runId || undefined,
             assistantMessageId:
-              options?.assistantMessageId || options?.conversation?.assistantMessageId,
+              options?.assistantMessageId ||
+              options?.conversation?.assistantMessageId,
             conversationRevision:
-              options?.conversationRevision ?? options?.conversation?.conversationRevision,
+              options?.conversationRevision ??
+              options?.conversation?.conversationRevision,
           },
         },
         conversationId: options?.conversationId,
         messageId: options?.messageId || id,
         runId: options?.runId,
         assistantMessageId:
-          options?.assistantMessageId || options?.conversation?.assistantMessageId,
+          options?.assistantMessageId ||
+          options?.conversation?.assistantMessageId,
         conversationRevision: options?.conversationRevision,
         expectedRevision: options?.expectedRevision,
       }),
@@ -694,6 +800,86 @@ export class AgentStream {
   /** WebSocket 是否处于可发送状态 */
   isOpen(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  /** 发送浏览器 console 辅助帧；不进入 Agent 对话流。 */
+  sendConsoleData(
+    entries: Array<{ level: string; args: string; timestamp: number }>,
+  ): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({ type: "console_data", entries }));
+  }
+
+  /** Register the preview instance owned by this browser connection. */
+  registerPreview(registration: PreviewRegistration): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({ type: "preview_register", registration }));
+  }
+
+  unregisterPreview(previewInstanceId?: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(
+      JSON.stringify({
+        type: "preview_unregister",
+        ...(previewInstanceId ? { previewInstanceId } : {}),
+      }),
+    );
+  }
+
+  setPreviewObservationHandler(
+    handler: PreviewObservationHandler | null,
+  ): void {
+    this.previewObservationHandler = handler;
+    const registration = handler?.getPreviewRegistration?.();
+    if (registration) this.registerPreview(registration);
+  }
+
+  sendPreviewObservationResult(
+    requestId: string,
+    result: PreviewObservationResult,
+  ): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(
+      JSON.stringify({
+        type: "preview_observe_result",
+        requestId,
+        result,
+      }),
+    );
+  }
+
+  sendPermissionResponse(
+    permissionId: string,
+    optionId: string,
+    responseContent?: string,
+  ): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(
+      JSON.stringify({
+        type: "permission_response",
+        permissionId,
+        optionId,
+        responseContent,
+      }),
+    );
+  }
+
+  sendUserChoiceResponse(
+    requestId: string,
+    choice:
+      | { type: "option"; optionId: string }
+      | { type: "custom"; text: string }
+      | { type: "cancel" },
+  ): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(
+      JSON.stringify({ type: "user_choice_response", requestId, choice }),
+    );
+  }
+
+  sendModelChange(modelId: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({ type: "set_model", modelId }));
   }
 
   /** 请求可用模型列表；响应通过 "models" 事件返回 */
@@ -734,13 +920,13 @@ export class AgentStream {
     );
   }
 
-  cancel(messageId: string): void {
+  cancel(messageId?: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
     this.ws.send(
       JSON.stringify({
         type: "cancel",
-        id: messageId,
+        ...(messageId ? { id: messageId } : {}),
       }),
     );
   }

@@ -9,6 +9,7 @@ import type {
   ImageAttachment,
   MessageAcceptedAck,
   ViewerContext,
+  PreviewObservationHandler,
 } from "@workbench/agent-client";
 import { normalizeAiError } from "@workbench/shared";
 import { getConfiguredAgentClient } from "../../config";
@@ -539,6 +540,7 @@ interface UseChatStreamOptions {
   }) => void;
   beforeSend?: () => Promise<void> | void;
   externalStreamServiceRef?: React.MutableRefObject<StreamService | null>;
+  previewObservationHandlerRef?: React.RefObject<PreviewObservationHandler | null>;
 }
 
 export function useChatStream(options: UseChatStreamOptions) {
@@ -569,6 +571,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     onDiagnosticEvent,
     beforeSend,
     externalStreamServiceRef,
+    previewObservationHandlerRef,
   } = options;
 
   const [plan, setPlan] = useState<PlanState>(EMPTY_PLAN);
@@ -1084,7 +1087,11 @@ export function useChatStream(options: UseChatStreamOptions) {
           startTitleGeneration(titleSource);
         }
 
-        const streamService = new StreamService({ mode });
+        const streamService = new StreamService({
+          mode,
+          previewObservationHandler:
+            previewObservationHandlerRef?.current ?? null,
+        });
         streamServiceRef.current = streamService;
         if (externalStreamServiceRef) {
           externalStreamServiceRef.current = streamService;
@@ -1220,7 +1227,10 @@ export function useChatStream(options: UseChatStreamOptions) {
           },
 
           onPermission: (request) => {
-            if (request.toolCall.approvalKind === "plan_approval" || request.toolCall.approvalKind === "config_visibility") {
+            if (
+              request.toolCall.approvalKind === "plan_approval" ||
+              request.toolCall.approvalKind === "config_visibility"
+            ) {
               // 计划审批会有意隐藏流式状态；先写 ref，避免宿主状态同步 effect
               // 把仍在等待用户选择的运行误判为终态。
               pendingPermissionRef.current = request;
@@ -1877,7 +1887,9 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       if (
         source === "user" &&
-        (pendingPermissionRequest?.toolCall.approvalKind === "plan_approval" || pendingPermissionRequest?.toolCall.approvalKind === "config_visibility")
+        (pendingPermissionRequest?.toolCall.approvalKind === "plan_approval" ||
+          pendingPermissionRequest?.toolCall.approvalKind ===
+            "config_visibility")
       ) {
         streamServiceRef.current?.sendPermissionResponse(
           pendingPermissionRequest.toolCall.toolCallId,
@@ -2000,7 +2012,8 @@ export function useChatStream(options: UseChatStreamOptions) {
           responseContent,
         );
         if (
-          pendingPermissionRequest.toolCall.approvalKind === "plan_approval" || pendingPermissionRequest.toolCall.approvalKind === "config_visibility"
+          pendingPermissionRequest.toolCall.approvalKind === "plan_approval" ||
+          pendingPermissionRequest.toolCall.approvalKind === "config_visibility"
         ) {
           activeRunRef.current = true;
           setIsStreaming(true);

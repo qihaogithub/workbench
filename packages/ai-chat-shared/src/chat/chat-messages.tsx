@@ -160,45 +160,14 @@ function hasFileChanges(msg: ChatMessage): boolean {
 function hasVisibleCurrentMessage(msg: ChatMessage): boolean {
   return Boolean(
     msg.content?.trim() ||
-    msg.reasonings?.length ||
-    msg.tools?.length ||
-    msg.parts?.some((part) => {
-      if (part.type === "text" || part.type === "reasoning") {
-        return part.content.trim().length > 0;
-      }
-      return true;
-    }),
-  );
-}
-
-function RunSummaryStatus({ summary }: { summary: NonNullable<ChatMessage["runSummary"]> }) {
-  const failedProjections = summary.projections.filter(
-    (projection) => projection.status === "failed",
-  ).length;
-  const pendingProjections = summary.projections.filter(
-    (projection) => projection.status === "pending",
-  ).length;
-  const committedMutations = summary.mutations.filter(
-    (mutation) => mutation.status === "committed",
-  ).length;
-
-  if (committedMutations === 0 && failedProjections === 0 && pendingProjections === 0) return null;
-
-  return (
-    <div
-      className={cn(
-        "mt-2 flex items-center gap-1.5 text-xs",
-        failedProjections > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground",
-      )}
-      role="status"
-    >
-      <Check className="h-3.5 w-3.5" aria-hidden="true" />
-      <span>
-        {committedMutations > 0 ? `已提交 ${committedMutations} 项修改` : "修改状态已更新"}
-        {failedProjections > 0 ? `；${failedProjections} 项预览同步失败` : ""}
-        {pendingProjections > 0 ? `；${pendingProjections} 项预览待验证` : ""}
-      </span>
-    </div>
+      msg.reasonings?.length ||
+      msg.tools?.length ||
+      msg.parts?.some((part) => {
+        if (part.type === "text" || part.type === "reasoning") {
+          return part.content.trim().length > 0;
+        }
+        return true;
+      }),
   );
 }
 
@@ -296,7 +265,6 @@ export function ChatMessages({
           externalAuthSessionId={externalAuthSessionId}
           onUserChoiceResponse={onUserChoiceResponse}
         />
-        {msg.runSummary && <RunSummaryStatus summary={msg.runSummary} />}
       </div>
     );
   };

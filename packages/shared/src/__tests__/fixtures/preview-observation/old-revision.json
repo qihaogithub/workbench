@@ -1,0 +1,43 @@
+{
+  "facts": {
+    "identity": {
+      "schemaVersion": 1,
+      "projectId": "fixture-project",
+      "workspaceId": "fixture-workspace",
+      "pageId": "old-revision-page",
+      "runtimeType": "prototype-html-css",
+      "surface": "active-single-page",
+      "previewInstanceId": "preview-old-revision",
+      "renderGeneration": 5,
+      "revision": 41
+    },
+    "capabilities": ["page-summary", "runtime", "assertions"],
+    "viewport": {
+      "width": 640,
+      "height": 480,
+      "devicePixelRatio": 1,
+      "scrollX": 0,
+      "scrollY": 0
+    },
+    "document": {
+      "clientWidth": 640,
+      "clientHeight": 480,
+      "scrollWidth": 640,
+      "scrollHeight": 480,
+      "horizontalOverflow": false,
+      "verticalOverflow": false
+    },
+    "runtime": {
+      "readyState": "complete",
+      "fontsReady": true,
+      "runtimeErrorCount": 0,
+      "consoleErrorCount": 0
+    }
+  },
+  "assertions": [
+    {"id": "old-revision-ready", "type": "runtime-ready"}
+  ],
+  "expectedStatuses": ["passed"],
+  "expectedAssertionStatus": "passed",
+  "currentRevision": 42
+}

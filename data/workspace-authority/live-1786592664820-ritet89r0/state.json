@@ -1,10 +1,10 @@
 {
   "workspaceId": "live-1786592664820-ritet89r0",
   "projectId": "proj_1786592664725_hrrrvm",
-  "revision": 3,
-  "rootHash": "ac6eba4be1619e558309479fc3ef3d3d15b3c1bd677b39c4f95526581e243fcc",
+  "revision": 4,
+  "rootHash": "95d393c0af272852fab0ea63208c6c032083c3a36348cc6e7519bd93866f5123",
   "resourceHashes": {
-    "demos/page_fwfi/config.schema.json": "a0d29e038c5cfc38267e6ecfd72e62fa6e0533aa4d50b6b6bb1946bffe037dcf",
+    "demos/page_fwfi/config.schema.json": "2ee4aa7aaccec8458cc6251ecc0acc8ef4a12d4ff79cc90229dad2f74a5d87c5",
     "demos/page_fwfi/index.tsx": "03e0f95e4daca3264a7924d8bf79da5d693442950e777aa20f68a06520fdd714",
     "demos/page_fwfi/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_fwfi/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
@@ -16,5 +16,5 @@
     "78228075-ba00-4f44-a198-975373a2fb6e": "73707cec90b7bc4ee80901d08d6930cc9ca631291d74d282f281288e700363e0",
     "d7cd3de2-336e-4e54-8a01-18c57883bea5": "ed35413e17cc7d42dc52bf0b5f4a0bc50a37fc2be70ed7d67f88eec76cd0188d"
   },
-  "updatedAt": 1786592698354
+  "updatedAt": 1789005932098
 }

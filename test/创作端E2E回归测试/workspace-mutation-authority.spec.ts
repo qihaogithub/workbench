@@ -414,17 +414,16 @@ test.describe("Workspace Mutation Authority E2E", () => {
   });
 
   // ── Test 4 ──────────────────────────────────────────────────────────────
-  // 场景: 用旧内容发起 PUT → Yjs-First 不再拒绝（无 expectedHash 冲突检测）→ 最后写入胜出
-  // 语义变化: 旧架构下 stale 写入会被 409 拒绝以保护磁盘内容；Yjs-First 移除了
-  // assertExpected()，所有写入都被接受，并发编辑由 Yjs CRDT 在协同房间层合并。
-  test("Yjs-First 下旧浏览器写入不再产生冲突，最后写入胜出", async ({ page }) => {
+  // 场景: 用旧内容发起 PUT → Authority 重新校验资源基线 → 显式冲突
+  // 语义: stale Agent/HTTP 写入不得覆盖较新的提交；人类 Yjs 编辑仍在房间内合并。
+  test("旧浏览器写入基线过期时显式冲突并保留新版本", async ({ page }) => {
     const freshMarker = `fresh-${crypto.randomBytes(4).toString("hex")}`;
     const staleMarker = `stale-${crypto.randomBytes(4).toString("hex")}`;
 
     await openHome(page);
     const { project, sessionId } = await createMutationProject(
       page,
-      "Yjs-First无冲突",
+      "协同基线冲突",
     );
 
     const demoPage = await createDemoPage(
@@ -445,7 +444,7 @@ test.describe("Workspace Mutation Authority E2E", () => {
     await persistWorkspace(page, sessionId);
 
     // "旧浏览器"用过期内容发起 PUT
-    // Yjs-First: 不再返回 409，写入被接受（last-write-wins）
+    // Authority: 旧基线必须返回 409，不能静默覆盖 fresh 版本
     const staleResponse = await page.request.put(
       `/api/sessions/${sessionId}/files/${demoPage.id}`,
       {
@@ -456,15 +455,14 @@ test.describe("Workspace Mutation Authority E2E", () => {
       },
     );
 
-    // Yjs-First 语义：不再有 409 冲突拒绝
     const staleStatus = staleResponse.status();
-    expect(staleStatus, "Yjs-First 下 stale 写入应被接受（2xx），不应返回 409").toBeLessThan(400);
+    expect(staleStatus, "旧基线写入应显式返回 409 冲突").toBe(409);
 
-    // 最后写入胜出：stale marker 出现在最终内容中
-    // （旧架构下 stale 写入被拒绝，freshMarker 会保留；Yjs-First 下 stale 写入覆盖 freshMarker）
+    // 新版本保留：stale marker 不得覆盖 freshMarker
     const reopenedSessionId = await openProjectEditor(page, project);
     const finalFiles = await getDemoPageFiles(page, reopenedSessionId, demoPage.id);
-    expect(finalFiles.code, "Yjs-First 下最后写入的内容应胜出").toContain(staleMarker);
+    expect(finalFiles.code, "旧基线冲突后应保留最新提交").toContain(freshMarker);
+    expect(finalFiles.code, "旧基线冲突后不应写入 stale marker").not.toContain(staleMarker);
   });
 
   // ── Test 5 ──────────────────────────────────────────────────────────────

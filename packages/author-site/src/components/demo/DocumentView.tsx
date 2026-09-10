@@ -418,6 +418,7 @@ export function DocumentView({
           typeof update.title === "string" &&
           update.title.trim()
         ) {
+          if (update.reason === "content-save") return;
           const title = update.title.trim();
           if (event.type === "knowledge-updated") {
             setItems((current) =>
@@ -518,7 +519,19 @@ export function DocumentView({
           : [...currentItems, updated];
         setItems(nextItems);
         onItemsChangeRef.current?.(nextItems);
-        window.dispatchEvent(new Event("knowledge-updated"));
+        // This save already updated the local directory entry above. Include
+        // the identity so DocumentView listeners can avoid a redundant full
+        // directory reload while still notifying other consumers that the
+        // published snapshot is stale.
+        window.dispatchEvent(
+          new CustomEvent("knowledge-updated", {
+            detail: {
+              docId: updated.id,
+              title: updated.title,
+              reason: "content-save",
+            },
+          }),
+        );
         return;
       }
 
@@ -1344,7 +1357,7 @@ export function DocumentView({
               </div>
               {userExpanded && (
                 <div className="space-y-0">
-                  {loading ? (
+                  {loading && userItems.length === 0 ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
@@ -1419,7 +1432,7 @@ export function DocumentView({
               </div>
               {designSpecExpanded && (
                 <div className="space-y-0">
-                  {designSpecsLoading ? (
+                  {designSpecsLoading && designSpecs.length === 0 ? (
                     <div
                       className="px-3 py-2 text-xs text-muted-foreground"
                       style={{ paddingLeft: 24 + 12 }}

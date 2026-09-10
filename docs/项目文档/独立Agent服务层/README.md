@@ -2,7 +2,7 @@
 
 > 版本：v2.20
 > 创建日期：2026-04-05
-> 更新日期：2026-09-06
+> 更新日期：2026-09-10
 
 ---
 
@@ -24,15 +24,15 @@ Markdown 引用发现、按权限读取与受控参考图生成见[核心模块�
 
 ## 文档列表
 
-| 文档                                             | 说明                                                                                                                      | 阅读顺序 | 状态     |
-| :----------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------ | :------- | :------- |
-| [01-架构设计.md](./01-架构设计.md)               | Fastify 服务、Pi Agent 单后端、Workspace Authority 单写者事务、工具权限、工作空间与截图服务协作                           | 1        | 已更新   |
-| [02-接口规范.md](./02-接口规范.md)               | REST API、WebSocket 消息与 `run_summary` 终态、服务端安全骨架下的项目规则、会话附件上传、Workspace Authority API、使用端只读 AI、内部配置同步、校验与模型接口 | 2 | 已更新 |
-| [03-核心模块设计.md](./03-核心模块设计.md)       | Core、Backend、Routes、Session、Workspace、WorkspaceMutationAuthority、Pi Tools、Bash 单命令与精确拒绝原因、Schema 递归语义校验及 UI 未验证边界、图片资源工具边界、预装 Skills 等模块职责 | 3 | 已更新 |
-| [04_SSE_Drain机制.md](./04_SSE_Drain机制.md)     | 历史 workbench SSE drain 问题记录，当前仅作迁移背景参考                                                                   | 4        | 历史参考 |
-| [05-快照服务.md](./05-快照服务.md)               | Git/snapshot 双模式、NUL 安全 Git 状态解析、argv 命令调用、变更比较、丢弃回滚、Session 生命周期                         | 5        | 已更新   |
-| [06-Pi-Agent子Agent.md](./06-Pi-Agent子Agent.md) | Pi Agent 子 Agent 委派、生命周期与权限边界                                                                                | 6        | 已完成   |
-| [07-Agent运行时内置Skill/](./07-Agent运行时内置Skill/) | Agent 运行时内置 Skill 清单、加载机制、触发场景和权限边界                                                            | 7        | 已更新   |
+| 文档                                                   | 说明                                                                                                                                                                                                                                                           | 阅读顺序 | 状态     |
+| :----------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------- | :------- |
+| [01-架构设计.md](./01-架构设计.md)                     | Fastify 服务、Pi Agent 单后端、Workspace Authority 单写者事务、工具权限、工作空间与截图服务协作                                                                                                                                                                | 1        | 已更新   |
+| [02-接口规范.md](./02-接口规范.md)                     | REST API、WebSocket 消息与 `run_summary` 终态、服务端安全骨架下的项目规则、会话附件上传、Workspace Authority API、使用端只读 AI、内部配置同步、校验与模型接口                                                                                                  | 2        | 已更新   |
+| [03-核心模块设计.md](./03-核心模块设计.md)             | Core、Backend、Routes、Session、Workspace、WorkspaceMutationAuthority、Pi Tools、Bash 单命令与精确拒绝原因、Schema 递归语义校验及 UI 未验证边界、图片资源工具边界、预装 Skills、预览观察 Broker 与 Spine probe 通道、重连 pending 清理和身份路径校验等模块职责 | 3        | 已更新   |
+| [04_SSE_Drain机制.md](./04_SSE_Drain机制.md)           | 历史 workbench SSE drain 问题记录，当前仅作迁移背景参考                                                                                                                                                                                                        | 4        | 历史参考 |
+| [05-快照服务.md](./05-快照服务.md)                     | Git/snapshot 双模式、NUL 安全 Git 状态解析、argv 命令调用、变更比较、丢弃回滚、Session 生命周期                                                                                                                                                                | 5        | 已更新   |
+| [06-Pi-Agent子Agent.md](./06-Pi-Agent子Agent.md)       | Pi Agent 子 Agent 委派、生命周期与权限边界                                                                                                                                                                                                                     | 6        | 已完成   |
+| [07-Agent运行时内置Skill/](./07-Agent运行时内置Skill/) | Agent 运行时内置 Skill 清单、加载机制、触发场景和权限边界                                                                                                                                                                                                      | 7        | 已更新   |
 
 ---
 
@@ -105,20 +105,20 @@ Markdown 引用发现、按权限读取与受控参考图生成见[核心模块�
 
 ## 核心设计决策
 
-| 决策           | 当前结论                                                                                                         |
-| :------------- | :--------------------------------------------------------------------------------------------------------------- |
-| 后端形态       | 只支持 Pi Agent 单后端，`AgentType` 固定为 `pi-agent`                                                            |
-| Agent 运行方式 | 进程内动态导入 `@earendil-works/pi-agent-core` 和 node 子入口                                                    |
-| 工具权限       | 由 Pi Tools 权限白名单、路径校验、用户确认和后端快照共同约束                                                     |
-| 模型配置       | 通过 author-site 恢复的全局 backend providers、Session 级 model config 和 Pi Agent 环境变量组合生效              |
-| 网页读取       | `webRead` 默认读取公开 HTTP/HTTPS 文本页面，并拒绝本机、内网、保留地址和非文本内容                               |
-| 联网搜索       | `webSearch` 使用 Brave Search API 免费额度方案，默认关闭并由环境变量显式启用                                     |
-| 外部授权       | Figma MCP 与钉钉 dws 只接收当前用户 session 级授权；agent-service 不持有平台全局外部账号                         |
+| 决策           | 当前结论                                                                                                                 |
+| :------------- | :----------------------------------------------------------------------------------------------------------------------- |
+| 后端形态       | 只支持 Pi Agent 单后端，`AgentType` 固定为 `pi-agent`                                                                    |
+| Agent 运行方式 | 进程内动态导入 `@earendil-works/pi-agent-core` 和 node 子入口                                                            |
+| 工具权限       | 由 Pi Tools 权限白名单、路径校验、用户确认和后端快照共同约束                                                             |
+| 模型配置       | 通过 author-site 恢复的全局 backend providers、Session 级 model config 和 Pi Agent 环境变量组合生效                      |
+| 网页读取       | `webRead` 默认读取公开 HTTP/HTTPS 文本页面，并拒绝本机、内网、保留地址和非文本内容                                       |
+| 联网搜索       | `webSearch` 使用 Brave Search API 免费额度方案，默认关闭并由环境变量显式启用                                             |
+| 外部授权       | Figma MCP 与钉钉 dws 只接收当前用户 session 级授权；agent-service 不持有平台全局外部账号                                 |
 | 预装 Skills    | agent-service 当前随包携带 9 个运行时 Skill；提示词只展示名称和简介，命中后通过 `readPreinstalledSkill` 按需读取完整指令 |
-| 事件流         | WebSocket 通过 `ws-event-router.ts` 统一转发 stream、thought、tool、plan、permission、user choice、finish、error |
-| 文件变更       | `snapshot-service` 同时支持 Git 仓库和普通目录快照模式                                                           |
-| Workspace 写入 | 活动 live Workspace 所有写入必须经过 WorkspaceMutationAuthority 单写者事务提交，旧直接写入路径已删除             |
-| 截图           | `screenshot-service` 使用 author-site `/api/compile` 编译并通过 Puppeteer 渲染                                   |
+| 事件流         | WebSocket 通过 `ws-event-router.ts` 统一转发 stream、thought、tool、plan、permission、user choice、finish、error         |
+| 文件变更       | `snapshot-service` 同时支持 Git 仓库和普通目录快照模式                                                                   |
+| Workspace 写入 | 活动 live Workspace 所有写入必须经过 WorkspaceMutationAuthority 单写者事务提交，旧直接写入路径已删除                     |
+| 截图           | `screenshot-service` 使用 author-site `/api/compile` 编译并通过 Puppeteer 渲染                                           |
 
 ---
 
@@ -140,7 +140,7 @@ Markdown 引用发现、按权限读取与受控参考图生成见[核心模块�
 | 2026-07-01 | v2.10 | 补充全局 backend providers 的运行时副本定位和 author-site 启动恢复机制         |
 | 2026-07-09 | v2.11 | 明确预览区选中图片由 author-site 先资产化，Pi Agent 图片工具消费受管资产路径   |
 | 2026-07-14 | v2.12 | 补齐 Workspace Mutation Authority 架构层、API 路由、模块设计和核心决策         |
-| 2026-08-12 | v2.15 | 补充工具副作用后的不可重试边界、CORS API Key 头和当前工具版本 27                |
+| 2026-08-12 | v2.15 | 补充工具副作用后的不可重试边界、CORS API Key 头和当前工具版本 27               |
 | 2026-09-06 | v2.17 | 补充 live Workspace Bash 精确拒绝原因与嵌套条件字段 Schema 校验                |
 | 2026-09-06 | v2.18 | 明确 `schemaValidate` 只验证 Schema 契约，不代表运行中 UI 已通过验收           |
-| 2026-09-06 | v2.20 | 新增 Agent 运行时内置 Skill 专题目录，并维护当前 9 个 Skill 的清单和加载机制      |
+| 2026-09-06 | v2.20 | 新增 Agent 运行时内置 Skill 专题目录，并维护当前 9 个 Skill 的清单和加载机制   |

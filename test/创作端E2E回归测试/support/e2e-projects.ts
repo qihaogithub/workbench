@@ -1,8 +1,8 @@
-import type { APIRequestContext, Page } from '@playwright/test';
-import * as fs from 'fs';
-import * as path from 'path';
+import type { APIRequestContext, Page } from "@playwright/test";
+import * as fs from "fs";
+import * as path from "path";
 
-export const E2E_PROJECT_CATEGORY = '__e2e__';
+export const E2E_PROJECT_CATEGORY = "__e2e__";
 export const E2E_PROJECT_STALE_MS = 24 * 60 * 60 * 1000;
 
 export type E2EProjectMeta = {
@@ -36,8 +36,14 @@ type E2EProjectRegistry = {
 
 const sharedProjectCache = new Map<string, E2EProjectMeta>();
 
-export const outputRoot = path.join(__dirname, '..', 'test-outputs');
-export const runStatePath = path.join(outputRoot, 'e2e-run.json');
+const E2E_BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:4200";
+
+function absoluteApiUrl(pathname: string): string {
+  return new URL(pathname, E2E_BASE_URL).toString();
+}
+
+export const outputRoot = path.join(__dirname, "..", "test-outputs");
+export const runStatePath = path.join(outputRoot, "e2e-run.json");
 
 function ensureOutputRoot(): void {
   fs.mkdirSync(outputRoot, { recursive: true });
@@ -45,11 +51,11 @@ function ensureOutputRoot(): void {
 
 function readJsonFile<T>(filePath: string): T | null {
   if (!fs.existsSync(filePath)) return null;
-  return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+  return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
 }
 
 function writeJsonFile(filePath: string, value: unknown): void {
-  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
 export function registryPathForRun(runId: string): string {
@@ -59,7 +65,7 @@ export function registryPathForRun(runId: string): string {
 export function createE2ERunState(baseURL: string): E2ERunState {
   ensureOutputRoot();
   const now = new Date();
-  const timestamp = now.toISOString().replace(/[-:.]/g, '');
+  const timestamp = now.toISOString().replace(/[-:.]/g, "");
   const random = Math.random().toString(36).slice(2, 8);
   const runId = `${timestamp}-${random}`;
   const state: E2ERunState = {
@@ -70,7 +76,10 @@ export function createE2ERunState(baseURL: string): E2ERunState {
   };
 
   writeJsonFile(runStatePath, state);
-  writeJsonFile(state.registryPath, { runId, projects: [] } satisfies E2EProjectRegistry);
+  writeJsonFile(state.registryPath, {
+    runId,
+    projects: [],
+  } satisfies E2EProjectRegistry);
 
   return state;
 }
@@ -115,11 +124,13 @@ export function registerE2EProject(project: E2EProjectMeta): void {
 
 export function e2eProjectName(caseName: string): string {
   const state = getE2ERunState();
-  const normalizedCaseName = caseName.trim().replace(/\s+/g, ' ');
-  return `E2E:${state.runId}:${normalizedCaseName || '未命名用例'}`;
+  const normalizedCaseName = caseName.trim().replace(/\s+/g, " ");
+  return `E2E:${state.runId}:${normalizedCaseName || "未命名用例"}`;
 }
 
-async function parseApiResponse<T>(response: { json(): Promise<unknown> }): Promise<T> {
+async function parseApiResponse<T>(response: {
+  json(): Promise<unknown>;
+}): Promise<T> {
   const body = (await response.json()) as ApiEnvelope<T>;
   if (!body.success || body.data === undefined) {
     throw new Error(`API failed: ${JSON.stringify(body)}`);
@@ -131,7 +142,7 @@ export async function createE2EProject(
   page: Page,
   caseName: string,
 ): Promise<E2EProjectMeta> {
-  const response = await page.request.post('/api/demos', {
+  const response = await page.request.post(absoluteApiUrl("/api/demos"), {
     data: {
       name: e2eProjectName(caseName),
       category: E2E_PROJECT_CATEGORY,
@@ -160,7 +171,7 @@ export async function getOrCreateSharedE2EProject(
     return existing;
   }
 
-  const response = await page.request.post('/api/demos', {
+  const response = await page.request.post(absoluteApiUrl("/api/demos"), {
     data: {
       name,
       category: E2E_PROJECT_CATEGORY,
@@ -184,9 +195,11 @@ export async function ensureE2EProjectCategory(
   const response = await request.patch(`/api/demos/${project.id}`, {
     data: { category: E2E_PROJECT_CATEGORY },
   });
-  const updated = await parseApiResponse<{ id: string; name?: string; category?: string }>(
-    response,
-  );
+  const updated = await parseApiResponse<{
+    id: string;
+    name?: string;
+    category?: string;
+  }>(response);
   const nextProject = {
     ...project,
     name: updated.name ?? project.name,
@@ -202,7 +215,7 @@ export async function deleteE2EProject(
 ): Promise<{ ok: boolean; status: number; body: string }> {
   const response = await request.delete(`/api/demos/${projectId}`);
   const status = response.status();
-  const body = await response.text().catch(() => '');
+  const body = await response.text().catch(() => "");
   return {
     ok: response.ok() || status === 404,
     status,
@@ -210,15 +223,20 @@ export async function deleteE2EProject(
   };
 }
 
-export function isStaleE2EProject(project: E2EProjectMeta, now = Date.now()): boolean {
+export function isStaleE2EProject(
+  project: E2EProjectMeta,
+  now = Date.now(),
+): boolean {
   return (
     project.category === E2E_PROJECT_CATEGORY &&
-    typeof project.createdAt === 'number' &&
+    typeof project.createdAt === "number" &&
     project.createdAt < now - E2E_PROJECT_STALE_MS
   );
 }
 
-export async function listProjects(request: APIRequestContext): Promise<E2EProjectMeta[]> {
-  const response = await request.get('/api/demos');
+export async function listProjects(
+  request: APIRequestContext,
+): Promise<E2EProjectMeta[]> {
+  const response = await request.get("/api/demos");
   return parseApiResponse<E2EProjectMeta[]>(response);
 }

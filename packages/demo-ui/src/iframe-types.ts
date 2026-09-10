@@ -1,43 +1,43 @@
 /** iframe → 父窗口消息类型 */
 export type IframeOutMessageType =
-  | 'READY'
-  | 'LOADED'
-  | 'COMPONENT_READY'
-  | 'RUNTIME_ERROR'
-  | 'RESIZE'
-  | 'THUMBNAIL_LAYOUT_RESULT'
-  | 'THUMBNAIL_LAYOUT_ERROR'
-  | 'POSITIONABLE_SIZES_RESULT'
-  | 'CONSOLE_LOG'
-  | 'APP_ACTION'
-  | 'VISUAL_SELECT'
-  | 'VISUAL_INLINE_EDIT'
-  | 'VISUAL_ANNOTATION_CREATE'
-  | 'VISUAL_NODE_TREE_RESULT'
-  | 'COMMENT_CLICK'
-  | 'COMMENT_VIEW_STATE'
-  | 'ELEMENT_LOCATION_RESULT'
-  | 'POSITION_CHANGE'
-  | 'POSITION_DRAG'
-  | 'POSITION_EDIT_READY';
+  | "READY"
+  | "LOADED"
+  | "COMPONENT_READY"
+  | "RUNTIME_ERROR"
+  | "RESIZE"
+  | "THUMBNAIL_LAYOUT_RESULT"
+  | "THUMBNAIL_LAYOUT_ERROR"
+  | "POSITIONABLE_SIZES_RESULT"
+  | "CONSOLE_LOG"
+  | "APP_ACTION"
+  | "VISUAL_SELECT"
+  | "VISUAL_INLINE_EDIT"
+  | "VISUAL_ANNOTATION_CREATE"
+  | "VISUAL_NODE_TREE_RESULT"
+  | "COMMENT_CLICK"
+  | "COMMENT_VIEW_STATE"
+  | "ELEMENT_LOCATION_RESULT"
+  | "POSITION_CHANGE"
+  | "POSITION_DRAG"
+  | "POSITION_EDIT_READY";
 
 /** 父窗口 → iframe 消息类型 */
 export type IframeInMessageType =
-  | 'UPDATE_CODE'
-  | 'UPDATE_CONFIG'
-  | 'SLEEP'
-  | 'WAKE'
-  | 'COLLECT_THUMBNAIL_LAYOUT'
-  | 'COLLECT_POSITIONABLE_SIZES'
-  | 'UPDATE_VISUAL_EDIT_STATE'
-  | 'COLLECT_VISUAL_NODE_TREE'
-  | 'ENTER_COMMENT_MODE'
-  | 'EXIT_COMMENT_MODE'
-  | 'LOCATE_ELEMENT'
-  | 'ENTER_POSITION_EDIT'
-  | 'EXIT_POSITION_EDIT'
-  | 'TOGGLE_POSITION_DIMMING'
-  | 'APPLY_POSITIONS';
+  | "UPDATE_CODE"
+  | "UPDATE_CONFIG"
+  | "SLEEP"
+  | "WAKE"
+  | "COLLECT_THUMBNAIL_LAYOUT"
+  | "COLLECT_POSITIONABLE_SIZES"
+  | "UPDATE_VISUAL_EDIT_STATE"
+  | "COLLECT_VISUAL_NODE_TREE"
+  | "ENTER_COMMENT_MODE"
+  | "EXIT_COMMENT_MODE"
+  | "LOCATE_ELEMENT"
+  | "ENTER_POSITION_EDIT"
+  | "EXIT_POSITION_EDIT"
+  | "TOGGLE_POSITION_DIMMING"
+  | "APPLY_POSITIONS";
 
 /** positionable 元素尺寸数据 */
 export interface PositionableSizeItem {
@@ -45,9 +45,16 @@ export interface PositionableSizeItem {
   height: number;
 }
 
+/** Identity echoed by preview lifecycle messages. */
+export interface PreviewLifecycleIdentity {
+  previewInstanceId?: string;
+  renderGeneration?: number;
+  revision?: number;
+}
+
 /** 控制台日志条目（iframe postMessage payload） */
 export interface ConsoleLogPayload {
-  level: 'log' | 'warn' | 'error' | 'info' | 'debug';
+  level: "log" | "warn" | "error" | "info" | "debug";
   args: string;
   timestamp: number;
 }
@@ -83,7 +90,7 @@ export interface VisualNodeInfo {
   };
   /** 原型页节点的运行时配置绑定；编辑器据此修改配置值而不是覆盖绑定源码。 */
   binding?: {
-    kind: 'text';
+    kind: "text";
     key: string;
   };
   computedStyle?: {
@@ -132,14 +139,16 @@ export interface VisualNodeInfo {
   sourceEnd?: number;
   sourceLine?: number;
   sourceColumn?: number;
-  editCapabilities: Array<'annotate' | 'text' | 'image' | 'link' | 'style' | 'className' | 'structure'>;
+  editCapabilities: Array<
+    "annotate" | "text" | "image" | "link" | "style" | "className" | "structure"
+  >;
 }
 
 export interface VisualNodeTreeItem extends VisualNodeInfo {
   children: VisualNodeTreeItem[];
 }
 
-export type VisualPropertyChangeKind = 'text' | 'style' | 'attribute';
+export type VisualPropertyChangeKind = "text" | "style" | "attribute";
 
 export interface VisualPropertyChange {
   id: string;
@@ -232,8 +241,8 @@ export interface VisualEditPatch {
   };
   before: string;
   after: string;
-  kind: 'text' | 'className' | 'structure' | 'listItem' | 'aiSuggestion';
-  status: 'draft' | 'previewed' | 'accepted' | 'rejected' | 'reverted';
+  kind: "text" | "className" | "structure" | "listItem" | "aiSuggestion";
+  status: "draft" | "previewed" | "accepted" | "rejected" | "reverted";
   node?: VisualNodeInfo;
   annotationId?: string;
   error?: string;

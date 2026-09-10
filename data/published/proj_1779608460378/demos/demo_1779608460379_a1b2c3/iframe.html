@@ -28,6 +28,7 @@
       "lottie-web": "/data/proj_1779608460378/preview-runtime/vendor/lottie-web.js",
       "@rive-app/canvas": "/data/proj_1779608460378/preview-runtime/vendor/rive-app-canvas.js",
       "@esotericsoftware/spine-webgl": "/data/proj_1779608460378/preview-runtime/vendor/spine-webgl.js",
+      "@esotericsoftware/spine-webgl-42": "/data/proj_1779608460378/preview-runtime/vendor/spine-webgl-42.js",
       "@preview/sdk": "/data/proj_1779608460378/preview-runtime/vendor/preview-sdk.js"
 }
   }
@@ -951,7 +952,7 @@
 
   function redrawSelection() {
     ensureLayer();
-    if (!state.selectedNodeId) {
+    if (!state.enabled || !state.selectedNodeId) {
       if (selectedBox) selectedBox.style.display = 'none';
       updateLabel();
       return;
@@ -1001,6 +1002,11 @@
 
   function redrawHoverFromState() {
     ensureLayer();
+    if (!state.enabled) {
+      if (hoverBox) hoverBox.style.display = 'none';
+      updateLabel();
+      return;
+    }
     var hoverNodeId = state.hoverNodeId || lastHoverId;
     if (!hoverNodeId) {
       if (hoverBox) hoverBox.style.display = 'none';
@@ -1076,6 +1082,7 @@
       propertyChanges: Array.isArray(next.propertyChanges) ? next.propertyChanges : [],
       annotations: Array.isArray(next.annotations) ? next.annotations : []
     };
+    syncSelectionCursor(state.enabled && !state.annotationMode);
     ensureLayer();
     if (!state.enabled) {
       clearHover();
@@ -1087,6 +1094,25 @@
     redrawSelection();
     redrawHoverFromState();
     renderAnnotations();
+  }
+
+  function syncSelectionCursor(enabled) {
+    var styleId = 'visual-selection-cursor';
+    var cursorStyle = document.getElementById(styleId);
+    document.documentElement.toggleAttribute('data-visual-selection-mode', enabled);
+    if (!enabled) {
+      if (cursorStyle) cursorStyle.remove();
+      return;
+    }
+    if (!cursorStyle) {
+      cursorStyle = document.createElement('style');
+      cursorStyle.id = styleId;
+      cursorStyle.textContent =
+        'html[data-visual-selection-mode] body *:not([data-visual-overlay]):not([data-visual-overlay] *){' +
+        'cursor:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2724%27 height=%2724%27 viewBox=%270 0 24 24%27%3E%3Cpath d=%27M4 2.5 4.1 18l4.45-4.2 3.1 6.2 3.15-1.58-3.1-6.2 6.2-.18L4 2.5Z%27 fill=%27%23111827%27 stroke=%27white%27 stroke-width=%271.6%27 stroke-linejoin=%27round%27/%3E%3Ccircle cx=%2718.2%27 cy=%2718.2%27 r=%273%27 fill=%27%233b82f6%27 stroke=%27white%27 stroke-width=%271.2%27/%3E%3C/svg%3E") 4 3,default!important;' +
+        '}';
+      document.head.appendChild(cursorStyle);
+    }
   }
 
   function closestEditable(target) {
@@ -1563,9 +1589,9 @@
 
     
 (function() {
+  var POSITION_EDIT_ATTR = 'data-position-edit-id';
   var editing = false;
-  var editItems = [];
-  var editPositions = {};
+  var editTarget = null;
   var dimming = true;
   var dragTarget = null;
   var _lastPosDragSend = 0;
@@ -1576,7 +1602,6 @@
   var dragAccumTx = 0;
   var dragAccumTy = 0;
   var containerEl = null;
-  var editBoundaries = null;
 
   function getContainer() {
     if (containerEl) return containerEl;
@@ -1584,99 +1609,99 @@
     return containerEl;
   }
 
-  function injectPosKey(items, positions) {
-    var root = document.getElementById('root');
-    if (!root) { console.warn('[pos-edit] injectPosKey: #root not found'); return; }
-    var container = getContainer();
-    var containerRect = container.getBoundingClientRect();
+  function getPositionedElements() {
+    var root = document.getElementById('root') || document.body;
     var all = root.querySelectorAll('*');
-    var assigned = {};
-    var absoluteCount = 0;
-    var boundingBoxMatched = 0;
+    var result = [];
     for (var i = 0; i < all.length; i++) {
       var el = all[i];
-      if (el.hasAttribute('data-pos-key')) continue;
       var cs = window.getComputedStyle(el);
-      if (cs.position !== 'absolute') continue;
-      absoluteCount++;
-      var rect = el.getBoundingClientRect();
-      var op = el.offsetParent;
-      var opRect = op ? op.getBoundingClientRect() : containerRect;
-      var elLeft = Math.round(rect.left - opRect.left);
-      var elTop = Math.round(rect.top - opRect.top);
-      for (var j = 0; j < items.length; j++) {
-        var key = items[j];
-        if (assigned[key]) continue;
-        var pos = positions[key] || { x: 0, y: 0 };
-        if (Math.abs(elLeft - pos.x) <= 3 && Math.abs(elTop - pos.y) <= 3) {
-          el.setAttribute('data-pos-key', key);
-          assigned[key] = true;
-          boundingBoxMatched++;
-          console.log('[pos-edit] injectPosKey: matched', key, 'at', elLeft, elTop, '(expected', pos.x, pos.y, ')');
-          break;
-        }
-      }
+      if (cs.position === 'absolute') result.push(el);
     }
+    return result;
+  }
 
-    var unmatched = [];
-    for (var k = 0; k < items.length; k++) {
-      if (!assigned[items[k]]) unmatched.push(items[k]);
-    }
+  function getElementPosition(el) {
+    var containerRect = getContainer().getBoundingClientRect();
+    var rect = el.getBoundingClientRect();
+    var op = el.offsetParent;
+    var opRect = op ? op.getBoundingClientRect() : containerRect;
+    return {
+      x: Math.round(rect.left - opRect.left),
+      y: Math.round(rect.top - opRect.top),
+    };
+  }
 
-    // bounding box 匹配失败时，回退到 computed style left/top
-    if (unmatched.length > 0) {
-      console.warn('[pos-edit] injectPosKey: bounding box matched', boundingBoxMatched + '/' + items.length, 'unmatched:', unmatched);
-      for (var m = 0; m < all.length; m++) {
-        var mel = all[m];
-        if (mel.hasAttribute('data-pos-key')) continue;
-        var mcs = window.getComputedStyle(mel);
-        if (mcs.position !== 'absolute') continue;
-        var mrect = mel.getBoundingClientRect();
-        console.log('[pos-edit] absolute element:', mel.tagName, 'rect:', Math.round(mrect.left - containerRect.left), Math.round(mrect.top - containerRect.top), Math.round(mrect.width), Math.round(mrect.height));
-      }
-
-      // 回退：使用 computed style left/top
-      for (var f = 0; f < all.length; f++) {
-        var fel = all[f];
-        if (fel.hasAttribute('data-pos-key')) continue;
-        var fcs = window.getComputedStyle(fel);
-        if (fcs.position !== 'absolute') continue;
-        var fleft = parseInt(fcs.left, 10);
-        var ftop = parseInt(fcs.top, 10);
-        if (isNaN(fleft) || isNaN(ftop)) continue;
-        for (var u = 0; u < unmatched.length; u++) {
-          var ukey = unmatched[u];
-          if (assigned[ukey]) continue;
-          var upos = positions[ukey] || { x: 0, y: 0 };
-          if (Math.abs(fleft - upos.x) <= 3 && Math.abs(ftop - upos.y) <= 3) {
-            fel.setAttribute('data-pos-key', ukey);
-            assigned[ukey] = true;
-            console.log('[pos-edit] injectPosKey: fallback matched', ukey, 'via computed style left/top:', fleft, ftop, '(expected', upos.x, upos.y, ')');
-            break;
-          }
-        }
-      }
-    }
-
-    var matched = Object.keys(assigned);
-    var finalUnmatched = [];
-    for (var z = 0; z < items.length; z++) {
-      if (!assigned[items[z]]) finalUnmatched.push(items[z]);
-    }
-    console.log('[pos-edit] injectPosKey: scanned', absoluteCount, 'absolute elements, matched', matched.length + '/' + items.length, matched);
-    if (finalUnmatched.length > 0) {
-      console.warn('[pos-edit] injectPosKey: still unmatched after fallback:', finalUnmatched, 'container:', container.tagName, container.id || '(no id)');
+  function clearPositionEditMarker() {
+    var marked = document.querySelectorAll('[' + POSITION_EDIT_ATTR + ']');
+    for (var i = 0; i < marked.length; i++) {
+      marked[i].removeAttribute(POSITION_EDIT_ATTR);
+      marked[i].style.cursor = '';
     }
   }
 
-  function cleanupPosKey(items) {
-    for (var i = 0; i < items.length; i++) {
-      var els = document.querySelectorAll('[data-pos-key="' + items[i] + '"]');
-      for (var j = 0; j < els.length; j++) {
-        els[j].removeAttribute('data-pos-key');
-        els[j].style.cursor = '';
+  function resolveTargetElement(target) {
+    var all = getPositionedElements();
+    var candidates = [];
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (target.domKey && el.getAttribute('data-pos-key') !== target.domKey) continue;
+      candidates.push(el);
+    }
+
+    var expected = target.position || { x: 0, y: 0 };
+    var occurrence = typeof target.domOccurrence === 'number' ? target.domOccurrence : -1;
+    if (occurrence >= 0 && candidates[occurrence]) {
+      var occurrenceEl = candidates[occurrence];
+      var occurrencePosition = getElementPosition(occurrenceEl);
+      if (Math.abs(occurrencePosition.x - expected.x) <= 6 && Math.abs(occurrencePosition.y - expected.y) <= 6) {
+        return occurrenceEl;
       }
     }
+
+    var nearest = null;
+    var nearestDistance = Infinity;
+    for (var j = 0; j < candidates.length; j++) {
+      var position = getElementPosition(candidates[j]);
+      var distance = Math.abs(position.x - expected.x) + Math.abs(position.y - expected.y);
+      if (distance < nearestDistance) {
+        nearest = candidates[j];
+        nearestDistance = distance;
+      }
+    }
+    if (nearest) return nearest;
+
+    // 兼容未声明 data-pos-key 的旧预览：仅在没有声明 key 候选时按坐标回退。
+    if (target.domKey) {
+      for (var k = 0; k < all.length; k++) {
+        var fallbackPosition = getElementPosition(all[k]);
+        var fallbackDistance = Math.abs(fallbackPosition.x - expected.x) + Math.abs(fallbackPosition.y - expected.y);
+        if (fallbackDistance < nearestDistance) {
+          nearest = all[k];
+          nearestDistance = fallbackDistance;
+        }
+      }
+    }
+    return nearest;
+  }
+
+  function markTarget(target) {
+    clearPositionEditMarker();
+    var element = resolveTargetElement(target);
+    if (!element) {
+      console.warn('[pos-edit] unable to resolve target element', target);
+      return null;
+    }
+    element.setAttribute(POSITION_EDIT_ATTR, target.id);
+    return element;
+  }
+
+  function getMarkedElement(id) {
+    var marked = document.querySelectorAll('[' + POSITION_EDIT_ATTR + ']');
+    for (var i = 0; i < marked.length; i++) {
+      if (!id || marked[i].getAttribute(POSITION_EDIT_ATTR) === id) return marked[i];
+    }
+    return null;
   }
 
   function setDimCSS(on) {
@@ -1697,8 +1722,8 @@
     for (var i = 0; i < all.length; i++) {
       var el = all[i];
       if (el.id === 'root') continue;
-      if (el.hasAttribute('data-pos-key')) continue;
-      if (el.querySelector('[data-pos-key]')) continue;
+      if (el.hasAttribute(POSITION_EDIT_ATTR)) continue;
+      if (el.querySelector('[' + POSITION_EDIT_ATTR + ']')) continue;
       el.style.setProperty('opacity', '0.5', 'important');
       el.classList.add('pos-dimmed');
     }
@@ -1713,18 +1738,13 @@
   }
 
   function setGrabCursors(on) {
-    var els = document.querySelectorAll('[data-pos-key]');
-    for (var i = 0; i < els.length; i++) {
-      var el = els[i];
-      var key = el.getAttribute('data-pos-key');
-      if (!key || editItems.indexOf(key) === -1) continue;
-      el.style.cursor = on ? 'grab' : '';
-    }
+    var el = getMarkedElement(editTarget && editTarget.id);
+    if (el) el.style.cursor = on ? 'grab' : '';
   }
 
-  function applyPosition(key, x, y) {
-    var el = document.querySelector('[data-pos-key="' + key + '"]');
-    if (!el) { console.warn('[pos-edit] applyPosition: no element with data-pos-key="' + key + '"'); return; }
+  function applyPosition(id, x, y) {
+    var el = getMarkedElement(id);
+    if (!el) { console.warn('[pos-edit] applyPosition: no active element for', id); return; }
     var container = getContainer();
     var containerRect = container.getBoundingClientRect();
     el.style.transform = '';
@@ -1739,7 +1759,7 @@
     var containerTargetX = x + (opRect.left - containerRect.left);
     var containerTargetY = y + (opRect.top - containerRect.top);
 
-    var b = editBoundaries ? editBoundaries[key] : null;
+    var b = editTarget && editTarget.boundary ? editTarget.boundary : null;
     if (!b) {
       containerTargetX = Math.max(0, Math.min(containerTargetX, containerRect.width - elRect.width));
       containerTargetY = Math.max(0, Math.min(containerTargetY, containerRect.height - elRect.height));
@@ -1757,50 +1777,49 @@
     var roundedOY = Math.round(offsetY);
     if (Math.abs(roundedOX) > 0 || Math.abs(roundedOY) > 0) {
       el.style.transform = 'translate(' + roundedOX + 'px, ' + roundedOY + 'px)';
-      console.log('[pos-edit] applyPosition:', key, 'target:', x, y, 'current:', Math.round(elRect.left - opRect.left), Math.round(elRect.top - opRect.top), 'offset:', roundedOX, roundedOY);
+      console.log('[pos-edit] applyPosition:', id, 'target:', x, y, 'current:', Math.round(elRect.left - opRect.left), Math.round(elRect.top - opRect.top), 'offset:', roundedOX, roundedOY);
     }
   }
 
-  function exit() {
+  function exit(notifyParent) {
     editing = false;
-    editBoundaries = null;
-    setGrabCursors(false);
-    setDimCSS(false);
     clearAllTransforms();
-    cleanupPosKey(editItems);
+    setGrabCursors(false);
+    clearPositionEditMarker();
+    setDimCSS(false);
     containerEl = null;
     dragTarget = null;
+    editTarget = null;
     dragAccumTx = 0;
     dragAccumTy = 0;
     console.log('[pos-edit] exit complete');
-    window.parent.postMessage({ type: 'POSITION_EDIT_READY', active: false }, '*');
+    if (notifyParent !== false) {
+      window.parent.postMessage({ type: 'POSITION_EDIT_READY', active: false }, '*');
+    }
   }
 
   function clearAllTransforms() {
-    for (var i = 0; i < editItems.length; i++) {
-      var el = document.querySelector('[data-pos-key="' + editItems[i] + '"]');
-      if (el) el.style.transform = '';
-    }
+    var el = getMarkedElement(editTarget && editTarget.id);
+    if (el) el.style.transform = '';
   }
 
-  function enter(items, positions, boundary) {
-    console.log('[pos-edit] enter called, items:', JSON.stringify(items), 'positions:', JSON.stringify(positions), 'editing was:', editing, 'boundary:', boundary ? Object.keys(boundary).length + ' keys' : 'none');
+  function enter(target) {
+    console.log('[pos-edit] enter called, target:', JSON.stringify(target), 'editing was:', editing);
     if (editing) {
       console.warn('[pos-edit] enter called while already editing, re-entering');
-      exit();
+      exit(false);
     }
-    editItems = items;
-    editPositions = positions;
-    editBoundaries = boundary || null;
-    injectPosKey(items, positions);
+    if (!target || typeof target.id !== 'string') return;
+    editTarget = target;
+    markTarget(target);
     editing = true;
     setGrabCursors(true);
     if (dimming) {
       console.log('[pos-edit] applying dimming');
       setDimCSS(true);
     }
-    console.log('[pos-edit] enter done, editing:', editing, 'grabCursorCount:', document.querySelectorAll('[data-pos-key]').length);
-    window.parent.postMessage({ type: 'POSITION_EDIT_READY', active: true }, '*');
+    console.log('[pos-edit] enter done, editing:', editing, 'activeElement:', !!getMarkedElement(target.id));
+    window.parent.postMessage({ type: 'POSITION_EDIT_READY', active: true, id: target.id }, '*');
   }
 
   document.addEventListener('pointerdown', function(event) {
@@ -1833,8 +1852,8 @@
     var deltaX = event.clientX - dragStartX;
     var deltaY = event.clientY - dragStartY;
     var targetRect = dragTarget.getBoundingClientRect();
-    var key = dragTarget.getAttribute('data-pos-key');
-    var result = constrainToBoundary(key, targetRect, deltaX, deltaY);
+    var id = dragTarget.getAttribute(POSITION_EDIT_ATTR);
+    var result = constrainToBoundary(targetRect, deltaX, deltaY);
     var offsetX = result.constrainedLeft - dragOrigLeft;
     var offsetY = result.constrainedTop - dragOrigTop;
     dragTarget.style.transform = 'translate(' + (dragAccumTx + offsetX) + 'px, ' + (dragAccumTy + offsetY) + 'px)';
@@ -1847,7 +1866,7 @@
       var opRect2 = op2 ? op2.getBoundingClientRect() : containerRect;
       window.parent.postMessage({
         type: 'POSITION_DRAG',
-        key: key,
+        id: id,
         x: Math.round(result.constrainedLeft + containerRect.left - opRect2.left),
         y: Math.round(result.constrainedTop + containerRect.top - opRect2.top)
       }, '*');
@@ -1856,14 +1875,14 @@
 
   document.addEventListener('pointerup', function(event) {
     if (!dragTarget) return;
-    var key = dragTarget.getAttribute('data-pos-key');
+    var id = dragTarget.getAttribute(POSITION_EDIT_ATTR);
     var targetRect = dragTarget.getBoundingClientRect();
     var containerRect = getContainer().getBoundingClientRect();
     var finalRect = dragTarget.getBoundingClientRect();
     var containerX = Math.round(finalRect.left - containerRect.left);
     var containerY = Math.round(finalRect.top - containerRect.top);
 
-    var b = editBoundaries ? editBoundaries[key] : null;
+    var b = editTarget && editTarget.boundary ? editTarget.boundary : null;
     if (!b) {
       containerX = Math.max(0, Math.min(containerX, containerRect.width - targetRect.width));
       containerY = Math.max(0, Math.min(containerY, containerRect.height - targetRect.height));
@@ -1891,7 +1910,7 @@
 
     window.parent.postMessage({
       type: 'POSITION_CHANGE',
-      key: key,
+      id: id,
       x: finalX,
       y: finalY
     }, '*');
@@ -1914,12 +1933,11 @@
     if (event.source !== window.parent) return;
     var data = event.data || {};
     if (data.type === 'ENTER_POSITION_EDIT') {
-      console.log('[pos-edit] received ENTER_POSITION_EDIT, items:', (data.items || []).length, 'positions keys:', Object.keys(data.positions || {}).length, 'boundary:', data.boundary ? Object.keys(data.boundary).length + ' keys' : 'none');
       try {
-        if (data.items && data.positions) {
-          enter(data.items, data.positions, data.boundary);
+        if (data.target) {
+          enter(data.target);
         } else {
-          console.warn('[pos-edit] ENTER_POSITION_EDIT missing items or positions, items:', data.items, 'positions:', data.positions);
+          console.warn('[pos-edit] ENTER_POSITION_EDIT missing target');
         }
       } catch (err) {
         console.error('[pos-edit] ENTER_POSITION_EDIT handler error:', err);
@@ -1948,13 +1966,13 @@
     }
   });
 
-  function constrainToBoundary(key, targetRect, deltaX, deltaY) {
+  function constrainToBoundary(targetRect, deltaX, deltaY) {
     var container = getContainer();
     var containerRect = container.getBoundingClientRect();
     var newLeft = dragOrigLeft + deltaX;
     var newTop = dragOrigTop + deltaY;
 
-    var b = editBoundaries ? editBoundaries[key] : null;
+    var b = editTarget && editTarget.boundary ? editTarget.boundary : null;
 
     if (!b) {
       newLeft = Math.max(0, Math.min(newLeft, containerRect.width - targetRect.width));
@@ -1988,9 +2006,13 @@
     var els = document.elementsFromPoint(x, y);
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
-      if (el.hasAttribute && el.hasAttribute('data-pos-key')) {
-        var key = el.getAttribute('data-pos-key');
-        if (editItems.indexOf(key) !== -1) return { el: el, key: key };
+      var current = el;
+      while (current) {
+        if (current.hasAttribute && current.hasAttribute(POSITION_EDIT_ATTR)) {
+          var id = current.getAttribute(POSITION_EDIT_ATTR);
+          if (editTarget && id === editTarget.id) return { el: current, id: id };
+        }
+        current = current.parentElement;
       }
     }
     return null;
@@ -2008,11 +2030,15 @@
     let currentComponent = null;
     let updateVersion = 0;
     let currentRequestId = null;
+    let currentPreviewInstanceId = null;
+    let currentRenderGeneration = null;
+    let currentRevision = null;
     let isSleeping = false;
 
     window.__DEMO_PROPS__ = currentConfig;
     window.__APP_STATE__ = currentAppState;
     window.__ROUTE_PARAMS__ = currentRouteParams;
+    window.__WORKBENCH_SPINE_ASSET_BASE__ = "/data/proj_1779608460378/assets/animations";
 
     // 画布可按页面完整内容高度显示卡片，最多到 MAX_PAGE_HEIGHT（50000）。
     // 这里与画布上限保持一致，保证单次测量请求的高度不会超过画布能展示的上限，
@@ -2115,7 +2141,7 @@
       React.useLayoutEffect(function() {
         if (props.version !== updateVersion || props.requestId !== currentRequestId) return;
         reportRuntimeTiming('render_committed', { version: props.version });
-        window.parent.postMessage({ type: 'LOADED', requestId: props.requestId }, '*');
+        window.parent.postMessage({ type: 'LOADED', requestId: props.requestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
       }, [props.version, props.requestId]);
       return null;
     }
@@ -2144,7 +2170,7 @@
       requestAnimationFrame(function() {
         var h = measureFullContentHeight();
         if (h >= 50) {
-          window.parent.postMessage({ type: 'RESIZE', height: h, requestId: currentRequestId }, '*');
+          window.parent.postMessage({ type: 'RESIZE', height: h, requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
         }
       });
       setTimeout(function() {
@@ -2177,7 +2203,7 @@
           timestamp: Date.now()
         }));
       } catch (_err) {}
-      window.parent.postMessage({ type: 'RUNTIME_ERROR', requestId: currentRequestId, ...safePayload }, '*');
+      window.parent.postMessage({ type: 'RUNTIME_ERROR', requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision, ...safePayload }, '*');
     }
 
     function reportRuntimeTiming(stage, details) {
@@ -2187,7 +2213,10 @@
           source: 'preview-runtime',
           stage: stage,
           sinceShellStart: Math.round(now - shellStartedAt),
-          requestId: currentRequestId
+          requestId: currentRequestId,
+          previewInstanceId: currentPreviewInstanceId,
+          renderGeneration: currentRenderGeneration,
+          revision: currentRevision
         }, details || {});
         try { console.info('[PreviewRuntime]', payload); } catch (_consoleErr) {}
         window.parent.postMessage({
@@ -2297,10 +2326,54 @@
       resources: summarizeResourceTimings()
     });
 
+    var currentVisibilityRegions = {};
+    var visibilityOriginalStyles = new WeakMap();
+    function applyVisibilityRegions() {
+      var elements = document.querySelectorAll('[data-region-id]');
+      for (var i = 0; i < elements.length; i++) {
+        var element = elements[i];
+        var regionId = element.getAttribute('data-region-id');
+        var state = regionId ? currentVisibilityRegions[regionId] : null;
+        if (!state) continue;
+        var original = visibilityOriginalStyles.get(element);
+        if (!original) {
+          original = {
+            display: element.style.getPropertyValue('display'),
+            displayPriority: element.style.getPropertyPriority('display'),
+            opacity: element.style.getPropertyValue('opacity'),
+            opacityPriority: element.style.getPropertyPriority('opacity'),
+            pointerEvents: element.style.getPropertyValue('pointer-events'),
+            pointerEventsPriority: element.style.getPropertyPriority('pointer-events'),
+            ariaDisabled: element.getAttribute('aria-disabled')
+          };
+          visibilityOriginalStyles.set(element, original);
+        }
+        if (state.visible === false) element.style.setProperty('display', 'none', 'important');
+        else if (original.display) element.style.setProperty('display', original.display, original.displayPriority);
+        else element.style.removeProperty('display');
+        if (state.enabled === false) {
+          element.style.setProperty('opacity', '0.55');
+          element.style.setProperty('pointer-events', 'none');
+          element.setAttribute('aria-disabled', 'true');
+        } else {
+          if (original.opacity) element.style.setProperty('opacity', original.opacity, original.opacityPriority);
+          else element.style.removeProperty('opacity');
+          if (original.pointerEvents) element.style.setProperty('pointer-events', original.pointerEvents, original.pointerEventsPriority);
+          else element.style.removeProperty('pointer-events');
+          if (original.ariaDisabled === null) element.removeAttribute('aria-disabled');
+          else element.setAttribute('aria-disabled', original.ariaDisabled);
+        }
+      }
+    }
+
     window.addEventListener('message', (event) => {
       if (event.source !== window.parent) return;
 
-      const { type, code, moduleUrl, configData: newConfigData, cssImports: newCssImports, appState, routeParams, requestId, isUrl } = event.data;
+      const { type, code, moduleUrl, configData: newConfigData, cssImports: newCssImports, appState, routeParams, spineAssetBaseUrl, requestId, previewInstanceId: incomingPreviewInstanceId, renderGeneration: incomingRenderGeneration, revision: incomingRevision, isUrl } = event.data;
+      if (typeof incomingPreviewInstanceId === 'string') currentPreviewInstanceId = incomingPreviewInstanceId;
+      if (typeof incomingRenderGeneration === 'number') currentRenderGeneration = incomingRenderGeneration;
+      if (typeof incomingRevision === 'number') currentRevision = incomingRevision;
+      if (typeof spineAssetBaseUrl === 'string') window.__WORKBENCH_SPINE_ASSET_BASE__ = spineAssetBaseUrl;
 
       if (type === 'SLEEP') {
         isSleeping = true;
@@ -2310,7 +2383,7 @@
       if (type === 'WAKE') {
         isSleeping = false;
         requestAnimationFrame(function() {
-          window.parent.postMessage({ type: 'RESIZE', height: measureFullContentHeight(), requestId: currentRequestId }, '*');
+          window.parent.postMessage({ type: 'RESIZE', height: measureFullContentHeight(), requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
         });
         return;
       }
@@ -2320,6 +2393,9 @@
         var isModuleUrl = type === 'UPDATE_MODULE' || !!isUrl;
         var incomingCode = moduleUrl || code;
         currentRequestId = typeof requestId === 'number' ? requestId : null;
+        currentRenderGeneration = typeof event.data.renderGeneration === 'number' ? event.data.renderGeneration : currentRequestId;
+        currentRevision = typeof event.data.revision === 'number' ? event.data.revision : null;
+        if (typeof event.data.previewInstanceId === 'string') currentPreviewInstanceId = event.data.previewInstanceId;
         reportRuntimeTiming('update_code_received', { isUrl: isModuleUrl });
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
@@ -2340,8 +2416,15 @@
         window.__DEMO_PROPS__ = currentConfig;
         updateAppRuntime(appState, routeParams);
         if (currentComponent) {
+          updateVersion += 1;
           renderComponent();
+          requestAnimationFrame(applyVisibilityRegions);
         }
+      }
+
+      if (type === 'UPDATE_VISIBILITY') {
+        currentVisibilityRegions = event.data.visibilityRegions || {};
+        requestAnimationFrame(applyVisibilityRegions);
       }
 
       if (type === 'COLLECT_POSITIONABLE_SIZES') {
@@ -2377,7 +2460,7 @@
                   sizes2[key2] = { width: Math.round(rect.width), height: Math.round(rect.height) };
                 }
               }
-              window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: sizes2, requestId: currentRequestId }, '*');
+              window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: sizes2, requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
             }
             if (pendingImages.length > 0) {
               // 等待所有图片加载完成后再测量
@@ -2404,7 +2487,7 @@
               measureAndReport();
             }
           } catch (err) {
-            window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: {}, requestId: currentRequestId }, '*');
+          window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: {}, requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
           }
         });
       }
@@ -2510,7 +2593,7 @@
       const height = measureFullContentHeight();
       if (Math.abs(height - lastReportedHeight) <= 1) return;
       lastReportedHeight = height;
-      window.parent.postMessage({ type: 'RESIZE', height, requestId: currentRequestId }, '*');
+      window.parent.postMessage({ type: 'RESIZE', height, requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
     });
     resizeObserver.observe(document.body);
 
@@ -2522,7 +2605,7 @@
         var h = measureFullContentHeight();
         if (Math.abs(h - lastReportedHeight) > 1) {
           lastReportedHeight = h;
-          window.parent.postMessage({ type: 'RESIZE', height: h, requestId: currentRequestId }, '*');
+      window.parent.postMessage({ type: 'RESIZE', height: h, requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
         }
       });
     }
@@ -2544,10 +2627,10 @@
     });
 
     reportRuntimeTiming('ready_sent');
-    window.parent.postMessage({ type: 'READY' }, '*');
+    window.parent.postMessage({ type: 'READY', previewInstanceId: currentPreviewInstanceId }, '*');
 
     const initialCode = null;
-    const initialCodeUrl = "/data/proj_1779608460378/demos/demo_1779608460379_a1b2c3/compiled.js?v=1786010300352";
+    const initialCodeUrl = "/data/proj_1779608460378/demos/demo_1779608460379_a1b2c3/compiled.js?v=1789026443365";
     if (initialCode) {
       window.__DEMO_PROPS__ = currentConfig;
       const blob = new Blob([initialCode], { type: 'application/javascript' });
@@ -2570,7 +2653,7 @@
           });
           renderComponent();
           URL.revokeObjectURL(moduleUrl);
-          window.parent.postMessage({ type: 'COMPONENT_READY', requestId: currentRequestId }, '*');
+          window.parent.postMessage({ type: 'COMPONENT_READY', requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
         })
         .catch((err) => {
           reportRuntimeError({ stage: 'dependency_import', error: err.message });

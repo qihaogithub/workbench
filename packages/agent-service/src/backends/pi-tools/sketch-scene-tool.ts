@@ -88,6 +88,17 @@ function canAccess(config: AgentConfig, pageId: string): boolean {
 }
 
 async function readScene(config: AgentConfig, pageId: string): Promise<SketchSceneDocument | null> {
+  const liveWorkspace = config.workingDir
+    ? resolveLiveWorkspaceMutationContext(config.workingDir)
+    : null;
+  if (liveWorkspace) {
+    const snapshot = await liveWorkspace.authority.getSnapshot(
+      liveWorkspace.projectId,
+      liveWorkspace.workspaceId,
+    );
+    const content = snapshot.resources[sketchSceneRelativePath(pageId)];
+    return content === undefined ? null : parseSketchSceneDocument(content);
+  }
   const content = await fs.promises.readFile(sketchScenePath(config, pageId), 'utf-8');
   return parseSketchSceneDocument(content);
 }
@@ -95,17 +106,22 @@ async function readScene(config: AgentConfig, pageId: string): Promise<SketchSce
 async function writeScene(config: AgentConfig, pageId: string, scene: SketchSceneDocument): Promise<WorkspaceMutationReceipt | null> {
   const filePath = sketchScenePath(config, pageId);
   const content = JSON.stringify(scene, null, 2);
-  const existing = await fs.promises.readFile(filePath, 'utf-8').catch(() => null);
   const liveWorkspace = config.workingDir ? resolveLiveWorkspaceMutationContext(config.workingDir) : null;
   if (liveWorkspace) {
+    const snapshot = await liveWorkspace.authority.getSnapshot(
+      liveWorkspace.projectId,
+      liveWorkspace.workspaceId,
+    );
+    const existing = snapshot.resources[sketchSceneRelativePath(pageId)] ?? null;
     const state = await liveWorkspace.authority.getState(liveWorkspace.projectId, liveWorkspace.workspaceId);
     return liveWorkspace.authority.mutate({
       mutationId: crypto.randomUUID(), projectId: liveWorkspace.projectId, workspaceId: liveWorkspace.workspaceId,
-      sessionId: config.sessionId, baseRevision: state.revision, actor: 'ai', reason: 'agent_sketch_scene',
+      sessionId: config.sessionId, ...(config.runId ? { runId: config.runId } : {}), baseRevision: state.revision, actor: config.mutationActor ?? 'ai', reason: 'agent_sketch_scene',
       operations: [{ type: 'put_text', path: sketchSceneRelativePath(pageId), content,
         ...(existing === null ? { expectedAbsent: true } : { expectedHash: crypto.createHash('sha256').update(existing).digest('hex') }) }],
     });
   }
+  const existing = await fs.promises.readFile(filePath, 'utf-8').catch(() => null);
   await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
   await fs.promises.writeFile(filePath, content, 'utf-8');
   return null;

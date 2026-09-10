@@ -1,8 +1,8 @@
 {
   "workspaceId": "live-1786367484066-d86iaf4bb",
   "projectId": "proj_1779608460378",
-  "revision": 8,
-  "rootHash": "7b3a94ba8bc36402ed278b49c3a59ec4ddd7a12c50fa54e021acdd43a119435e",
+  "revision": 10,
+  "rootHash": "ffb843ca39c46725f2c61c19b038e6799c787f23bcbc0378cbafc6b6bfcb6fd5",
   "resourceHashes": {
     ".canvas-layout.json": "151b93e581344d5bde1eb47ceb550ad0f83d865af708f43bc43cbe10fc145214",
     "assets/images/000db583d36b-subject-meiyu.png": "000db583d36b8dc1b5e2d0457b40cec556180c7efe927dcf94899480ca012f8b",
@@ -34,15 +34,15 @@
     "assets/images/fcf610ad88a2-phone-status-bar.png": "fcf610ad88a2402c08300b16fe262a84fc8e907b0c0dff9ecce3082742a411a2",
     "assets/images/ff56667adcca-tab-bar-phone.png": "ff56667adcca1c73fa7ac98719b27e035e38ed5b79e1a7e4cb75d98715ab4bf3",
     "convention.md": "158377baa50f92f0ff3e30302ba56e5474abd7e8d88b96780b8fb827e9aed296",
-    "demos/demo_1779608460379_a1b2c3/config.schema.json": "be3bc6a86a19f296fe7fdd9d2831ba12575a863aa451a82e36bd2ea61649c15f",
+    "demos/demo_1779608460379_a1b2c3/config.schema.json": "615a3c5a21aabb4972d288ee3d4d859ab0ec50cdc1da389df06add166f2a271d",
     "demos/demo_1779608460379_a1b2c3/index.tsx": "fee81897c6a2aa7a87bba8df1d7d45c4f19f3327eacef6a4d0a6cdcb0e8ab370",
-    "demos/demo_1779608460380_d4e5f6/config.schema.json": "cef5ca1146ac1f7df11ec3df7a5569fe2fb8d64d217d1daec8bdc122244588d0",
+    "demos/demo_1779608460380_d4e5f6/config.schema.json": "9157c40ef45584a5614a891557278c08a5e22eaea44aa0c168d2767cda9ea0ad",
     "demos/demo_1779608460380_d4e5f6/index.tsx": "5aacf51792458f7634364b3b4499e465307c7d2ffc78ea38ce6e6662e41871a2",
     "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
     "memory.md": "d04b661b955595020045e412814cb4292c20c228ad67fe03f0bd8fbadb12ccfd",
     "project.config.schema.json": "ac22b65155362309fbe39470b79486b0d2ba68279023d1412706fc2affc46c99",
     "project.config.values.json": "07773392bc236a4ecec7d7a8e9981fb8e4bc8eac94cafcaec2993d12666945a2",
-    "workspace-tree.json": "e5100cb8f9685df8996429c718e48668232589f5e8e061a241bfad5868ac0e6b"
+    "workspace-tree.json": "bc1f9266ead92873f4517523c19333e674e8402cc6dfac63bc640f728ff8c013"
   },
   "mutationPayloads": {
     "2e2e11e1-ef74-4c9a-867f-11567c4fe712": "5d6287b118a6011b8cceca81b358684a2dd9b31ed4bb2def2c8bbe420fda52c2",
@@ -51,7 +51,8 @@
     "aafa3ae7-772b-4c04-81e0-fb399efd01d5": "8f5470ccef7b4764cd15a3a2792331d8531d2c1dbbbe44f20ab365d74bc17cda",
     "b75f78e8-f085-4703-b71f-1f945059a835": "706d34992178bb44d4c513e0a2a7f90348f33916cf4e524076cc17e5e02b02a4",
     "72dcb809-b7c5-472a-a118-029a847f9a91": "798e65c796d04bbb841a352ab7b899665c052d28ab0e0f72e0652a7a12d15987",
-    "ad652796-6856-4bbf-b51f-c3d318b55432": "7b1a858f2ae3a4ad5d5dede018d2cc960d8d5782d3628b0b6b71e2f534886b6e"
+    "ad652796-6856-4bbf-b51f-c3d318b55432": "7b1a858f2ae3a4ad5d5dede018d2cc960d8d5782d3628b0b6b71e2f534886b6e",
+    "6f922d4b-b05a-42b6-b7aa-20a0372d38f5": "902f1de636e7766cb6f14c8eee75558753fdd7e041028134d16a603aa88dbc06"
   },
-  "updatedAt": 1786368416274
+  "updatedAt": 1789024972048
 }

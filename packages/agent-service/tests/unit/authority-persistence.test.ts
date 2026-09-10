@@ -1,7 +1,11 @@
 import * as Y from "yjs";
+import crypto from "node:crypto";
 import { describe, expect, it } from "vitest";
 
-import { deduplicateContent } from "../../src/collab/extensions/authority-persistence";
+import {
+  AuthorityPersistenceExtension,
+  deduplicateContent,
+} from "../../src/collab/extensions/authority-persistence";
 
 describe("AuthorityPersistenceExtension 重复内容守卫", () => {
   const moduleSource = [
@@ -136,5 +140,77 @@ describe("Phase 2: Yjs 状态持久化恢复后重连不加倍", () => {
 
     const fixed = deduplicateContent(doubled);
     expect(fixed).toBe(X);
+  });
+});
+
+describe("Authority receipt → 活跃 Yjs 房间投影", () => {
+  const hash = (value: string) => crypto.createHash("sha256").update(value).digest("hex");
+  const descriptor = {
+    projectId: "project-1",
+    workspaceId: "workspace-1",
+    resourcePath: "demos/home/index.tsx",
+    kind: "page-code" as const,
+  };
+
+  it("房间仍在 receipt 基线时安全应用 canonical 内容", () => {
+    const extension = new AuthorityPersistenceExtension({} as never);
+    const document = new Y.Doc();
+    document.getText("content").insert(0, "before");
+
+    const result = extension.applyCommittedResource({
+      documentName: JSON.stringify(descriptor),
+      document,
+      descriptor,
+      beforeHash: hash("before"),
+      afterHash: hash("after"),
+      canonicalContent: "after",
+    });
+
+    expect(result).toBe("applied");
+    expect(document.getText("content").toString()).toBe("after");
+  });
+
+  it("房间有未落盘人类编辑时标记冲突而不覆盖本地内容", () => {
+    const extension = new AuthorityPersistenceExtension({} as never);
+    const document = new Y.Doc();
+    document.getText("content").insert(0, "human-edit");
+
+    const result = extension.applyCommittedResource({
+      documentName: JSON.stringify(descriptor),
+      document,
+      descriptor,
+      beforeHash: hash("before"),
+      afterHash: hash("agent-after"),
+      canonicalContent: "agent-after",
+    });
+
+    expect(result).toBe("conflicted");
+    expect(document.getText("content").toString()).toBe("human-edit");
+  });
+
+  it("冲突房间的后续 flush 被拒绝，避免旧 Yjs 内容覆盖 Authority", async () => {
+    const extension = new AuthorityPersistenceExtension({} as never);
+    const document = new Y.Doc();
+    document.getText("content").insert(0, "human-edit");
+    extension.applyCommittedResource({
+      documentName: JSON.stringify(descriptor),
+      document,
+      descriptor,
+      beforeHash: hash("before"),
+      afterHash: hash("agent-after"),
+      canonicalContent: "agent-after",
+    });
+
+    await expect(extension.onStoreDocument({
+      document,
+      lastContext: {
+        ok: true,
+        ...descriptor,
+        sessionId: "session-1",
+        userId: "user-1",
+        username: "User",
+        workspacePath: "/tmp/workspace-1",
+      },
+    })).rejects.toThrow("WORKSPACE_RESOURCE_CONFLICT");
   });
 });

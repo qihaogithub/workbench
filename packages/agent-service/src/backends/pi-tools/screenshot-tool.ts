@@ -31,6 +31,13 @@ const CaptureScreenshotParams = Type.Object({
       default: true,
     }),
   ),
+  renderMode: Type.Optional(
+    Type.Union([Type.Literal("fast"), Type.Literal("strict")], {
+      description:
+        "Screenshot quality mode. fast favors latency; strict waits for the full render. Default strict.",
+      default: "strict",
+    }),
+  ),
   pageId: Type.Optional(
     Type.String({
       description:
@@ -379,6 +386,7 @@ export function createCaptureScreenshotTool(
         const width = args.width ?? 375;
         const height = args.height ?? 812;
         const fullPage = args.fullPage ?? true;
+        const renderMode = args.renderMode ?? "strict";
         const configData = readConfigDefaults(schemaPath);
         const serviceUrl = getScreenshotServiceUrl();
 
@@ -413,6 +421,7 @@ export function createCaptureScreenshotTool(
             width,
             height,
             fullPage,
+            renderMode,
             sessionId: config.sessionId,
           };
         } else if (isPrototypePage) {
@@ -450,6 +459,7 @@ export function createCaptureScreenshotTool(
             width,
             height,
             fullPage,
+            renderMode,
             sessionId: config.sessionId,
           };
         } else {
@@ -469,6 +479,7 @@ export function createCaptureScreenshotTool(
             width,
             height,
             fullPage,
+            renderMode,
             sessionId: config.sessionId,
           };
         }
@@ -498,7 +509,7 @@ export function createCaptureScreenshotTool(
         }
 
         const imageResponse = await fetch(
-          `${serviceUrl}/api/screenshots/file/${projectId}/${demoId}?t=${Date.now()}`,
+          `${serviceUrl}/api/screenshots/file/${projectId}/${demoId}?variant=${renderMode}&t=${Date.now()}`,
         );
         if (!imageResponse.ok) {
           return {
@@ -519,13 +530,13 @@ export function createCaptureScreenshotTool(
         const buffer = Buffer.from(await imageResponse.arrayBuffer());
         const base64 = buffer.toString("base64");
         const sizeKB = Math.round(buffer.length / 1024);
-        const screenshotUrl = `/api/screenshots/file/${projectId}/${demoId}`;
+        const screenshotUrl = `/api/screenshots/file/${projectId}/${demoId}?variant=${renderMode}`;
 
         return {
           content: [
             {
               type: "text" as const,
-              text: `Screenshot captured (${width}x${height}${fullPage ? ", full page" : ""}, ${sizeKB}KB). URL: ${screenshotUrl}`,
+              text: `Screenshot captured (${width}x${height}${fullPage ? ", full page" : ""}, ${renderMode}, ${sizeKB}KB). URL: ${screenshotUrl}`,
             },
             {
               type: "image" as const,
@@ -539,6 +550,11 @@ export function createCaptureScreenshotTool(
             width,
             height,
             fullPage,
+            renderMode,
+            evidence: {
+              kind: "reference-render",
+              precision: "reference",
+            },
             sizeKB,
             screenshotUrl,
             cached: result.data.cached ?? false,

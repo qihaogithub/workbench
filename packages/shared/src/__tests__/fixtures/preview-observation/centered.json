@@ -1,0 +1,52 @@
+{
+  "facts": {
+    "identity": {
+      "schemaVersion": 1,
+      "projectId": "fixture-project",
+      "workspaceId": "fixture-workspace",
+      "pageId": "centered-page",
+      "runtimeType": "prototype-html-css",
+      "surface": "active-single-page",
+      "previewInstanceId": "preview-centered",
+      "renderGeneration": 3,
+      "revision": 18
+    },
+    "capabilities": ["page-summary", "target-node", "layout", "runtime", "assertions"],
+    "viewport": {
+      "width": 640,
+      "height": 480,
+      "devicePixelRatio": 2,
+      "scrollX": 0,
+      "scrollY": 0
+    },
+    "document": {
+      "clientWidth": 640,
+      "clientHeight": 480,
+      "scrollWidth": 640,
+      "scrollHeight": 480,
+      "horizontalOverflow": false,
+      "verticalOverflow": false
+    },
+    "runtime": {
+      "readyState": "complete",
+      "fontsReady": true,
+      "runtimeErrorCount": 0,
+      "consoleErrorCount": 0
+    },
+    "targetResolution": "resolved",
+    "target": {
+      "nodeId": "hero",
+      "nodeIdStability": "stable",
+      "rect": {"x": 220, "y": 160, "width": 200, "height": 160},
+      "parentRect": {"x": 0, "y": 0, "width": 640, "height": 480},
+      "style": {"display": "block", "visibility": "visible", "opacity": 1}
+    }
+  },
+  "assertions": [
+    {"id": "hero-centered", "type": "centered", "tolerancePx": 0},
+    {"id": "hero-visible", "type": "visible"},
+    {"id": "hero-exists", "type": "exists"}
+  ],
+  "expectedStatuses": ["passed", "passed", "passed"],
+  "expectedAssertionStatus": "passed"
+}

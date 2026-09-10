@@ -1,10 +1,10 @@
 {
   "workspaceId": "live-1786594338395-ah2a8z31j",
   "projectId": "proj_1786594337456_uafur2",
-  "revision": 3,
-  "rootHash": "365baaa99093e5dc793c555945d249bc511fc93fa8d2a6967e64f9dd0a939503",
+  "revision": 4,
+  "rootHash": "bd2c39c65236de2b482fe8f45893e067f5915876f67aabe189985a295cd699f0",
   "resourceHashes": {
-    "demos/page_ixfq/config.schema.json": "a0d29e038c5cfc38267e6ecfd72e62fa6e0533aa4d50b6b6bb1946bffe037dcf",
+    "demos/page_ixfq/config.schema.json": "2ee4aa7aaccec8458cc6251ecc0acc8ef4a12d4ff79cc90229dad2f74a5d87c5",
     "demos/page_ixfq/index.tsx": "03e0f95e4daca3264a7924d8bf79da5d693442950e777aa20f68a06520fdd714",
     "demos/page_ixfq/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_ixfq/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
@@ -16,5 +16,5 @@
     "81440758-438f-4eb0-8e54-38bdc46d1ea5": "86f8835410353c5e2b8697daaf3e01d62b16a27426296958abe9853efdad70fd",
     "96a36cb6-b522-436a-817b-4e84f7ec22ac": "d5b4e9b6b8afabe48716b6e9d2a4c8b8216f3de800fb8c7391d473b66ed6a51a"
   },
-  "updatedAt": 1786594341150
+  "updatedAt": 1789005938598
 }

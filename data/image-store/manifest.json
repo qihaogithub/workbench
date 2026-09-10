@@ -12077,6 +12077,21 @@
       "projectRefs": [
         "proj_1785135808250_r4cb4a"
       ]
+    },
+    {
+      "id": "img_5htP5MlfKx_RAQ",
+      "sha256": "321ea947bb0fe04762c8eb49c3ada956ee66c3f27b32291d47df8b32e29f10be",
+      "filename": "image_1789026530414_0.png",
+      "mimeType": "image/png",
+      "sizeBytes": 233402,
+      "width": 1902,
+      "height": 361,
+      "sourceType": "user_upload",
+      "createdAt": 1789026530686,
+      "createdBy": "ai-agent",
+      "projectRefs": [
+        "proj_1779608460378"
+      ]
     }
   ]
 }

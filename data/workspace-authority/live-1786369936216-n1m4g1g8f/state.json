@@ -1,8 +1,8 @@
 {
   "workspaceId": "live-1786369936216-n1m4g1g8f",
   "projectId": "proj_1779608460378",
-  "revision": 2,
-  "rootHash": "7b3a94ba8bc36402ed278b49c3a59ec4ddd7a12c50fa54e021acdd43a119435e",
+  "revision": 16,
+  "rootHash": "96c0ef0b5441ba6a41af808bc093cf2fddd9abbd0be8d097d685910ec9d1c605",
   "resourceHashes": {
     ".canvas-layout.json": "151b93e581344d5bde1eb47ceb550ad0f83d865af708f43bc43cbe10fc145214",
     "assets/images/000db583d36b-subject-meiyu.png": "000db583d36b8dc1b5e2d0457b40cec556180c7efe927dcf94899480ca012f8b",
@@ -34,18 +34,31 @@
     "assets/images/fcf610ad88a2-phone-status-bar.png": "fcf610ad88a2402c08300b16fe262a84fc8e907b0c0dff9ecce3082742a411a2",
     "assets/images/ff56667adcca-tab-bar-phone.png": "ff56667adcca1c73fa7ac98719b27e035e38ed5b79e1a7e4cb75d98715ab4bf3",
     "convention.md": "158377baa50f92f0ff3e30302ba56e5474abd7e8d88b96780b8fb827e9aed296",
-    "demos/demo_1779608460379_a1b2c3/config.schema.json": "be3bc6a86a19f296fe7fdd9d2831ba12575a863aa451a82e36bd2ea61649c15f",
+    "demos/demo_1779608460379_a1b2c3/config.schema.json": "615a3c5a21aabb4972d288ee3d4d859ab0ec50cdc1da389df06add166f2a271d",
     "demos/demo_1779608460379_a1b2c3/index.tsx": "fee81897c6a2aa7a87bba8df1d7d45c4f19f3327eacef6a4d0a6cdcb0e8ab370",
-    "demos/demo_1779608460380_d4e5f6/config.schema.json": "cef5ca1146ac1f7df11ec3df7a5569fe2fb8d64d217d1daec8bdc122244588d0",
-    "demos/demo_1779608460380_d4e5f6/index.tsx": "5aacf51792458f7634364b3b4499e465307c7d2ffc78ea38ce6e6662e41871a2",
+    "demos/demo_1779608460380_d4e5f6/config.schema.json": "9157c40ef45584a5614a891557278c08a5e22eaea44aa0c168d2767cda9ea0ad",
+    "demos/demo_1779608460380_d4e5f6/index.tsx": "0b645911513c1b2f2c777535ae3c88247af9cf95ad336d89941ac8957f8a61d0",
     "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
     "memory.md": "d04b661b955595020045e412814cb4292c20c228ad67fe03f0bd8fbadb12ccfd",
-    "project.config.schema.json": "ac22b65155362309fbe39470b79486b0d2ba68279023d1412706fc2affc46c99",
+    "project.config.schema.json": "bbde507fef1233dfed39be7050cf6077c93b33329f9109e8c6a43421e9fba4bc",
     "project.config.values.json": "07773392bc236a4ecec7d7a8e9981fb8e4bc8eac94cafcaec2993d12666945a2",
-    "workspace-tree.json": "e5100cb8f9685df8996429c718e48668232589f5e8e061a241bfad5868ac0e6b"
+    "workspace-tree.json": "bc1f9266ead92873f4517523c19333e674e8402cc6dfac63bc640f728ff8c013"
   },
   "mutationPayloads": {
-    "abcef377-aa1d-43bb-9ef0-1a8c594b8619": "496f259ba8146a2419c2a0df0de95a5affe2c714727f72b953cd446421c6c7c0"
+    "abcef377-aa1d-43bb-9ef0-1a8c594b8619": "496f259ba8146a2419c2a0df0de95a5affe2c714727f72b953cd446421c6c7c0",
+    "dcaefd20-0892-4e2e-b198-b8b14d8299da": "0a9514065fe0b54d509eb2bf7789a1c4d255571004a51bab6c171dd6008f0af7",
+    "6f16de59-51fa-4fa0-86eb-0906ba0a9508": "7929d8d741ed90fe48372658e9aaeb23c219749051787c9b461a21a52879c026",
+    "ac3219af-4c3f-4b50-8998-2dc409e856dd": "d2d6e6e6b70981679b5ce7d9e8bf012f1a32fd852100a6266ed7f961557968ae",
+    "2b5b0ab0-3d1a-4c56-a3f5-9b79b5be0d9e": "0af9574a96be3434f866f3dc3e2851b3ce058ef06eecbe7e5b93f44e7c56618b",
+    "f2017ca5-9227-4a76-9611-367db188e7ba": "1430ee148e0fabaacc81342f33d70b632fdf701ccf8d7eb0d1344d4a8f465b6e",
+    "2f9a22c6-e9e3-455a-af35-bebfeb50c574": "733ae2fb392d543f92f546376ec4409893c21715f8f8b037f8827f2967bbf1e5",
+    "79c8f71e-6177-40e6-9220-53e7b514b438": "2e2e42c8e2f241123da27b2e359c7ece8c71934d85da485f416712aceb2d9459",
+    "254eb06c-044f-4d0e-916a-e32707b270bd": "73aa2ac66e588e8b4775d77e1535c827d8d0976a761bc5c9b6b610dde1feaeff",
+    "4029cbbb-5e90-4507-8702-22cbf2b92dc7": "3e3d425d516401ce027949ffc33973e6e1b9ab0e65a43b71cd75c74f6a799027",
+    "3014daf6-1263-4f5e-8dfe-1ce5711dfb81": "1ed795bbba41d7ee3137f2c89e7a7d0fbda86dfb693688d53cdda6a647f838c3",
+    "4b17af0c-5aef-4f9c-9f0f-1bc651d66f4b": "4493d3de4d5695d68ecaea7717c34ed04fd4904ec69a4ebfb4ffa1a8d1e20b62",
+    "5d5f726f-f833-4def-82b4-bd9bca9990ae": "104652e0f9a4b7a6b7a7ea3f044df703daad1a4e7f7cf5e90bab82bf7b4804aa",
+    "b2b700ef-02be-489f-883f-97620d374beb": "f7171c5d7a00af3be3c5ca7cce18194dd4b761d332babb0095403edb76f6c7c4"
   },
-  "updatedAt": 1786373651889
+  "updatedAt": 1789026987346
 }

@@ -96,6 +96,32 @@ export interface RunSummary {
     surface: string;
     status: 'pending' | 'applied' | 'failed';
   }>;
+  observations?: Array<{
+    availability: 'observed' | 'stale' | 'unavailable' | 'unsupported';
+    readiness: 'ready' | 'partial' | 'runtime-error';
+    identity?: {
+      schemaVersion: number;
+      projectId: string;
+      workspaceId: string;
+      pageId: string;
+      runtimeType: string;
+      surface: string;
+      previewInstanceId: string;
+      renderGeneration: number;
+      revision: number;
+      rootHash?: string;
+    };
+    assertionStatus: 'not-requested' | 'passed' | 'failed' | 'uncertain' | 'unsupported';
+    assertionTypes: Array<{
+      type: string;
+      status: 'passed' | 'failed' | 'uncertain' | 'unsupported';
+    }>;
+    evidence: { kind: string; precision: string };
+    observedAt?: number;
+    latencyMs?: number;
+    payloadBytes?: number;
+    reasons?: string[];
+  }>;
 }
 
 export interface AgentResult {

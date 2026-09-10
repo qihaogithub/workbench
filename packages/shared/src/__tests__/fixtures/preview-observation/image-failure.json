@@ -1,0 +1,50 @@
+{
+  "facts": {
+    "identity": {
+      "schemaVersion": 1,
+      "projectId": "fixture-project",
+      "workspaceId": "fixture-workspace",
+      "pageId": "image-page",
+      "runtimeType": "high-fidelity-react",
+      "surface": "active-single-page",
+      "previewInstanceId": "preview-image",
+      "renderGeneration": 4,
+      "revision": 20
+    },
+    "capabilities": ["page-summary", "target-node", "layout", "runtime", "assertions"],
+    "viewport": {
+      "width": 1024,
+      "height": 768,
+      "devicePixelRatio": 1,
+      "scrollX": 0,
+      "scrollY": 0
+    },
+    "document": {
+      "clientWidth": 1024,
+      "clientHeight": 768,
+      "scrollWidth": 1024,
+      "scrollHeight": 768,
+      "horizontalOverflow": false,
+      "verticalOverflow": false
+    },
+    "runtime": {
+      "readyState": "complete",
+      "fontsReady": true,
+      "runtimeErrorCount": 0,
+      "consoleErrorCount": 0
+    },
+    "targetResolution": "resolved",
+    "target": {
+      "nodeId": "hero-image",
+      "nodeIdStability": "stable",
+      "rect": {"x": 312, "y": 184, "width": 400, "height": 240},
+      "style": {"display": "block", "visibility": "visible", "opacity": 1},
+      "image": {"complete": false, "naturalWidth": 0, "naturalHeight": 0, "failed": true}
+    }
+  },
+  "assertions": [
+    {"id": "hero-image-loaded", "type": "image-loaded"}
+  ],
+  "expectedStatuses": ["failed"],
+  "expectedAssertionStatus": "failed"
+}

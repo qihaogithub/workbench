@@ -43,6 +43,12 @@ export type ErrorCode =
 
 export interface AgentConfig {
   sessionId: string;
+  /** Current conversation run; refreshed before each message for mutation receipts. */
+  runId?: string;
+  /** Mutation identity for delegated runs; defaults to the primary `ai` actor. */
+  mutationActor?: "ai" | "subagent";
+  /** Originating WebSocket connection for connection-scoped preview observation. */
+  connectionId?: string;
   workingDir?: string;
   projectId?: string;
   demoId?: string;
@@ -184,9 +190,46 @@ export interface ProjectionAckEntry {
   status: "pending" | "applied" | "failed";
 }
 
+/** Bounded, redacted preview evidence retained in a run summary. */
+export interface PreviewObservationSummary {
+  availability: "observed" | "stale" | "unavailable" | "unsupported";
+  readiness: "ready" | "partial" | "runtime-error";
+  identity?: {
+    schemaVersion: number;
+    projectId: string;
+    workspaceId: string;
+    pageId: string;
+    runtimeType: string;
+    surface: string;
+    previewInstanceId: string;
+    renderGeneration: number;
+    revision: number;
+    rootHash?: string;
+  };
+  assertionStatus:
+    | "not-requested"
+    | "passed"
+    | "failed"
+    | "uncertain"
+    | "unsupported";
+  assertionTypes: Array<{
+    type: string;
+    status: "passed" | "failed" | "uncertain" | "unsupported";
+  }>;
+  evidence: {
+    kind: string;
+    precision: string;
+  };
+  observedAt?: number;
+  latencyMs?: number;
+  payloadBytes?: number;
+  reasons?: string[];
+}
+
 export interface RunSummary {
   mutations: MutationReceiptEntry[];
   projections: ProjectionAckEntry[];
+  observations?: PreviewObservationSummary[];
 }
 
 // ============================================================

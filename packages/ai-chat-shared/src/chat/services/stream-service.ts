@@ -6,6 +6,8 @@ import {
   type ImageAttachment,
   type RunSummary,
   type ViewerContext,
+  type PreviewObservationHandler,
+  type PreviewRegistration,
 } from "@workbench/agent-client";
 import { parseToolCallFromEvent } from "../utils/chat-stream-utils";
 import type { ToolUpdateEvent } from "../utils/chat-stream-utils";
@@ -161,11 +163,16 @@ export class StreamService {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private hasInjectedMemory = false;
   private readonly mode: AgentMode;
+  private previewObservationHandler: PreviewObservationHandler | null;
   private static readonly KEEPALIVE_INTERVAL_MS = 25000;
   private static readonly RECONNECT_GRACE_MS = 10000; // 断连后等待重连的最大时间
 
-  constructor(options?: { mode?: AgentMode }) {
+  constructor(options?: {
+    mode?: AgentMode;
+    previewObservationHandler?: PreviewObservationHandler | null;
+  }) {
     this.mode = options?.mode ?? "workbench";
+    this.previewObservationHandler = options?.previewObservationHandler ?? null;
   }
 
   get isActive(): boolean {
@@ -188,6 +195,7 @@ export class StreamService {
     const agentClient = getConfiguredAgentClient();
     const stream = agentClient.stream(agentSessionId);
     this.stream = stream;
+    stream.setPreviewObservationHandler(this.previewObservationHandler);
 
     this.setupEventHandlers();
     return stream;
@@ -197,6 +205,18 @@ export class StreamService {
     this.handlers = { ...this.handlers, ...handlers };
   }
 
+  setPreviewObservationHandler(
+    handler: PreviewObservationHandler | null,
+  ): void {
+    this.previewObservationHandler = handler;
+    this.stream?.setPreviewObservationHandler(handler);
+  }
+
+  /** Register the currently rendered preview on the active AgentStream. */
+  registerPreview(registration: PreviewRegistration): void {
+    this.stream?.registerPreview(registration);
+  }
+
   async waitForConnection(stream: AgentStream): Promise<void> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -204,8 +224,7 @@ export class StreamService {
       }, 3000);
 
       const checkConnection = () => {
-        const ws = (stream as any).ws;
-        if (ws?.readyState === WebSocket.OPEN) {
+        if (stream.isOpen()) {
           clearTimeout(timeout);
           stream.off("status", onStatus);
           this.connectionEstablished = true;
@@ -247,20 +266,31 @@ export class StreamService {
       throw new Error("Stream not connected");
     }
 
+    // Refresh the identity immediately before every run. This covers a
+    // preview that mounted before StreamService or after a reconnect, so the
+    // Broker has an identity to compare before the first observation request.
+    const registration =
+      this.previewObservationHandler?.getPreviewRegistration?.();
+    if (registration) this.stream.registerPreview(registration);
+
     // viewer-readonly：系统提示词、只读上下文均由 agent-service 服务端注入，
     // 客户端只透传原始问题与浏览端上下文
     if (this.mode === "viewer-readonly") {
       this.messageInFlight = true;
-      this.stream.send(message, conversation?.messageId ?? `msg-${Date.now()}`, {
-        stream: true,
-        projectId,
-        demoId,
-        referencedProjects,
-        model: modelId,
-        images,
-        viewerContext,
-        conversation,
-      });
+      this.stream.send(
+        message,
+        conversation?.messageId ?? `msg-${Date.now()}`,
+        {
+          stream: true,
+          projectId,
+          demoId,
+          referencedProjects,
+          model: modelId,
+          images,
+          viewerContext,
+          conversation,
+        },
+      );
       return;
     }
 
@@ -315,10 +345,7 @@ export class StreamService {
         );
       }
       // 公约注入 L2 system prompt 末尾
-      const conventionSuffix = [
-        ctx.conventionPrefix,
-        ctx.pageConventionPrefix,
-      ]
+      const conventionSuffix = [ctx.conventionPrefix, ctx.pageConventionPrefix]
         .filter(Boolean)
         .join("");
       if (conventionSuffix && projectRules) {
@@ -327,23 +354,27 @@ export class StreamService {
     }
 
     this.messageInFlight = true;
-    this.stream.send(finalContent, conversation?.messageId ?? `msg-${Date.now()}`, {
-      stream: true,
-      workingDir,
-      projectId,
-      demoId,
-      referencedProjects,
-      model: modelId,
-      images,
-      files,
-      projectRules,
-      conversation,
-      conversationId: conversation?.conversationId,
-      messageId: conversation?.messageId,
-      runId: conversation?.runId,
-      assistantMessageId: conversation?.assistantMessageId,
-      conversationRevision: conversation?.conversationRevision,
-    });
+    this.stream.send(
+      finalContent,
+      conversation?.messageId ?? `msg-${Date.now()}`,
+      {
+        stream: true,
+        workingDir,
+        projectId,
+        demoId,
+        referencedProjects,
+        model: modelId,
+        images,
+        files,
+        projectRules,
+        conversation,
+        conversationId: conversation?.conversationId,
+        messageId: conversation?.messageId,
+        runId: conversation?.runId,
+        assistantMessageId: conversation?.assistantMessageId,
+        conversationRevision: conversation?.conversationRevision,
+      },
+    );
   }
 
   sendPermissionResponse(
@@ -351,53 +382,29 @@ export class StreamService {
     optionId: string,
     responseContent?: string,
   ): void {
-    const ws = (this.stream as any)?.ws;
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(
-        JSON.stringify({
-          type: "permission_response",
-          permissionId,
-          optionId,
-          responseContent,
-        }),
-      );
-    }
+    this.stream?.sendPermissionResponse(
+      permissionId,
+      optionId,
+      responseContent,
+    );
   }
 
   sendUserChoiceResponse(requestId: string, choice: UserChoiceResponse): void {
-    const ws = (this.stream as any)?.ws;
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(
-        JSON.stringify({
-          type: "user_choice_response",
-          requestId,
-          choice,
-        }),
-      );
-    }
+    this.stream?.sendUserChoiceResponse(requestId, choice);
   }
 
   sendModelChange(modelId: string): void {
-    const ws = (this.stream as any)?.ws;
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "set_model", modelId }));
-    }
+    this.stream?.sendModelChange(modelId);
   }
 
   requestModels(workingDir?: string): void {
-    const ws = (this.stream as any)?.ws;
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "get_models", workingDir }));
-    }
+    this.stream?.requestModels({ workingDir });
   }
 
   forwardConsoleEntries(
     entries: Array<{ level: string; args: string; timestamp: number }>,
   ): void {
-    const ws = (this.stream as any)?.ws;
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "console_data", entries }));
-    }
+    this.stream?.sendConsoleData(entries);
   }
 
   close(): void {
@@ -405,10 +412,9 @@ export class StreamService {
     this.clearReconnectTimer();
     if (this.stream) {
       // P5 Layer 1: send cancel frame before closing if a message is in flight
-      const ws = (this.stream as any)?.ws;
-      if (this.messageInFlight && ws?.readyState === WebSocket.OPEN) {
+      if (this.messageInFlight && this.stream.isOpen()) {
         try {
-          ws.send(JSON.stringify({ type: "cancel" }));
+          this.stream.cancel();
         } catch {
           // WebSocket may close between the check and send; ignore
         }
@@ -478,7 +484,10 @@ export class StreamService {
 
     this.stream.on("status", (event: StreamEvent) => {
       if (this.currentSessionId !== streamId) return;
-      if (event.status === "processing" || event.status === "awaiting_approval") {
+      if (
+        event.status === "processing" ||
+        event.status === "awaiting_approval"
+      ) {
         this.connectionEstablished = true;
         this.messageInFlight = true;
         this.clearReconnectTimer();

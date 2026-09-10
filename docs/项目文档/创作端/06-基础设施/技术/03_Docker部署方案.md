@@ -382,6 +382,14 @@ Pi Agent 内置 5 个工具，通过 `beforeToolCall`/`afterToolCall` 拦截机�
 - 部署前校验 `.env.docker` 必须包含非空 `INTERNAL_API_TOKEN`。
 - 部署后检查本次部署服务的容器状态、健康检查和端口；当部署范围包含 author-site 或 agent-service 时，还会用 `INTERNAL_API_TOKEN` 调用 agent-service 内部模型配置接口，确认管理后台配置同步链路可用。
 
+### 5.2 非 viewer 服务自动部署
+
+Codex Cron 可按每 30 分钟周期检查本地 `main` 分支，并从独立干净 worktree 自动部署四个非 viewer 服务：`knowledge-service`、`agent-service`、`author-site` 和 `screenshot-service`。任务固定执行 `scripts/deploy-fast.sh knowledge agent author shot`，不会构建、重启或替换 `viewer-site`。
+
+自动任务首次运行只建立提交基线；后续仅在部署相关路径发生新提交时执行。部署前会运行 viewer 契约检查，并记录远端 `viewer-site` 容器 ID、启动时间和 HTTP 状态；部署后要求这些值不变。部署失败不自动回滚，保留待部署提交并在下一周期重试。
+
+由于 `viewer-site` 会代理部分 `author-site` API 并读取共享发布数据，即使 viewer 容器未重启，共享依赖、上游 API 或 `/app/data` 变化仍可能影响 viewer 的运行时行为。自动任务必须在通知中明确这一边界。
+
 需要更新截图服务时，显式开启：
 
 ```bash

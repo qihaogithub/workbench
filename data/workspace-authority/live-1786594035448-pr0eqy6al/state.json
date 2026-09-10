@@ -1,11 +1,11 @@
 {
   "workspaceId": "live-1786594035448-pr0eqy6al",
   "projectId": "proj_1786594035427_wbtem8",
-  "revision": 9,
-  "rootHash": "aac209db17e44c0a9906f0299e60958267c33773d787248bdf9bf5205547c8fc",
+  "revision": 10,
+  "rootHash": "78ac2d3d93eaf27e4986ed16a9384fae328502bc4addf282180e025c92649d28",
   "resourceHashes": {
     ".canvas-layout.json": "5a65fe8489b295ee5b237e6c66114618b8cb1438e4d5d4b2e5d3ef5de759607f",
-    "demos/page_zux8/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_zux8/config.schema.json": "e60e8ef12ce527b4b4d0bbea8cfe06d51ab000e478bb13fb5576b216a8e0a209",
     "demos/page_zux8/index.tsx": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_zux8/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_zux8/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
@@ -23,5 +23,5 @@
     "46eea225-22a8-4e51-a222-2f77ab8ef5ca": "0d839c0ddff2af2ff96d1fe169ccaac17b968cdc59c450b0488122342476beba",
     "189050ef-a1b5-4005-bf4b-c677722c989c": "3be45519329f494f4bb0e5f4cd894636ab3faf434ae064f9c495bb560868b43d"
   },
-  "updatedAt": 1786594050148
+  "updatedAt": 1789005936213
 }

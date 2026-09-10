@@ -6,8 +6,13 @@ import type {
   AgentEvent,
   FileChange,
   MutationReceiptEntry,
+  PreviewObservationSummary,
   PlanItem,
 } from "../../core/types";
+import {
+  isPreviewObservationResult,
+  type PreviewObservationResult,
+} from "@workbench/shared/demo/preview-observation";
 import { isKnowledgeBasePath } from "./permission-manager";
 import { resolveLiveWorkspaceMutationContext } from "../../workspace/workspace-mutation-authority";
 import {
@@ -41,6 +46,7 @@ export class ToolHookManager {
   private planItems: PlanItem[] = [];
   private readKnowledgeFiles: Set<string> = new Set();
   private mutationReceipts: MutationReceiptEntry[] = [];
+  private previewObservations: PreviewObservationSummary[] = [];
 
   constructor(
     private config: AgentConfig,
@@ -59,6 +65,16 @@ export class ToolHookManager {
     return this.mutationReceipts;
   }
 
+  getPreviewObservations(): PreviewObservationSummary[] {
+    return this.previewObservations.map((observation) => ({
+      ...observation,
+      identity: observation.identity ? { ...observation.identity } : undefined,
+      assertionTypes: observation.assertionTypes.map((assertion) => ({ ...assertion })),
+      evidence: { ...observation.evidence },
+      reasons: observation.reasons ? [...observation.reasons] : undefined,
+    }));
+  }
+
   hasCommittedVisibilityRules(): boolean {
     return this.mutationReceipts.some((receipt) => receipt.resources.some((resource) => resource.path === "project.visibility-rules.json"));
   }
@@ -70,6 +86,86 @@ export class ToolHookManager {
   resetForNewMessage(): void {
     this.files = [];
     this.mutationReceipts = [];
+    this.previewObservations = [];
+  }
+
+  private recordPreviewObservation(event: any, isError: boolean): void {
+    const details = getToolResultDetails(event) as
+      | (PreviewObservationResult & {
+          _observationMetrics?: { latencyMs?: unknown; payloadBytes?: unknown };
+        })
+      | undefined;
+    // A failed observePreview call is still a terminal observation outcome.
+    // Keep a fixed, redacted summary so RunSummary/metrics do not silently
+    // count only successful observations. Never copy the tool error text into
+    // the durable summary because it may contain model- or page-authored data.
+    if (isError || !isPreviewObservationResult(details)) {
+      if (!isError) return;
+      this.previewObservations.push({
+        availability: "unavailable",
+        readiness: "partial",
+        assertionStatus: "not-requested",
+        assertionTypes: [],
+        evidence: {
+          kind: "runtime-structure",
+          precision: "layout",
+        },
+        latencyMs:
+          typeof event?.durationMs === "number" &&
+          Number.isFinite(event.durationMs) &&
+          event.durationMs >= 0
+            ? Math.floor(event.durationMs)
+            : undefined,
+        reasons: ["observation-tool-error"],
+      });
+      if (this.previewObservations.length > 32) {
+        this.previewObservations.splice(0, this.previewObservations.length - 32);
+      }
+      return;
+    }
+
+    const identity = details.identity
+      ? {
+          schemaVersion: details.identity.schemaVersion,
+          projectId: details.identity.projectId,
+          workspaceId: details.identity.workspaceId,
+          pageId: details.identity.pageId,
+          runtimeType: details.identity.runtimeType,
+          surface: details.identity.surface,
+          previewInstanceId: details.identity.previewInstanceId,
+          renderGeneration: details.identity.renderGeneration,
+          revision: details.identity.revision,
+          ...(details.identity.rootHash
+            ? { rootHash: details.identity.rootHash }
+            : {}),
+        }
+      : undefined;
+    const metrics = details._observationMetrics;
+    const safeMetric = (value: unknown): number | undefined =>
+      typeof value === "number" && Number.isFinite(value) && value >= 0
+        ? Math.floor(value)
+        : undefined;
+    this.previewObservations.push({
+      availability: details.availability,
+      readiness: details.readiness,
+      identity,
+      assertionStatus: details.assertionStatus,
+      assertionTypes: details.assertions.slice(0, 32).map((assertion) => ({
+        type: assertion.type,
+        status: assertion.status,
+      })),
+      evidence: {
+        kind: details.evidence.kind,
+        precision: details.evidence.precision,
+      },
+      observedAt: details.observedAt,
+      latencyMs: safeMetric(metrics?.latencyMs),
+      payloadBytes: safeMetric(metrics?.payloadBytes),
+      reasons: details.reasons?.slice(0, 16),
+    });
+    if (this.previewObservations.length > 32) {
+      this.previewObservations.splice(0, this.previewObservations.length - 32);
+    }
   }
 
   private pushFileChange(change: FileChange): void {
@@ -258,6 +354,9 @@ export class ToolHookManager {
       onFileChanges?: (changes: FileChange[]) => void;
     },
   ): void {
+    if (toolName === "observePreview") {
+      this.recordPreviewObservation(event, isError);
+    }
     const changes = this.recordToolFileChange(toolName, input, isError, event);
     options?.onFileChanges?.(changes);
 

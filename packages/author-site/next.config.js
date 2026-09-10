@@ -36,6 +36,13 @@ if (fs.existsSync(rootEnvPath)) {
   }
 }
 
+// Allow opt-in isolated build output for parallel local/E2E dev servers. The
+// default remains `.next`; callers must choose the directory explicitly so a
+// second server never silently diverges from the normal development setup.
+const configuredDistDir = process.env.NEXT_DIST_DIR?.trim();
+const disableServerMinification =
+  process.env.NEXT_DISABLE_SERVER_MINIFICATION === "1";
+
 function getAllowedDevOrigins() {
   const configured = process.env.NEXT_ALLOWED_DEV_ORIGINS || "";
   return Array.from(
@@ -52,6 +59,7 @@ function getAllowedDevOrigins() {
 const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname, "../.."),
+  distDir: configuredDistDir || ".next",
   // Next 16 blocks HMR and other /_next requests from origins that are not
   // explicitly trusted once this option is configured. Keep public dev
   // tunnels opt-in through the local environment instead of hard-coding one.
@@ -64,6 +72,7 @@ const nextConfig = {
   },
   experimental: {
     proxyClientMaxBodySize: sessionAssetBodySizeLimit,
+    ...(disableServerMinification ? { serverMinification: false } : {}),
   },
   env: {
     NEXT_PUBLIC_PREVIEW_CDN_BASE_URL:
@@ -74,8 +83,7 @@ const nextConfig = {
     // 本地开发和生产均默认启用编辑页的 Puppeteer 自动截图；
     // 可由显式环境变量覆盖，供专项诊断使用。
     NEXT_PUBLIC_AUTOMATIC_SCREENSHOT_GENERATION:
-      process.env.NEXT_PUBLIC_AUTOMATIC_SCREENSHOT_GENERATION ||
-      "true",
+      process.env.NEXT_PUBLIC_AUTOMATIC_SCREENSHOT_GENERATION || "true",
   },
   transpilePackages: [
     "@workbench/agent-client",

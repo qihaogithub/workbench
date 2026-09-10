@@ -158,7 +158,7 @@ describe("WorkspaceMutationAuthority", () => {
     expect(JSON.parse(fs.readFileSync(path.join(workspacePath, "whiteboards", "bindings.json"), "utf8"))).toEqual(JSON.parse(bindings));
   });
 
-  it("提交 receipt 后才发布事件，Yjs-First 不再拒绝旧 hash 覆盖", async () => {
+  it("提交 receipt 后才发布事件，协作者写入仍可合并而 Agent 受基线保护", async () => {
     const { authority, workspacePath } = createAuthority();
     const events: string[] = [];
     authority.onCommitted(({ receipt }) => {
@@ -174,7 +174,8 @@ describe("WorkspaceMutationAuthority", () => {
     expect(receipt.revision).toBe(2);
     expect(fs.readFileSync(path.join(workspacePath, "demos/home/index.tsx"), "utf-8")).toBe("after");
     expect(events).toEqual(["mutation-1"]);
-    // Yjs-First: assertExpected() removed — stale expectedHash no longer causes rejection
+    // Human collaboration updates are merged by the Yjs room and are not
+    // subject to the Agent file queue's optimistic CAS precondition.
     const receipt2 = await authority.mutate({
       mutationId: "mutation-2", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
       actor: "collab", reason: "stale", operations: [{ type: "put_text", path: "demos/home/index.tsx", content: "stale", expectedHash: hash("before") }],
@@ -245,8 +246,72 @@ describe("WorkspaceMutationAuthority", () => {
       }),
     ]);
 
-    expect([first.revision, second.revision]).toEqual([2, 3]);
+    expect([first.revision, second.revision].sort()).toEqual([2, 3]);
     expect((await authority.getState("project-1", "workspace-1")).revision).toBe(3);
+  });
+
+  it("两个 Agent 修改同一文件时按路径队列执行，后者只能显式冲突", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const base = hash("before");
+    const first = authority.mutate({
+      mutationId: "agent-same-file-1",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sessionId: "session-1",
+      runId: "run-1",
+      baseRevision: 1,
+      actor: "ai",
+      reason: "agent_write_file",
+      operations: [{ type: "put_text", path: "./demos/home/index.tsx", content: "first", expectedHash: base }],
+    });
+    const second = authority.mutate({
+      mutationId: "agent-same-file-2",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sessionId: "session-2",
+      runId: "run-2",
+      baseRevision: 1,
+      actor: "ai",
+      reason: "agent_write_file",
+      operations: [{ type: "put_text", path: "demos/home/index.tsx", content: "second", expectedHash: base }],
+    });
+
+    const results = await Promise.allSettled([first, second]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    const rejected = results.find((result): result is PromiseRejectedResult => result.status === "rejected")!.reason;
+    expect(rejected).toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
+    expect(["first", "second"]).toContain(fs.readFileSync(path.join(workspacePath, "demos/home/index.tsx"), "utf8"));
+    const committed = results.find((result): result is PromiseFulfilledResult<{ runId?: string; sessionId?: string }> => result.status === "fulfilled")!.value;
+    expect(committed).toMatchObject({ runId: expect.stringMatching(/^run-[12]$/), sessionId: expect.stringMatching(/^session-[12]$/) });
+  });
+
+  it("人类提交后，Agent 生成期间取得的旧基线不能覆盖协作者内容", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const beforeHash = hash("before");
+    await authority.mutate({
+      mutationId: "human-interleave",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sessionId: "human-session",
+      baseRevision: 1,
+      actor: "collab",
+      reason: "collab_autosave",
+      operations: [{ type: "put_text", path: "demos/home/index.tsx", content: "human-after", expectedHash: beforeHash }],
+    });
+
+    await expect(authority.mutate({
+      mutationId: "agent-old-baseline",
+      projectId: "project-1",
+      workspaceId: "workspace-1",
+      sessionId: "agent-session",
+      runId: "agent-run",
+      baseRevision: 1,
+      actor: "ai",
+      reason: "agent_write_file",
+      operations: [{ type: "put_text", path: "demos/home/index.tsx", content: "agent-stale", expectedHash: beforeHash }],
+    })).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
+    expect(fs.readFileSync(path.join(workspacePath, "demos/home/index.tsx"), "utf8")).toBe("human-after");
   });
 
   it("按 revision 返回 committed catch-up 事件且观察者异常不改变 receipt", async () => {
@@ -853,18 +918,17 @@ describe("WorkspaceMutationAuthority", () => {
     const unsubscribe = authority.onCommitted(() => undefined);
     expect(authority.getHealth("project-1", "workspace-1").eventSubscriberCount).toBe(1);
 
-    // Yjs-First: stale expectedHash no longer causes conflict — mutation commits
-    const receipt = await authority.mutate({
+    // Agent stale baselines fail closed instead of overwriting a newer file.
+    await expect(authority.mutate({
       mutationId: "health-commit", projectId: "project-1", workspaceId: "workspace-1", baseRevision: 1,
       actor: "ai", reason: "test", operations: [{ type: "put_text", path: "demos/home/index.tsx", content: "stale", expectedHash: hash("not-current") }],
-    });
-    expect(receipt.committed).toBe(true);
+    })).rejects.toMatchObject({ code: "WORKSPACE_RESOURCE_CONFLICT" });
 
     const restarted = new WorkspaceMutationAuthority({
       dataDir: path.join(path.dirname(workspacePath), "data"),
       resolveWorkspacePath: (workspaceId) => workspaceId === "workspace-1" ? workspacePath : null,
     });
-    expect(restarted.getHealth("project-1", "workspace-1").conflictCount).toBe(0);
+    expect(restarted.getHealth("project-1", "workspace-1").conflictCount).toBe(1);
     unsubscribe();
     expect(restarted.getHealth("project-1", "workspace-1").eventSubscriberCount).toBe(0);
   });

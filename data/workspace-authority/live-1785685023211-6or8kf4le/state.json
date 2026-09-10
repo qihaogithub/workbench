@@ -1,18 +1,18 @@
 {
   "workspaceId": "live-1785685023211-6or8kf4le",
   "projectId": "proj_1785685022249_aevplm",
-  "revision": 37,
-  "rootHash": "341dde3e18f83b4c72220648ec08981b8a739bf3ec41b2b051a1e1e37b3d76f5",
+  "revision": 38,
+  "rootHash": "9f40a2d8f5b2c3a9a22089b9bc70788c71cab1093fa4063b43fdd94f9408e388",
   "resourceHashes": {
     ".canvas-layout.json": "173a9f95afad69c33119550d2bd4f22767191f564c8149f4a949375567d17298",
     "convention.md": "158377baa50f92f0ff3e30302ba56e5474abd7e8d88b96780b8fb827e9aed296",
-    "demos/config-basics_m2k8/config.schema.json": "67809d9f035b1fcc2a553a6290f6cec39f70e96a3048337cdf1e5f7ce6c94416",
+    "demos/config-basics_m2k8/config.schema.json": "5bf779c1f0f833eb99e091d39d896a721bdcdb8667ecc669c8f789e3a41f906c",
     "demos/config-basics_m2k8/index.tsx": "d482772267a9b89c1cf0120452f5771427bb158b4f1c7a2c5dff71230bd84c0c",
-    "demos/config-choice_x9z1/config.schema.json": "281e5860bd1f9fc77adcf09f46c52d08f9a568afffb5571c0cdc343bf714b91c",
+    "demos/config-choice_x9z1/config.schema.json": "badb8abd4f6e3d27812075481959d3306846ee6eac4fd0dcf748861e567749c9",
     "demos/config-choice_x9z1/index.tsx": "b180b3b0cf63a7cff16a6c41035e6111e3918f16e32a29aa2ddbe8445e656bb3",
-    "demos/config-media_p7q3/config.schema.json": "fe7e221fafcb7aba56b1d3f6d2e2d11d8d5b601aeb9fb937194d2e46a3ff4551",
+    "demos/config-media_p7q3/config.schema.json": "c4a0203b02084cb3222e189def39d227d1d1df113ca123df378fcb59ee05b091",
     "demos/config-media_p7q3/index.tsx": "52106ed2308195b443dfd7a3c392c6028b7469d4f200f783c19a46dfdadf864f",
-    "demos/config-structure_v4r6/config.schema.json": "67809d9f035b1fcc2a553a6290f6cec39f70e96a3048337cdf1e5f7ce6c94416",
+    "demos/config-structure_v4r6/config.schema.json": "5bf779c1f0f833eb99e091d39d896a721bdcdb8667ecc669c8f789e3a41f906c",
     "demos/config-structure_v4r6/index.tsx": "d482772267a9b89c1cf0120452f5771427bb158b4f1c7a2c5dff71230bd84c0c",
     "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
     "memory.md": "28b93c0523c8e2533ed9cf2fe647994544dd4b2b7767b2f5e2ccb3414e19f3d1",
@@ -54,5 +54,5 @@
     "d94ee5ea-60ab-447c-9435-aae135a27122": "1e18d916e0350cc8b7c1d53cf103638413991e5facd62d35b3f7189193d65929",
     "01601d61-26ea-48e0-a43c-0b76931c29dd": "ee8b680f9c15fc3a3c03c805863be129cb26768222aabc76e1fe4a777ef3bbb0"
   },
-  "updatedAt": 1785687362739
+  "updatedAt": 1789005912206
 }

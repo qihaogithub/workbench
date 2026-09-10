@@ -1,8 +1,8 @@
 {
   "workspaceId": "live-1785832228941-ay0onrwn3",
   "projectId": "proj_1785742777589_ncs6r6",
-  "revision": 154,
-  "rootHash": "c1ef68245b492973a2bfacb9c4c60c53e0f04622f78849625bc12b686e9922e9",
+  "revision": 155,
+  "rootHash": "846ebfa3b28e067040fd2d7aecd39b382e3ea4b075c00cd5bae63b60f2c4d11a",
   "resourceHashes": {
     ".canvas-layout.json": "658863a2145ec69081a3e3902f580f4d11ae9491434ebcb05f3965297b03728c",
     "assets/animations/msg68qdf/celebration_confetti.json.json": "8a7493a963643d52dd9b547cef2fcac0e92b3f4b1ac7fafb4578d075a0d67ae8",
@@ -368,11 +368,11 @@
     "assets/animations/mshemmwu/spineboy.png": "ab874448a224f8a92188e133735062c86e5f93eb7286b0fc37c5d39864e6569f",
     "assets/animations/mshemmwu/torso.png": "cf9f5d996a79c20b216ef437492ff2a28dca9153bf992e024dda0852e9a6457d",
     "convention.md": "158377baa50f92f0ff3e30302ba56e5474abd7e8d88b96780b8fb827e9aed296",
-    "demos/config-demo_m7p2/config.schema.json": "d77a916a59af34254499d72567c3e6f52c2c452d791326d73403a90cf9f068d3",
+    "demos/config-demo_m7p2/config.schema.json": "e4f1a2c742e4fa3ca79c4a38b4ca457a56b7b68c676bc90a5e2193a1bf721579",
     "demos/config-demo_m7p2/index.tsx": "73d3a1763a422f664c2b89eaca9e31f6952174e3216a6dfe548b81177edb91a2",
-    "demos/motion-formats_k4r2/config.schema.json": "d77a916a59af34254499d72567c3e6f52c2c452d791326d73403a90cf9f068d3",
+    "demos/motion-formats_k4r2/config.schema.json": "e4f1a2c742e4fa3ca79c4a38b4ca457a56b7b68c676bc90a5e2193a1bf721579",
     "demos/motion-formats_k4r2/index.tsx": "73d3a1763a422f664c2b89eaca9e31f6952174e3216a6dfe548b81177edb91a2",
-    "demos/prototype-config_b3k9/config.schema.json": "1891feba5a51b411895d17815cec394487a94e38c013cb1deb7922e4a46ecfea",
+    "demos/prototype-config_b3k9/config.schema.json": "b4ada19d4437370895f86adc984523f186c122e13853b46ac97d15f29d5a0138",
     "demos/prototype-config_b3k9/index.tsx": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/prototype-config_b3k9/prototype.css": "e258459c293b2f153c3f2ac69289102c0097c2de9bbe9d6b7e4a300d87595946",
     "demos/prototype-config_b3k9/prototype.html": "b298d45aaf3d52718768bd258ee1bb945ee35ea1eaf1d0dde3d7b0dc3653909a",
@@ -528,5 +528,5 @@
     "51897e5c-9814-404f-9dce-3c2155e987f5": "40006a57704587adc4c6aa5979c310301cd606a9f56cac43c87cbc27e0ff6c2d",
     "05922668-cab4-4f05-bbf6-12d0862c99f2": "436c37b75efa2f8001baa05a9dee3be7ea3fe846ebb60a9d9ecdc80c363cf655"
   },
-  "updatedAt": 1787208159286
+  "updatedAt": 1789005922863
 }

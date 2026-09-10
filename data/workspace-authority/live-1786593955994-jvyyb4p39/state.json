@@ -1,14 +1,14 @@
 {
   "workspaceId": "live-1786593955994-jvyyb4p39",
   "projectId": "proj_1786593955980_vszl23",
-  "revision": 4,
-  "rootHash": "6e2345aae0b7e8465cf491ee772aa69751c70b3e1ff1b168c0f8e751d0e70101",
+  "revision": 5,
+  "rootHash": "cf341f9c88622c41104397bcd97e58429370ea3f2f24825820f434623084d1a7",
   "resourceHashes": {
     ".canvas-layout.json": "7729aabaec2ed9b81b658fe7b3e50645fec1af583384f23cc84aca6df2ffd81e",
-    "demos/page_hvrn/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_hvrn/config.schema.json": "e60e8ef12ce527b4b4d0bbea8cfe06d51ab000e478bb13fb5576b216a8e0a209",
     "demos/page_hvrn/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_hvrn/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
-    "demos/page_ipao/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_ipao/config.schema.json": "e60e8ef12ce527b4b4d0bbea8cfe06d51ab000e478bb13fb5576b216a8e0a209",
     "demos/page_ipao/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_ipao/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
     "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
@@ -20,5 +20,5 @@
     "89fccbbc-f355-4250-ba9c-f9da4882342e": "a36aad94f74e267961c9cdd24cc13c0f170bc7761a4bca8714837be0b7a77d3f",
     "606b6f5e-df2b-46e2-8af3-89696c5de139": "9d33af1ba8b1466fa216dae21316b8ac8ab940b2bf34eabfddf30b1bb3f99c7e"
   },
-  "updatedAt": 1786593962742
+  "updatedAt": 1789005935787
 }

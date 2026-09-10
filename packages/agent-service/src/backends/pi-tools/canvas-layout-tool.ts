@@ -9,7 +9,12 @@ import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-p
 import { formatAuthorityCommitSummary } from "./authority-result-summary";
 import { logger } from "../../utils/logger";
 import { resolveLiveWorkspaceMutationContext } from "../../workspace/workspace-mutation-authority";
-import { isSafePageId, getPageDir, listPages } from "./workspace-page-utils";
+import {
+  isSafePageId,
+  getPageDir,
+  listPages,
+  listPagesFromSnapshotWithDiagnostics,
+} from "./workspace-page-utils";
 
 const CANVAS_LAYOUT_FILENAME = ".canvas-layout.json";
 const DEFAULT_PAGE_SIZE = { width: 375, height: 812 };
@@ -194,6 +199,21 @@ function readPreviewSize(
     const presentation = resolvePagePresentation(
       parsed as Record<string, unknown>,
     );
+    return presentation ? { ...presentation.viewport } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readPreviewSizeFromSnapshot(
+  resources: Record<string, string>,
+  pageId: string,
+): PreviewSize | undefined {
+  const content = resources[`demos/${pageId}/config.schema.json`];
+  if (content === undefined) return undefined;
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+    const presentation = resolvePagePresentation(parsed);
     return presentation ? { ...presentation.viewport } : undefined;
   } catch {
     return undefined;
@@ -505,12 +525,10 @@ function translateCanvasNodes(
   );
 }
 
-function readStoredCanvasLayout(workingDir: string): StoredCanvasLayout | null {
-  const layoutPath = getCanvasLayoutPath(workingDir);
-  if (!fs.existsSync(layoutPath)) return null;
-
+function parseStoredCanvasLayout(content: string | undefined): StoredCanvasLayout | null {
+  if (content === undefined) return null;
   try {
-    const parsed = JSON.parse(fs.readFileSync(layoutPath, "utf-8")) as unknown;
+    const parsed = JSON.parse(content) as unknown;
     if (!isRecord(parsed)) return null;
 
     const state = parseCanvasState(parsed.state);
@@ -526,6 +544,12 @@ function readStoredCanvasLayout(workingDir: string): StoredCanvasLayout | null {
   } catch {
     return null;
   }
+}
+
+function readStoredCanvasLayout(workingDir: string): StoredCanvasLayout | null {
+  const layoutPath = getCanvasLayoutPath(workingDir);
+  if (!fs.existsSync(layoutPath)) return null;
+  return parseStoredCanvasLayout(fs.readFileSync(layoutPath, "utf-8"));
 }
 
 function resolveCanvasPageSize(previewSize?: PreviewSize): {
@@ -914,7 +938,16 @@ export function createArrangeCanvasPagesTool(
       }
 
       try {
-        const workspacePages = listPages(workingDir);
+        const liveWorkspace = resolveLiveWorkspaceMutationContext(workingDir);
+        const authoritySnapshot = liveWorkspace
+          ? await liveWorkspace.authority.getSnapshot(
+              liveWorkspace.projectId,
+              liveWorkspace.workspaceId,
+            )
+          : null;
+        const workspacePages = authoritySnapshot
+          ? listPagesFromSnapshotWithDiagnostics(authoritySnapshot.resources).pages
+          : listPages(workingDir);
         if (workspacePages.length === 0) {
           return {
             content: [
@@ -932,7 +965,9 @@ export function createArrangeCanvasPagesTool(
           id: page.id,
           name: page.name,
           order: page.order,
-          previewSize: readPreviewSize(workingDir, page.id),
+          previewSize: authoritySnapshot
+            ? readPreviewSizeFromSnapshot(authoritySnapshot.resources, page.id)
+            : readPreviewSize(workingDir, page.id),
         }));
         const requestedIds = args.pageIds
           ? Array.from(new Set(args.pageIds))
@@ -962,7 +997,9 @@ export function createArrangeCanvasPagesTool(
         const viewportWidth = args.viewportWidth ?? DEFAULT_VIEWPORT_SIZE.width;
         const viewportHeight =
           args.viewportHeight ?? DEFAULT_VIEWPORT_SIZE.height;
-        const stored = readStoredCanvasLayout(workingDir);
+        const stored = authoritySnapshot
+          ? parseStoredCanvasLayout(authoritySnapshot.resources[CANVAS_LAYOUT_FILENAME])
+          : readStoredCanvasLayout(workingDir);
         const currentLayout = stored?.state.pages ?? {};
         const baseLayout = buildBaseLayout(allPages, currentLayout, sizeMode);
         const selectedIdSet = new Set(requestedIds);
@@ -1077,31 +1114,30 @@ export function createArrangeCanvasPagesTool(
         const content = JSON.stringify(storedLayout, null, 2);
         const mutationDecision = assertAiMutationAllowed(config, CANVAS_LAYOUT_FILENAME, { content });
         if (!mutationDecision.allowed) return aiMutationDeniedResult(mutationDecision, CANVAS_LAYOUT_FILENAME);
-        const liveWorkspace = resolveLiveWorkspaceMutationContext(workingDir);
         const receipt = liveWorkspace
           ? await (async () => {
-              const previous = fs.readFileSync(layoutPath, "utf-8");
               const authorityState = await liveWorkspace.authority.getState(
                 liveWorkspace.projectId,
                 liveWorkspace.workspaceId,
               );
+              const previous = authoritySnapshot?.resources[CANVAS_LAYOUT_FILENAME];
               return liveWorkspace.authority.mutate({
                 mutationId: crypto.randomUUID(),
                 projectId: liveWorkspace.projectId,
                 workspaceId: liveWorkspace.workspaceId,
                 sessionId: config.sessionId,
+                ...(config.runId ? { runId: config.runId } : {}),
                 baseRevision: authorityState.revision,
-                actor: "ai",
+                actor: config.mutationActor ?? "ai",
                 reason: "agent_canvas_arrange",
                 operations: [
                   {
                     type: "put_text",
                     path: CANVAS_LAYOUT_FILENAME,
                     content,
-                    expectedHash: crypto
-                      .createHash("sha256")
-                      .update(previous)
-                      .digest("hex"),
+                    ...(previous === undefined
+                      ? { expectedAbsent: true }
+                      : { expectedHash: crypto.createHash("sha256").update(previous).digest("hex") }),
                   },
                 ],
               });

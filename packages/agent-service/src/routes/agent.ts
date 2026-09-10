@@ -37,6 +37,7 @@ interface SendMessageBody {
   workingDir?: string;
   customWorkspace?: boolean;
   model?: string;
+  runId?: string;
   /** 行为模式：viewer-readonly 时服务端强制只读工具集与系统提示词 */
   mode?: string;
   /** viewer-readonly 模式下的浏览端上下文 */
@@ -187,7 +188,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
     '/api/agent/:sessionId/message',
     async (request: FastifyRequest<{ Params: SessionParams; Body: SendMessageBody }>, reply: FastifyReply) => {
       const { sessionId } = request.params;
-      const { content, projectId, demoId, workingDir, customWorkspace, projectRules, options, images, files } = request.body;
+      const { content, projectId, demoId, workingDir, customWorkspace, projectRules, options, images, files, runId } = request.body;
 
       if (!content) {
         return reply.code(400).send({
@@ -270,6 +271,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
         const config: AgentConfig = {
           sessionId,
+          ...(runId ? { runId } : {}),
           projectId: resolvedProjectId,
           demoId,
           workingDir: workspaceInfo?.path || workingDir,
@@ -285,6 +287,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
         };
 
         const agent = manager.getOrCreate(sessionId, config);
+        if (runId) agent.updateConfig({ runId });
 
         if (agent.status === 'initializing') {
           await agent.start();

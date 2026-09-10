@@ -1,14 +1,14 @@
 {
   "workspaceId": "live-1786594537420-vvme4o0yp",
   "projectId": "proj_1786594536530_g8erpn",
-  "revision": 5,
-  "rootHash": "5a2c9f96628dc228c181bc60d8bc214d317fdbdee671c1d0cb4a6c1ce5ab5bb9",
+  "revision": 6,
+  "rootHash": "e134d2d2922adfbcb20ef052e547f33a2cdbf6b9d19bcd43e4108d1c6d0877dd",
   "resourceHashes": {
-    "demos/1_ebuu/config.schema.json": "65cf92d66fe574e9b9f6ca014d35ead34d95572c6203fed3b5d7297e0fa1ff4c",
+    "demos/1_ebuu/config.schema.json": "6d79313babcc859318fcae730d78743e3398bd2e758a1f430fa2cee794c16894",
     "demos/1_ebuu/index.tsx": "0d69655e166a76a200bd46f9e67caca0191040c2228562c859e4aa2223bc0208",
     "demos/1_ebuu/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/1_ebuu/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
-    "demos/2_5b6h/config.schema.json": "b9e998e9736581dafd6e87bb1e8ae08e0c852be55afc0bb5277ef9589da54463",
+    "demos/2_5b6h/config.schema.json": "54d4ea7978494c8e92903252a117bf4e27d318583f82c7892cbcb59163330e25",
     "demos/2_5b6h/index.tsx": "68f9b1f156f2ed1b648d9a7984e4cfb7466587aebda0021466a54a6c0592263b",
     "demos/2_5b6h/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/2_5b6h/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
@@ -22,5 +22,5 @@
     "7268514e-aec9-498b-b6f8-89355392f66e": "6cc49b7449628547f2af212bf58038db127ebf3417fc00c428dfb983b642980d",
     "148501ba-2e4c-4a36-b71a-3d17219ff862": "1d9ae6ca212e45b21cd8afebfed80f500c98b10dca3ad845d0e05e3bec17a0fe"
   },
-  "updatedAt": 1786594552582
+  "updatedAt": 1789005941863
 }

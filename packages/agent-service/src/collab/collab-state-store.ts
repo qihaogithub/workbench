@@ -48,6 +48,16 @@ export class CollabStateStore {
     }
   }
 
+  /** Remove one room snapshot so a conflicted room reloads from canonical content. */
+  delete(workspaceId: string, descriptor: CollabDocumentName): void {
+    try {
+      const target = this.filePath(workspaceId, descriptor);
+      if (fs.existsSync(target)) fs.unlinkSync(target);
+    } catch (error) {
+      logger.error({ error, workspaceId }, "CollabStateStore: delete failed");
+    }
+  }
+
   deleteWorkspace(workspaceId: string): void {
     try {
       const dir = this.workspaceDir(workspaceId);

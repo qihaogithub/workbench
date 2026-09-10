@@ -9,10 +9,7 @@ import {
 import { IBackendAdapter } from "../backends/base";
 import { logger } from "../utils/logger";
 import { getErrorMessage } from "../utils/error-utils";
-import {
-  isRateLimitError,
-  withLlmRetry,
-} from "../utils/retry-utils";
+import { isRateLimitError, withLlmRetry } from "../utils/retry-utils";
 import { INACTIVITY_TIMEOUT_MS, ABSOLUTE_TIMEOUT_MS } from "./timeouts";
 
 /**
@@ -179,7 +176,8 @@ export class BackendAgent extends BaseAgent {
     };
 
     const resumeExecutionTimersAfterApproval = (toolCallId: string) => {
-      if (!awaitingPlanApproval || toolCallId !== pendingPlanApprovalToolCallId) return;
+      if (!awaitingPlanApproval || toolCallId !== pendingPlanApprovalToolCallId)
+        return;
       awaitingPlanApproval = false;
       pendingPlanApprovalToolCallId = undefined;
       if (!this.cancellationRequested) this.setStatus("processing");
@@ -195,9 +193,16 @@ export class BackendAgent extends BaseAgent {
     for (const evt of activityEvents) {
       this.on(evt, resetInactivityTimer);
     }
-    const onPermissionRequest = (event: import("./types").PermissionRequestEvent) => {
-      if (event.permissionRequest.toolCall.approvalKind === "plan_approval" || event.permissionRequest.toolCall.approvalKind === "config_visibility") {
-        pauseExecutionTimersForApproval(event.permissionRequest.toolCall.toolCallId);
+    const onPermissionRequest = (
+      event: import("./types").PermissionRequestEvent,
+    ) => {
+      if (
+        event.permissionRequest.toolCall.approvalKind === "plan_approval" ||
+        event.permissionRequest.toolCall.approvalKind === "config_visibility"
+      ) {
+        pauseExecutionTimersForApproval(
+          event.permissionRequest.toolCall.toolCallId,
+        );
       }
     };
     const onToolCallUpdate = (event: import("./types").ToolCallUpdateEvent) => {
@@ -463,6 +468,15 @@ export class BackendAgent extends BaseAgent {
   updateConfig(config: Partial<AgentConfig>): void {
     let changed = false;
 
+    if (config.runId !== undefined && this.config.runId !== config.runId) {
+      this.config.runId = config.runId;
+      changed = true;
+    }
+    if (config.mutationActor !== undefined && this.config.mutationActor !== config.mutationActor) {
+      this.config.mutationActor = config.mutationActor;
+      changed = true;
+    }
+
     if (
       config.workingDir !== undefined &&
       this.config.workingDir !== config.workingDir
@@ -494,6 +508,14 @@ export class BackendAgent extends BaseAgent {
 
     if (config.demoId !== undefined && this.config.demoId !== config.demoId) {
       this.config.demoId = config.demoId;
+      changed = true;
+    }
+
+    if (
+      config.connectionId !== undefined &&
+      this.config.connectionId !== config.connectionId
+    ) {
+      this.config.connectionId = config.connectionId;
       changed = true;
     }
 

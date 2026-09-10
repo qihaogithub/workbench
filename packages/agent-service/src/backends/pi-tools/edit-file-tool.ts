@@ -15,8 +15,6 @@ import {
   resolveLiveWorkspaceMutationContext,
   WorkspaceMutationAuthorityError,
 } from "../../workspace/workspace-mutation-authority";
-import { getHocuspocusCollabServer } from "../../collab/hocuspocus-server";
-import { resolveCollabResourceKind } from "../../collab/workspace-file-persistence";
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 import { createManagedDocumentProposalResult } from "./document-proposal-tool";
 import { formatAuthorityCommitSummary } from "./authority-result-summary";
@@ -535,54 +533,27 @@ export function createEditFileTool(
         // --- Write back ---
         let receipt;
         if (liveWorkspace) {
-          const resourceKind = resolveCollabResourceKind(args.path);
-          let collabWriteSucceeded = false;
-          if (resourceKind && config.sessionId) {
-            // Yjs-First: route text writes through collab room for CRDT merging
-            try {
-              const writeResult = await getHocuspocusCollabServer().writeToResource(
-                {
-                  projectId: liveWorkspace.projectId,
-                  workspaceId: liveWorkspace.workspaceId,
-                  sessionId: config.sessionId,
-                  resourcePath: args.path,
-                  kind: resourceKind,
-                },
-                newContent,
-                { expectedHash: crypto.createHash("sha256").update(rawContent).digest("hex") },
-              );
-              receipt = writeResult.receipt;
-              collabWriteSucceeded = Boolean(receipt);
-            } catch (collabErr) {
-              logger.warn(
-                { path: args.path, err: String(collabErr) },
-                "editFile: collab room write failed, falling back to Authority",
-              );
-            }
-          }
-          if (!collabWriteSucceeded) {
-            // Authority path (non-collab resource or collab room unavailable)
-            receipt = await liveWorkspace.authority.mutate({
-                  mutationId: crypto.randomUUID(),
-                  projectId: liveWorkspace.projectId,
-                  workspaceId: liveWorkspace.workspaceId,
-                  sessionId: config.sessionId,
-                  baseRevision: snapshot!.state.revision,
-                  actor: "ai",
-                  reason: "agent_edit_file",
-                  operations: [
-                    {
-                      type: "put_text",
-                      path: args.path,
-                      content: newContent,
-                      expectedHash: crypto
-                        .createHash("sha256")
-                        .update(rawContent)
-                        .digest("hex"),
-                    },
-                  ],
-                });
-          }
+          // Agent edits always use the same Authority CAS contract as every
+          // other managed write. Collaboration is a projection, not a silent
+          // fallback that could accept a stale editor snapshot.
+          receipt = await liveWorkspace.authority.mutate({
+            mutationId: crypto.randomUUID(),
+            projectId: liveWorkspace.projectId,
+            workspaceId: liveWorkspace.workspaceId,
+            sessionId: config.sessionId,
+            ...(config.runId ? { runId: config.runId } : {}),
+            baseRevision: snapshot!.state.revision,
+            actor: config.mutationActor ?? "ai",
+            reason: "agent_edit_file",
+            operations: [
+              {
+                type: "put_text",
+                path: args.path,
+                content: newContent,
+                expectedHash: crypto.createHash("sha256").update(rawContent).digest("hex"),
+              },
+            ],
+          });
         } else {
           await fs.promises.writeFile(filePath, newContent, "utf-8");
           receipt = null;

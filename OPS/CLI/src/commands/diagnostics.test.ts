@@ -12,6 +12,7 @@ import {
   buildWorkspaceFlows,
   formatDiagnosticFailureDetails,
   readSqliteEvents,
+  summarizeAgentPreviewObservations,
   summarizeDiagnosticPerformance,
   summarizeSandboxDiagnostics,
 } from "./diagnostics.js";
@@ -58,7 +59,8 @@ function insertEvent(
     payload?: Record<string, unknown>;
   },
 ): void {
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO editor_events (
       id,
       ts,
@@ -96,7 +98,8 @@ function insertEvent(
       NULL,
       @payloadJson
     )
-  `).run({
+  `,
+  ).run({
     id: input.id,
     ts: input.ts ?? "2026-07-09T00:00:00.000Z",
     group: input.group,
@@ -124,10 +127,14 @@ test("readSqliteEvents filters by event group", () => {
       db.close();
     }
 
-    const result = readSqliteEvents(dataDir, {
-      project: "project-1",
-      group: "autosave",
-    }, 20);
+    const result = readSqliteEvents(
+      dataDir,
+      {
+        project: "project-1",
+        group: "autosave",
+      },
+      20,
+    );
 
     assert.equal(result.dbMissing, false);
     assert.deepEqual(
@@ -165,10 +172,14 @@ test("applyFilters uses the same group filtering for JSONL fallback events", () 
     },
   ];
 
-  const filtered = applyFilters(events, {
-    project: "project-1",
-    group: "autosave",
-  }, 20);
+  const filtered = applyFilters(
+    events,
+    {
+      project: "project-1",
+      group: "autosave",
+    },
+    20,
+  );
 
   assert.deepEqual(
     filtered.map((event) => event.eventType),
@@ -181,25 +192,65 @@ test("SQLite and JSONL filters support the same multi-group workspace flow scope
   try {
     const db = createDiagnosticsDb(dataDir);
     try {
-      insertEvent(db, { id: "autosave", group: "autosave", type: "autosave.flush_started", ts: "2026-07-09T00:00:00.000Z" });
-      insertEvent(db, { id: "workspace", group: "workspace", type: "workspace.mutation_committed", ts: "2026-07-09T00:00:01.000Z" });
-      insertEvent(db, { id: "preview", group: "preview", type: "preview.content_loaded", ts: "2026-07-09T00:00:02.000Z" });
-      insertEvent(db, { id: "ui", group: "ui", type: "ui.changed", ts: "2026-07-09T00:00:03.000Z" });
+      insertEvent(db, {
+        id: "autosave",
+        group: "autosave",
+        type: "autosave.flush_started",
+        ts: "2026-07-09T00:00:00.000Z",
+      });
+      insertEvent(db, {
+        id: "workspace",
+        group: "workspace",
+        type: "workspace.mutation_committed",
+        ts: "2026-07-09T00:00:01.000Z",
+      });
+      insertEvent(db, {
+        id: "preview",
+        group: "preview",
+        type: "preview.content_loaded",
+        ts: "2026-07-09T00:00:02.000Z",
+      });
+      insertEvent(db, {
+        id: "ui",
+        group: "ui",
+        type: "ui.changed",
+        ts: "2026-07-09T00:00:03.000Z",
+      });
     } finally {
       db.close();
     }
     const groups = "autosave,collab,preview,workspace";
-    const sqlite = readSqliteEvents(dataDir, { project: "project-1", groups }, 20);
-    assert.deepEqual(sqlite.events.map((event) => event.id), ["autosave", "workspace", "preview"]);
-    const filtered = applyFilters([
-      ...sqlite.events,
-      {
-        id: "ui-jsonl", schemaVersion: 1, ts: "2026-07-09T00:00:04.000Z",
-        source: "frontend" as const, level: "info" as const, eventGroup: "ui" as const,
-        eventType: "ui.changed", projectId: "project-1", payload: {},
-      },
-    ], { project: "project-1", groups }, 20);
-    assert.deepEqual(filtered.map((event) => event.id), ["autosave", "workspace", "preview"]);
+    const sqlite = readSqliteEvents(
+      dataDir,
+      { project: "project-1", groups },
+      20,
+    );
+    assert.deepEqual(
+      sqlite.events.map((event) => event.id),
+      ["autosave", "workspace", "preview"],
+    );
+    const filtered = applyFilters(
+      [
+        ...sqlite.events,
+        {
+          id: "ui-jsonl",
+          schemaVersion: 1,
+          ts: "2026-07-09T00:00:04.000Z",
+          source: "frontend" as const,
+          level: "info" as const,
+          eventGroup: "ui" as const,
+          eventType: "ui.changed",
+          projectId: "project-1",
+          payload: {},
+        },
+      ],
+      { project: "project-1", groups },
+      20,
+    );
+    assert.deepEqual(
+      filtered.map((event) => event.id),
+      ["autosave", "workspace", "preview"],
+    );
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
@@ -215,10 +266,39 @@ test("workspace flows correlate mutation projection and canonical events by revi
     workspaceId: "workspace-1",
   };
   const flows = buildWorkspaceFlows([
-    { ...base, id: "received", ts: "2026-07-09T00:00:00.000Z", eventType: "workspace.mutation_received", traceId: "mutation-1", payload: { mutationId: "mutation-1", revision: null } },
-    { ...base, id: "committed", ts: "2026-07-09T00:00:01.000Z", eventType: "workspace.mutation_committed", traceId: "mutation-1", payload: { mutationId: "mutation-1", revision: 2 } },
-    { ...base, id: "projection", ts: "2026-07-09T00:00:02.000Z", eventType: "workspace.projection_applied", traceId: "mutation-1", payload: { mutationId: "mutation-1", revision: 2 } },
-    { ...base, source: "author-api" as const, id: "canonical", ts: "2026-07-09T00:00:03.000Z", eventType: "workspace.canonical_materialization_succeeded", traceId: "canonical:project-1:workspace-1:2", payload: { revision: 2 } },
+    {
+      ...base,
+      id: "received",
+      ts: "2026-07-09T00:00:00.000Z",
+      eventType: "workspace.mutation_received",
+      traceId: "mutation-1",
+      payload: { mutationId: "mutation-1", revision: null },
+    },
+    {
+      ...base,
+      id: "committed",
+      ts: "2026-07-09T00:00:01.000Z",
+      eventType: "workspace.mutation_committed",
+      traceId: "mutation-1",
+      payload: { mutationId: "mutation-1", revision: 2 },
+    },
+    {
+      ...base,
+      id: "projection",
+      ts: "2026-07-09T00:00:02.000Z",
+      eventType: "workspace.projection_applied",
+      traceId: "mutation-1",
+      payload: { mutationId: "mutation-1", revision: 2 },
+    },
+    {
+      ...base,
+      source: "author-api" as const,
+      id: "canonical",
+      ts: "2026-07-09T00:00:03.000Z",
+      eventType: "workspace.canonical_materialization_succeeded",
+      traceId: "canonical:project-1:workspace-1:2",
+      payload: { revision: 2 },
+    },
   ]);
   assert.equal(flows.length, 1);
   assert.deepEqual(flows[0], {
@@ -261,12 +341,21 @@ test("performance summary emits stable p50 p95 p99 fields for every WMA metric",
   const summary = summarizeDiagnosticPerformance([
     ...metricPayloads,
     {
-      ...metricPayloads[0], id: "debounce", eventGroup: "autosave", eventType: "autosave.flush_debounced",
+      ...metricPayloads[0],
+      id: "debounce",
+      eventGroup: "autosave",
+      eventType: "autosave.flush_debounced",
       payload: { delayMs: 800 },
     },
   ]);
   assert.deepEqual(summary.metrics.queueWait, {
-    count: 3, min: 10, p50: 20, p95: 30, p99: 30, max: 30, average: 20,
+    count: 3,
+    min: 10,
+    p50: 20,
+    p95: 30,
+    p99: 30,
+    max: 30,
+    average: 20,
   });
   assert.equal(summary.metrics.autosaveDebounceWait.p50, 800);
   assert.equal(summary.metrics.commitLatency.p95, 60);
@@ -294,24 +383,39 @@ test("export merges SQLite canonical events with agent-service JSONL mutation sp
     }
     const jsonlDir = path.join(dataDir, "editor-diagnostics");
     fs.mkdirSync(jsonlDir, { recursive: true });
-    fs.writeFileSync(path.join(jsonlDir, "agent-service.jsonl"), `${JSON.stringify({
-      id: "committed",
-      schemaVersion: 1,
-      ts: "2026-07-09T00:00:01.000Z",
-      source: "agent-service",
-      level: "info",
-      eventGroup: "workspace",
-      eventType: "workspace.mutation_committed",
-      projectId: "project-1",
-      sessionId: "session-1",
-      workspaceId: "workspace-1",
-      traceId: "mutation-1",
-      operationId: "mutation-1",
-      payload: { mutationId: "mutation-1", revision: 2, queueWaitMs: 5, commitLatencyMs: 25 },
-    })}\n`);
+    fs.writeFileSync(
+      path.join(jsonlDir, "agent-service.jsonl"),
+      `${JSON.stringify({
+        id: "committed",
+        schemaVersion: 1,
+        ts: "2026-07-09T00:00:01.000Z",
+        source: "agent-service",
+        level: "info",
+        eventGroup: "workspace",
+        eventType: "workspace.mutation_committed",
+        projectId: "project-1",
+        sessionId: "session-1",
+        workspaceId: "workspace-1",
+        traceId: "mutation-1",
+        operationId: "mutation-1",
+        payload: {
+          mutationId: "mutation-1",
+          revision: 2,
+          queueWaitMs: 5,
+          commitLatencyMs: 25,
+        },
+      })}\n`,
+    );
 
-    const result = buildDiagnosticsResult("export", { dataDir }, { project: "project-1" });
-    assert.deepEqual(result.events.map((event) => event.id), ["committed", "canonical"]);
+    const result = buildDiagnosticsResult(
+      "export",
+      { dataDir },
+      { project: "project-1" },
+    );
+    assert.deepEqual(
+      result.events.map((event) => event.id),
+      ["committed", "canonical"],
+    );
     assert.equal(result.workspaceFlows[0]?.status, "canonical_succeeded");
     assert.equal(result.performance.metrics.canonicalLag.p50, 2000);
     assert.equal(result.diagnostics.jsonlFallbackUsed, true);
@@ -416,7 +520,315 @@ test("sandbox summary exposes runtime safety outcomes without raw ticket or chan
   assert.equal(summary.expiredTicket, 1);
   assert.equal(summary.blockedRequestCount, 3);
   assert.equal(summary.timeoutMs.p95, 9000);
-  assert.deepEqual(summary.contextRecovery, { contextClosed: 1, browserRestarted: 1, recovered: 1 });
+  assert.deepEqual(summary.contextRecovery, {
+    contextClosed: 1,
+    browserRestarted: 1,
+    recovered: 1,
+  });
   assert.equal("executionId" in summary, false);
   assert.equal("channelId" in summary, false);
+});
+
+test("preview observation summary aggregates redacted run-log evidence", () => {
+  const dataDir = makeDataDir();
+  try {
+    const firstDir = path.join(dataDir, "agent-run-logs", "session-1");
+    const secondDir = path.join(dataDir, "agent-run-logs", "session-2");
+    fs.mkdirSync(firstDir, { recursive: true });
+    fs.mkdirSync(secondDir, { recursive: true });
+    const observation = {
+      availability: "observed",
+      readiness: "ready",
+      identity: { projectId: "project-1", runtimeType: "high-fidelity-react" },
+      assertionStatus: "passed",
+      assertionTypes: [{ type: "runtime-ready", status: "passed" }],
+      evidence: { kind: "runtime-structure", precision: "layout" },
+      latencyMs: 10,
+      payloadBytes: 100,
+    };
+    fs.writeFileSync(
+      path.join(firstDir, "message-1.jsonl"),
+      [
+        {
+          runId: "run-1",
+          eventType: "run_start",
+          timestamp: "2026-07-09T00:00:00.000Z",
+          payload: { demoId: "project-1" },
+        },
+        {
+          runId: "run-1",
+          eventType: "tool_call_update",
+          timestamp: "2026-07-09T00:00:01.000Z",
+          payload: { toolName: "observePreview", details: observation },
+        },
+        {
+          runId: "run-1",
+          eventType: "finish",
+          timestamp: "2026-07-09T00:00:02.000Z",
+          payload: {
+            success: true,
+            metrics: { mutationCommitted: true, projectionStatus: "applied" },
+          },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join("\n") + "\n",
+    );
+    fs.writeFileSync(
+      path.join(secondDir, "message-2.jsonl"),
+      [
+        {
+          runId: "run-2",
+          eventType: "run_start",
+          timestamp: "2026-07-09T00:00:00.000Z",
+          payload: { demoId: "project-1" },
+        },
+        {
+          runId: "run-2",
+          eventType: "tool_call_update",
+          timestamp: "2026-07-09T00:00:01.000Z",
+          payload: {
+            toolName: "observePreview",
+            details: {
+              availability: "stale",
+              readiness: "partial",
+              assertionStatus: "not-requested",
+              assertionTypes: [],
+              evidence: { kind: "runtime-structure", precision: "layout" },
+              reasons: ["stale-preview-identity"],
+            },
+          },
+        },
+        {
+          runId: "run-2",
+          eventType: "tool_call_update",
+          timestamp: "2026-07-09T00:00:02.000Z",
+          payload: {
+            toolName: "observePreview",
+            details: {
+              availability: "unavailable",
+              readiness: "partial",
+              assertionStatus: "not-requested",
+              assertionTypes: [],
+              evidence: { kind: "runtime-structure", precision: "layout" },
+              reasons: ["observation-timeout"],
+            },
+          },
+        },
+        {
+          runId: "run-2",
+          eventType: "finish",
+          timestamp: "2026-07-09T00:00:03.000Z",
+          payload: {
+            success: false,
+            metrics: {
+              mutationCommitted: false,
+              projectionStatus: "not_verified",
+            },
+          },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join("\n") + "\n",
+    );
+    const thirdDir = path.join(dataDir, "agent-run-logs", "session-3");
+    fs.mkdirSync(thirdDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(thirdDir, "message-3.jsonl"),
+      [
+        {
+          runId: "run-3",
+          eventType: "run_start",
+          timestamp: "2026-07-09T00:00:00.000Z",
+          payload: { demoId: "project-1" },
+        },
+        {
+          runId: "run-3",
+          eventType: "finish",
+          timestamp: "2026-07-09T00:00:03.000Z",
+          payload: {
+            success: true,
+            metrics: {
+              mutationCommitted: false,
+              projectionStatus: "not_verified",
+            },
+          },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join("\n") + "\n",
+    );
+    const fourthDir = path.join(dataDir, "agent-run-logs", "session-4");
+    fs.mkdirSync(fourthDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(fourthDir, "message-4.jsonl"),
+      [
+        {
+          runId: "run-4",
+          eventType: "run_start",
+          timestamp: "2026-07-09T00:00:00.000Z",
+          payload: { demoId: "project-1" },
+        },
+        {
+          runId: "run-4",
+          eventType: "tool_call_update",
+          timestamp: "2026-07-09T00:00:01.000Z",
+          payload: {
+            toolName: "observePreview",
+            status: "failed",
+            error: { message: "transport unavailable" },
+          },
+        },
+        {
+          runId: "run-4",
+          eventType: "finish",
+          timestamp: "2026-07-09T00:00:02.000Z",
+          payload: {
+            success: false,
+            metrics: {
+              mutationCommitted: false,
+              projectionStatus: "not_verified",
+            },
+          },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join("\n") + "\n",
+    );
+    const fifthDir = path.join(dataDir, "agent-run-logs", "session-5");
+    fs.mkdirSync(fifthDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(fifthDir, "message-5.jsonl"),
+      [
+        {
+          runId: "run-5",
+          eventType: "run_start",
+          timestamp: "2026-07-09T00:00:00.000Z",
+          payload: { demoId: "project-1" },
+        },
+        {
+          runId: "run-5",
+          eventType: "tool_call",
+          toolCallId: "preview-tool-5",
+          timestamp: "2026-07-09T00:00:01.000Z",
+          payload: { toolName: "observePreview" },
+        },
+        {
+          runId: "run-5",
+          eventType: "finish",
+          timestamp: "2026-07-09T00:00:03.000Z",
+          payload: {
+            success: false,
+            metrics: {
+              mutationCommitted: false,
+              projectionStatus: "not_verified",
+            },
+          },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join("\n") + "\n",
+    );
+
+    const summary = summarizeAgentPreviewObservations(dataDir, {
+      project: "project-1",
+    });
+    assert.equal(summary.runCount, 5);
+    assert.equal(summary.observationRunCount, 4);
+    assert.equal(summary.observationRate, 4 / 5);
+    assert.equal(summary.observationCount, 5);
+    assert.deepEqual(summary.availability, {
+      observed: 1,
+      stale: 1,
+      unavailable: 3,
+      unsupported: 0,
+    });
+    assert.deepEqual(summary.assertionStatus, {
+      "not-requested": 4,
+      passed: 1,
+      failed: 0,
+      uncertain: 0,
+      unsupported: 0,
+    });
+    assert.deepEqual(summary.assertionResults, {
+      count: 1,
+      passed: 1,
+      failed: 0,
+      uncertain: 0,
+      unsupported: 0,
+    });
+    assert.equal(summary.latencyMs.p50, 10);
+    assert.equal(summary.latencyP90Ms, 10);
+    assert.equal(summary.payloadBytes.p50, 100);
+    assert.equal(summary.payloadP90Bytes, 100);
+    assert.equal(summary.staleCount, 1);
+    assert.equal(summary.timeoutCount, 1);
+    assert.deepEqual(summary.runtimeTypes, { "high-fidelity-react": 1 });
+    assert.equal(summary.technicalRepair.successRate, 1);
+
+    const derivedProjectDir = path.join(
+      dataDir,
+      "agent-run-logs",
+      "session-derived",
+    );
+    fs.mkdirSync(derivedProjectDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(derivedProjectDir, "message-derived.jsonl"),
+      [
+        {
+          runId: "run-derived",
+          eventType: "run_start",
+          timestamp: "2026-07-09T00:00:00.000Z",
+          payload: {
+            demoId: "page-derived",
+            workingDir: path.join(
+              dataDir,
+              "workspaces",
+              "projects",
+              "project-derived",
+              "live-1",
+            ),
+          },
+        },
+        {
+          runId: "run-derived",
+          eventType: "tool_call_update",
+          timestamp: "2026-07-09T00:00:01.000Z",
+          payload: {
+            toolName: "observePreview",
+            details: {
+              availability: "unavailable",
+              readiness: "partial",
+              assertionStatus: "not-requested",
+              assertionTypes: [],
+              evidence: { kind: "runtime-structure", precision: "layout" },
+              reasons: ["page-not-active"],
+            },
+          },
+        },
+        {
+          runId: "run-derived",
+          eventType: "finish",
+          timestamp: "2026-07-09T00:00:02.000Z",
+          payload: {
+            success: false,
+            metrics: {
+              mutationCommitted: false,
+              projectionStatus: "not_verified",
+            },
+          },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join("\n") + "\n",
+    );
+    const derivedSummary = summarizeAgentPreviewObservations(dataDir, {
+      project: "project-derived",
+    });
+    assert.equal(derivedSummary.runCount, 1);
+    assert.equal(derivedSummary.observationCount, 1);
+    assert.equal(derivedSummary.availability.unavailable, 1);
+  } finally {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
 });

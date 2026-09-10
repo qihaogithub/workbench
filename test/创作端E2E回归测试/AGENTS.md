@@ -13,10 +13,13 @@ test/创作端E2E回归测试/
 ├── whiteboard-dialog-flow.spec.ts      # 配置图片白板宿主导入/提交回归
 ├── whiteboard-dialog-playwright.config.ts # 白板 feature flag 隔离配置
 ├── playwright.config.ts              # Playwright 配置文件
+├── preview-observation-browser.spec.ts # opt-in 预览观察 harness（transport double/真实 Broker）
 ├── global-setup.ts                   # 生成 E2E runId 和项目登记文件
 ├── global-teardown.ts                # 清理本轮和过期 E2E 测试项目
 ├── support/e2e-auth.ts               # E2E 登录 helper
 ├── support/e2e-projects.ts           # E2E 测试项目创建、登记和清理 helper
+├── support/preview-observation-fixture.ts # 预览观察 DOM/布局夹具
+├── support/preview-observation-fake-llm.mjs # 真实 Broker opt-in 的确定性模型服务
 └── AGENTS.md                         # 本文件
 ```
 
@@ -46,6 +49,7 @@ test/创作端E2E回归测试/
 ### 前置条件
 
 1. 确保开发服务器已启动：
+
    ```bash
    pnpm dev
    # 或按需启动 author-site
@@ -53,6 +57,7 @@ test/创作端E2E回归测试/
    ```
 
 2. 安装 Playwright 浏览器（首次运行）：
+
    ```bash
    pnpm playwright install chromium
    ```
@@ -123,14 +128,14 @@ pnpm test:e2e -- -t "完整流程"
 
 日志文件保存在 `test/创作端E2E回归测试/test-outputs/` 目录：
 
-| 文件 | 说明 |
-|------|------|
-| `test-log-*.txt` | 测试执行日志，包含每个步骤的详细信息 |
-| `01-homepage-*.png` | 首页截图 |
-| `02-edit-page-*.png` | 编辑页截图 |
-| `03-code-pasted-*.png` | 粘贴代码后截图 |
-| `04-saved-*.png` | 保存后截图 |
-| `error-*.png` | 测试失败时的错误截图 |
+| 文件                   | 说明                                 |
+| ---------------------- | ------------------------------------ |
+| `test-log-*.txt`       | 测试执行日志，包含每个步骤的详细信息 |
+| `01-homepage-*.png`    | 首页截图                             |
+| `02-edit-page-*.png`   | 编辑页截图                           |
+| `03-code-pasted-*.png` | 粘贴代码后截图                       |
+| `04-saved-*.png`       | 保存后截图                           |
+| `error-*.png`          | 测试失败时的错误截图                 |
 
 ### HTML 报告
 
@@ -163,20 +168,31 @@ playwright-cli screenshot
 
 测试脚本使用多种定位策略查找元素：
 
-| 元素 | 定位策略 |
-|------|----------|
-| 新建项目按钮 | `getByRole('button', { name: /新建/i })` 或包含"新建"的文本 |
-| 项目名称输入框 | `getByPlaceholder(/项目.*名称/i)` 或第一个文本输入框 |
-| 创建确认按钮 | `getByRole('button', { name: /创建/i })` |
-| 编辑按钮 | `getByRole('button', { name: /编辑/i })` |
-| 代码编辑器 | `.cm-editor`, `.cm-content`, `textarea`, `[contenteditable]` |
-| 保存按钮 | `getByRole('button', { name: /保存/i })` |
+| 元素           | 定位策略                                                     |
+| -------------- | ------------------------------------------------------------ |
+| 新建项目按钮   | `getByRole('button', { name: /新建/i })` 或包含"新建"的文本  |
+| 项目名称输入框 | `getByPlaceholder(/项目.*名称/i)` 或第一个文本输入框         |
+| 创建确认按钮   | `getByRole('button', { name: /创建/i })`                     |
+| 编辑按钮       | `getByRole('button', { name: /编辑/i })`                     |
+| 代码编辑器     | `.cm-editor`, `.cm-content`, `textarea`, `[contenteditable]` |
+| 保存按钮       | `getByRole('button', { name: /保存/i })`                     |
+
+预览观察 harness 的 AI 输入框是 `contenteditable`，使用 `aria-placeholder`/`data-placeholder` 定位；当前页面要求 Meta+Enter（macOS）或 Control+Enter（其他平台）提交，不能假定普通 Enter 会发送。
 
 ### 等待策略
 
 - `waitUntil: 'networkidle'` - 等待网络空闲
 - `waitForLoadState('domcontentloaded')` - 等待 DOM 加载
 - `waitForTimeout(1000-2000)` - 等待过渡动画
+
+### 预览观察真实 Broker 夹具
+
+- `preview-observation-browser.spec.ts` 的真实模式需要 author、agent-service 和确定性 fake LLM 使用同一隔离 `DATA_DIR`、`INTERNAL_API_TOKEN`、`CORS_ORIGINS`/`AUTHOR_SITE_URL`，并显式配置与用户持久选择一致的 provider/model。
+- 使用自定义 `NEXT_DIST_DIR` 构建 standalone 时，静态资源必须复制到 standalone 内嵌的同名 distDir（例如 `.next-observation-build/static`）；只复制 `.next/static` 会导致 HTML 可达但脚本 404。
+- 若本机 Next/SWC 在生产 Webpack 收尾阶段报 `_webpack.WebpackError is not a constructor`，可为一次性隔离构建设置 `NEXT_DISABLE_SERVER_MINIFICATION=1`；该开关只用于诊断构建，生产默认配置不变，构建完成后仍需复制同名 distDir 的静态资源。
+- 生产 `AgentStream` 自己消费 `preview_observe_request`，页面注入的 WebSocket 监听不保证能看到该请求；真实夹具应以终态 tool frames/RunSummary 取证，并给确定性 fake model 的切页步骤保留有界等待。
+- 多标签真实夹具需要显式创建同一项目/同一 Workspace 的独立 Session；编辑页默认会复用活跃 Session，且同一 Session 的 AgentManager 会串行化运行并保留当前 originating connection。这样既能验证双标签 Broker 隔离，又不会把预期的 `AGENT_BUSY`/Session 复用行为误判为观察串线。
+- 截图服务不可用场景使用 `E2E_PREVIEW_OBSERVATION_SCREENSHOT_UNAVAILABLE=1`，并让 author/agent-service 的 `SCREENSHOT_SERVICE_URL` 指向明确不可达的本机端口；真实验收应使用隔离数据目录和合成 E2E 用户，确认截图能力被健康检查剔除后 `observePreview` 仍返回 E1 结果。
 
 ## 自定义模板代码
 

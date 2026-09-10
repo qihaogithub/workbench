@@ -44,6 +44,26 @@ const isDelegateTask = (entry: ToolEntry) =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+const evidenceLabel = (value: unknown): string | null => {
+  if (!isRecord(value)) return null;
+  const kind = value.kind;
+  if (kind === "runtime-structure") return "E1 运行时结构";
+  if (kind === "current-surface-pixels") return "E2 当前画面像素";
+  if (kind === "reference-render") return "E3 参考渲染";
+  return null;
+};
+
+const getEvidenceLabels = (entries: ToolEntry[]): string[] => {
+  const labels = new Set<string>();
+  for (const entry of entries) {
+    const result = isRecord(entry.result) ? entry.result : undefined;
+    const details = result && isRecord(result.details) ? result.details : result;
+    const label = evidenceLabel(details && details.evidence);
+    if (label) labels.add(label);
+  }
+  return [...labels];
+};
+
 const getDelegateTaskTitle = (entry: ToolEntry) => {
   const task = entry.parameters?.task;
   return typeof task === "string" && task.trim()
@@ -144,6 +164,7 @@ const formatJSON = (data: unknown): string => {
 
 export function Tool({ path, entries, className }: ToolProps) {
   const { icon: ToolIcon, status, label } = getAggregateInfo(entries);
+  const evidenceLabels = getEvidenceLabels(entries);
   const [expanded, setExpanded] = useState(false);
   const primaryEntry = entries[0];
   const isSingleDelegate = entries.length === 1 && primaryEntry && isDelegateTask(primaryEntry);
@@ -211,6 +232,16 @@ export function Tool({ path, entries, className }: ToolProps) {
             {resolvedPath}
           </span>
         )}
+
+        {evidenceLabels.map((evidence) => (
+          <span
+            key={evidence}
+            className="rounded border border-current/20 px-1 py-0.5 text-[10px] leading-none opacity-80"
+            aria-label={`证据类型：${evidence}`}
+          >
+            {evidence}
+          </span>
+        ))}
 
         {/* 右侧状态 */}
         <div className="flex-shrink-0 ml-auto flex items-center gap-2">

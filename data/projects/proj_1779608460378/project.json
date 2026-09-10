@@ -25,14 +25,6 @@
   "demoFolders": [],
   "versions": [
     {
-      "versionId": "v26",
-      "savedAt": 1780470749603,
-      "savedBy": "a5862615-26bb-4688-924d-7fd68c132e21",
-      "sessionId": "session-1780470730747-tprm1ce7f",
-      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v26",
-      "fileCount": 8
-    },
-    {
       "versionId": "v27",
       "savedAt": 1780470768349,
       "savedBy": "user",
@@ -475,16 +467,29 @@
       "workspaceRevision": 27,
       "workspaceRootHash": "a451ed8800edecdf3d23a113c28c720d3d893fc0f9fc61c8349937faa5b6c0f7",
       "note": "发布快照"
+    },
+    {
+      "versionId": "v77",
+      "type": "publish_snapshot",
+      "savedAt": 1789026445356,
+      "savedBy": "system",
+      "sessionId": "publish-1789026445314",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460378/v77",
+      "fileCount": 39,
+      "workspaceId": "live-1786369936216-n1m4g1g8f",
+      "workspaceRevision": 14,
+      "workspaceRootHash": "88e977b28bff573ad5a87c4baebe15045ca730d3e0f8720d555fcd8bac1a38ae",
+      "note": "发布快照"
     }
   ],
   "createdAt": 1779608460378,
-  "updatedAt": 1786373653654,
+  "updatedAt": 1789027017135,
   "activeWorkspaceId": "live-1786369936216-n1m4g1g8f",
-  "activeWorkspaceUpdatedAt": 1786369936253,
-  "publishedVersion": "v76",
-  "publishedAt": 1786010306377,
+  "activeWorkspaceUpdatedAt": 1789026445359,
   "canonicalSyncedWorkspaceId": "live-1786369936216-n1m4g1g8f",
-  "canonicalSyncedRevision": 2,
-  "canonicalSyncedRootHash": "7b3a94ba8bc36402ed278b49c3a59ec4ddd7a12c50fa54e021acdd43a119435e",
-  "canonicalSyncedAt": 1786373653654
+  "canonicalSyncedRevision": 16,
+  "canonicalSyncedRootHash": "96c0ef0b5441ba6a41af808bc093cf2fddd9abbd0be8d097d685910ec9d1c605",
+  "canonicalSyncedAt": 1789027014206,
+  "publishedVersion": "v77",
+  "publishedAt": 1789026445380
 }

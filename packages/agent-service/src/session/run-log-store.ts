@@ -5,6 +5,7 @@ import { createEditorDiagnosticEvent, type EditorDiagnosticEvent } from '@workbe
 
 import { AgentError, AgentEvent, AgentResult, RunSummary } from '../core/types';
 import { logger } from '../utils/logger';
+import { isPreviewObservationResult } from '@workbench/shared/demo/preview-observation';
 
 export type RunLogLevel = 'info' | 'warn' | 'error';
 export type RunLogSource = 'model' | 'tool' | 'subagent' | 'file' | 'system';
@@ -141,6 +142,84 @@ function getToolTask(parameters: unknown): string | undefined {
   return isRecord(parameters) && typeof parameters.task === 'string'
     ? parameters.task
     : undefined;
+}
+
+function redactPreviewInput(parameters: unknown): unknown {
+  if (!isRecord(parameters)) return undefined;
+  const target = isRecord(parameters.target) ? parameters.target : undefined;
+  const assertions = Array.isArray(parameters.assertions)
+    ? parameters.assertions
+        .filter(isRecord)
+        .slice(0, 32)
+        .map((assertion) => ({
+          type: typeof assertion.type === 'string' ? assertion.type : 'unknown',
+        }))
+    : [];
+  return {
+    pageId: typeof parameters.pageId === 'string' ? parameters.pageId : undefined,
+    detail: typeof parameters.detail === 'string' ? parameters.detail : undefined,
+    includeAncestors:
+      typeof parameters.includeAncestors === 'boolean'
+        ? parameters.includeAncestors
+        : undefined,
+    timeoutMs: nonNegativeFiniteNumber(parameters.timeoutMs),
+    targetKind: target
+      ? target.nodeId
+        ? 'nodeId'
+        : target.sourceFile
+          ? 'source-location'
+          : target.selectedElement === true
+            ? 'selected-element'
+            : 'unknown'
+      : undefined,
+    assertionTypes: assertions,
+  };
+}
+
+function summarizePreviewDetails(details: unknown): unknown {
+  if (!isPreviewObservationResult(details)) {
+    return {
+      availability: 'unavailable',
+      readiness: 'partial',
+      assertionStatus: 'not-requested',
+      assertionTypes: [],
+      evidence: { kind: 'runtime-structure', precision: 'layout' },
+      reasons: ['observation-tool-error'],
+    };
+  }
+  const identity = details.identity;
+  const detailRecord = isRecord(details) ? details : undefined;
+  const metrics = isRecord(detailRecord?._observationMetrics)
+    ? detailRecord?._observationMetrics
+    : undefined;
+  return {
+    availability: details.availability,
+    readiness: details.readiness,
+    identity: identity
+      ? {
+          schemaVersion: identity.schemaVersion,
+          projectId: identity.projectId,
+          workspaceId: identity.workspaceId,
+          pageId: identity.pageId,
+          runtimeType: identity.runtimeType,
+          surface: identity.surface,
+          previewInstanceId: identity.previewInstanceId,
+          renderGeneration: identity.renderGeneration,
+          revision: identity.revision,
+          ...(identity.rootHash ? { rootHash: identity.rootHash } : {}),
+        }
+      : undefined,
+    assertionStatus: details.assertionStatus,
+    assertionTypes: details.assertions.slice(0, 32).map((assertion) => ({
+      type: assertion.type,
+      status: assertion.status,
+    })),
+    evidence: details.evidence,
+    observedAt: details.observedAt,
+    latencyMs: nonNegativeFiniteNumber(metrics?.latencyMs),
+    payloadBytes: nonNegativeFiniteNumber(metrics?.payloadBytes),
+    reasons: details.reasons?.slice(0, 16),
+  };
 }
 
 function nonNegativeFiniteNumber(value: unknown): number | undefined {
@@ -309,7 +388,10 @@ export class AgentRunLog {
             toolName: event.title,
             kind: event.kind,
             status: event.status,
-            parameters: event.parameters,
+            parameters:
+              event.title === 'observePreview'
+                ? redactPreviewInput(event.parameters)
+                : event.parameters,
           },
         });
         break;
@@ -332,24 +414,47 @@ export class AgentRunLog {
         }
         if (durationMs !== undefined) this.toolDurationSumMs += durationMs;
         this.observeToolDetails(event.details);
-        const toolName = this.toolNames.get(event.toolCallId);
+        const eventToolName = (event as unknown as { toolName?: unknown })
+          .toolName;
+        const toolName =
+          typeof eventToolName === 'string'
+            ? eventToolName
+            : this.toolNames.get(event.toolCallId);
         const isSubagent = isSubagentTool(toolName);
+        const isPreviewObservation = toolName === 'observePreview';
         if (isSubagent) this.subagentResultCount += 1;
         this.append({
           level: event.status === 'failed' ? 'error' : 'info',
           source: isSubagent ? 'subagent' : 'tool',
           eventType: 'tool_call_update',
           title: isSubagent ? 'Subagent task finished' : 'Tool call finished',
-          summary: event.error?.message || event.content,
+          summary: isPreviewObservation
+            ? event.status === 'failed'
+              ? 'Preview observation unavailable'
+              : 'Preview observation recorded'
+            : event.error?.message || event.content,
           toolCallId: event.toolCallId,
           payload: {
             toolName,
             status: event.status,
-            content: event.content,
-            result: event.result,
-            details: event.details,
+            content: isPreviewObservation ? undefined : event.content,
+            result: isPreviewObservation ? undefined : event.result,
+            details: isPreviewObservation
+              ? summarizePreviewDetails(event.details)
+              : event.details,
             durationMs: event.durationMs,
-            error: event.error,
+            // Observation failures can carry page/model-authored text in the
+            // error message. Keep only a bounded code in the durable log.
+            error: isPreviewObservation
+              ? isRecord(event.error) &&
+                typeof (event.error as Record<string, unknown>).code === 'string'
+                ? {
+                    code: String(
+                      (event.error as Record<string, unknown>).code,
+                    ).slice(0, 64),
+                  }
+                : undefined
+              : event.error,
           },
         });
         break;

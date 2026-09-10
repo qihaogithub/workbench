@@ -2,6 +2,7 @@ import {
   DocumentSaveCoordinator,
   DocumentSaveError,
   getDocumentSaveStatusLabel,
+  isDocumentSaveAttentionStatus,
   toDocumentSaveError,
 } from "../document-save-coordinator";
 import {
@@ -65,6 +66,18 @@ function createCoordinator(
 }
 
 describe("DocumentSaveCoordinator", () => {
+  it("只把异常保存状态标记为需要用户关注", () => {
+    expect(isDocumentSaveAttentionStatus("clean")).toBe(false);
+    expect(isDocumentSaveAttentionStatus("dirty")).toBe(false);
+    expect(isDocumentSaveAttentionStatus("saving")).toBe(false);
+    expect(isDocumentSaveAttentionStatus("saved")).toBe(false);
+    expect(isDocumentSaveAttentionStatus("offline")).toBe(true);
+    expect(isDocumentSaveAttentionStatus("authority-degraded")).toBe(true);
+    expect(isDocumentSaveAttentionStatus("conflict")).toBe(true);
+    expect(isDocumentSaveAttentionStatus("permission-denied")).toBe(true);
+    expect(isDocumentSaveAttentionStatus("validation-failed")).toBe(true);
+  });
+
   it("只在保存拿到成功回执后清理本地草稿", async () => {
     const save = jest.fn(async () => ({ revision: 7 }));
     const { coordinator, store, states } = createCoordinator(save);

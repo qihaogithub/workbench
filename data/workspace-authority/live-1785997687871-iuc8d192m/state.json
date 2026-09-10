@@ -1,16 +1,16 @@
 {
   "workspaceId": "live-1785997687871-iuc8d192m",
   "projectId": "proj_1783042627508_t1czw2",
-  "revision": 38,
-  "rootHash": "c7b841b3f761ab195dbda1e243c17293637ee8d7c05ebc03c93447891eb2fd9f",
+  "revision": 39,
+  "rootHash": "6556f1d089523bfe727a52be28007a08bfc21340e8206fa6c8c3da595bb26359",
   "resourceHashes": {
     ".canvas-layout.json": "e743b6552eaa1e4bfde922d091bc0156f1f1b965adffff04c5057c4e275c4888",
     "convention.md": "158377baa50f92f0ff3e30302ba56e5474abd7e8d88b96780b8fb827e9aed296",
-    "demos/pad-react_3gok/config.schema.json": "699d597b88f65d8b5a475efe4a644da578a511fc8e55508fbfaab5785307894b",
+    "demos/pad-react_3gok/config.schema.json": "eec79d2de271f515cb9e635ec88ac5dd763cf8930bcc6fcd01b93fc210193964",
     "demos/pad-react_3gok/index.tsx": "1411bf5f1a2ba822dbf5bfb15ddb09de0438812217ab1ef96b2b8bdf05907c44",
     "demos/pad-react_3gok/prototype.css": "1adcb21d886c645c0381864741cebff5660f4d9f37bc013e5086cb9976effd81",
     "demos/pad-react_3gok/prototype.html": "2864c611d38e0e8bfc278ade54561813302279817fdc5f30c3f5ae23015de5ee",
-    "demos/page_lib0/config.schema.json": "2eadb967b2a7b2a5129261b6c3c1991c9e56266e31c79affedc91f1d318d57a0",
+    "demos/page_lib0/config.schema.json": "f1fab2bf2bd65d53c565f7b8b6503f24084de6fcc06210014c231fef127c7399",
     "demos/page_lib0/index.tsx": "846fbe246199ace568f2dbfb9884ce5159ecca00fcc6d238820ca24adc516860",
     "demos/page_lib0/prototype.css": "d7b04bec0d32e350700f9247e390a8a313d95454f8ddcc7238f5fb684e86fc4e",
     "demos/page_lib0/prototype.html": "f4e6153070a6809eca337f9732235e32b844b25c6febf2a13a851c5c7995e408",
@@ -58,5 +58,5 @@
     "ac014e9a-2f6b-4572-aa45-b4c765241a8e": "a0872f52e27a1d115f1d29731f93d826206ce576a8ea33060235ecc67b000e56",
     "899a4ce7-2822-4a61-af31-7381ca8e00db": "4a695a6203f5731338cc8d1bb810521cb20c918e1a5d6eb57cc8aa4f3117038d"
   },
-  "updatedAt": 1786011362561
+  "updatedAt": 1789005928087
 }

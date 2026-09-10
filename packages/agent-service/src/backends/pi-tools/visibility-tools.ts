@@ -803,6 +803,7 @@ export function createPrepareConfigVisibilityDraftTool(config: AgentConfig): Age
         drafts.set(id, {
           id,
           sessionId: config.sessionId,
+          ...(config.runId ? { runId: config.runId } : {}),
           projectId: workspaceContext.live.projectId,
           workspaceId: workspaceContext.live.workspaceId,
           baseRevision: workspaceContext.snapshot.state.revision,
@@ -934,7 +935,7 @@ export function createCommitConfigVisibilityDraftTool(
           sessionId: config.sessionId,
           baseRevision: draft.baseRevision,
           baseRootHash: draft.baseRootHash,
-          actor: "ai",
+          actor: config.mutationActor ?? "ai",
           reason: "config_visibility_draft_commit",
           operations: draft.operations,
         };

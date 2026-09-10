@@ -1,5 +1,12 @@
 "use client";
-import React, { lazy, Suspense, useMemo, useState } from "react";
+import React, {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Route } from "lucide-react";
 import { resolvePagePresentation } from "@workbench/shared";
 
@@ -32,6 +39,9 @@ function DefaultEmptyState() {
 
 function SinglePagePreviewInternal({
   page,
+  previewObservationRegistry,
+  previewObservationContext,
+  previewRevision,
   rendererProps,
   emptyState,
   className,
@@ -60,6 +70,60 @@ function SinglePagePreviewInternal({
       page?.presentation ??
       (page?.schema ? resolvePagePresentation(page.schema) : undefined),
     [page?.schema, page?.presentation],
+  );
+  const observationHostRef = useRef<HTMLDivElement>(null);
+  const observationPageId = page?.id;
+  const observationRuntimeType = page?.runtimeType;
+  useEffect(() => {
+    const runtimeType = observationRuntimeType;
+    const context = previewObservationContext;
+    const root = observationHostRef.current;
+    if (
+      !previewObservationRegistry ||
+      !context ||
+      !root ||
+      !observationPageId ||
+      (runtimeType !== "sandboxed-html" && runtimeType !== "sketch-scene")
+    ) {
+      return;
+    }
+    return previewObservationRegistry.register({
+      identity: {
+        schemaVersion: 1,
+        projectId: context.projectId,
+        workspaceId: context.workspaceId,
+        pageId: observationPageId,
+        runtimeType,
+        surface: "active-single-page",
+        previewInstanceId: `single-page:${observationPageId}`,
+        renderGeneration: 0,
+        revision: previewRevision ?? 0,
+        rootHash: context.rootHash,
+      },
+      root,
+      capabilities:
+        runtimeType === "sandboxed-html" ? ["limited-host-facts"] : [],
+    });
+  }, [
+    observationPageId,
+    observationRuntimeType,
+    previewObservationContext,
+    previewObservationContext?.projectId,
+    previewObservationContext?.workspaceId,
+    previewObservationContext?.rootHash,
+    previewObservationRegistry,
+    previewRevision,
+  ]);
+  const visibilityRegions = useMemo(
+    () =>
+      page
+        ? Object.fromEntries(
+            Object.entries(page.visibilityRegions ?? {})
+              .filter(([key]) => key.startsWith(`${page.id}:`))
+              .map(([key, state]) => [key.slice(page.id.length + 1), state]),
+          )
+        : {},
+    [page?.id, page?.visibilityRegions],
   );
   const [uncontrolledNavigationActive, setUncontrolledNavigationActive] =
     useState(false);
@@ -99,11 +163,7 @@ function SinglePagePreviewInternal({
         title={page.name}
         previewSize={previewSize}
         configData={page.configData}
-        visibilityRegions={Object.fromEntries(
-          Object.entries(page.visibilityRegions ?? {})
-            .filter(([key]) => key.startsWith(`${page.id}:`))
-            .map(([key, state]) => [key.slice(page.id.length + 1), state]),
-        )}
+        visibilityRegions={visibilityRegions}
         demoId={iframeProps?.demoId ?? page.id}
       />
     );
@@ -116,11 +176,7 @@ function SinglePagePreviewInternal({
         css={page.prototypeCss}
         previewSize={previewSize}
         configData={page.configData}
-        visibilityRegions={Object.fromEntries(
-          Object.entries(page.visibilityRegions ?? {})
-            .filter(([key]) => key.startsWith(`${page.id}:`))
-            .map(([key, state]) => [key.slice(page.id.length + 1), state]),
-        )}
+        visibilityRegions={visibilityRegions}
         demoId={prototypeProps?.demoId ?? page.id}
         allowScroll={prototypeProps?.allowScroll ?? true}
       />
@@ -163,15 +219,28 @@ function SinglePagePreviewInternal({
   }
 
   return (
-    <div className={cn("relative h-full min-h-0", className)}>
+    <div
+      ref={observationHostRef}
+      className={cn("relative h-full min-h-0", className)}
+    >
       <style>{`
         .preview-stage-single-scroll::-webkit-scrollbar {
           display: none;
         }
       `}</style>
       {page && navigationEditable && showNavigationTool && (
-        <button type="button" className={cn("absolute right-5 top-5 z-40 flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border bg-background/90 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", navigationActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground")}
-          aria-label="绘制页面跳转热区" aria-pressed={navigationActive} title="绘制页面跳转热区" onClick={() => setNavigationActive(!navigationActive)}>
+        <button
+          type="button"
+          className={cn(
+            "absolute right-5 top-5 z-40 flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border bg-background/90 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            navigationActive &&
+              "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
+          )}
+          aria-label="绘制页面跳转热区"
+          aria-pressed={navigationActive}
+          title="绘制页面跳转热区"
+          onClick={() => setNavigationActive(!navigationActive)}
+        >
           <Route className="h-4 w-4" />
         </button>
       )}
@@ -214,20 +283,45 @@ function SinglePagePreviewInternal({
         }}
       >
         {content}
-        {page?.visibilityStatus && (page.visibilityStatus.visible === false || page.visibilityStatus.enabled === false || page.visibilityStatus.unavailable === true) && (
-          <div className="pointer-events-none absolute inset-4 z-30 flex items-center justify-center rounded-md bg-slate-900/20">
-            <span className="flex flex-col items-center gap-0.5 rounded-md bg-background/90 px-3 py-1.5 text-center text-xs text-muted-foreground shadow-sm">
-              <span>{page.visibilityStatus.unavailable ? "业务配置不可用" : page.visibilityStatus.visible === false ? "业务配置已隐藏" : "业务配置已禁用"}</span>
-              {page.visibilityStatus.message ? <span className="max-w-[280px] text-[10px]">{page.visibilityStatus.message}</span> : null}
-              {page.visibilityStatus.reasons?.length ? (
-                <span className="max-w-[280px] truncate text-[10px]">
-                  由配置「{[...new Set(page.visibilityStatus.reasons.flatMap((reason) => reason.fieldKeys ?? [reason.fieldKey]))].join("、")}」控制
+        {page?.visibilityStatus &&
+          (page.visibilityStatus.visible === false ||
+            page.visibilityStatus.enabled === false ||
+            page.visibilityStatus.unavailable === true) && (
+            <div className="pointer-events-none absolute inset-4 z-30 flex items-center justify-center rounded-md bg-slate-900/20">
+              <span className="flex flex-col items-center gap-0.5 rounded-md bg-background/90 px-3 py-1.5 text-center text-xs text-muted-foreground shadow-sm">
+                <span>
+                  {page.visibilityStatus.unavailable
+                    ? "业务配置不可用"
+                    : page.visibilityStatus.visible === false
+                      ? "业务配置已隐藏"
+                      : "业务配置已禁用"}
                 </span>
-              ) : null}
-              {page.visibilityStatus.fallbackPageId ? <span className="text-[10px]">备用页：{page.visibilityStatus.fallbackPageId}</span> : null}
-            </span>
-          </div>
-        )}
+                {page.visibilityStatus.message ? (
+                  <span className="max-w-[280px] text-[10px]">
+                    {page.visibilityStatus.message}
+                  </span>
+                ) : null}
+                {page.visibilityStatus.reasons?.length ? (
+                  <span className="max-w-[280px] truncate text-[10px]">
+                    由配置「
+                    {[
+                      ...new Set(
+                        page.visibilityStatus.reasons.flatMap(
+                          (reason) => reason.fieldKeys ?? [reason.fieldKey],
+                        ),
+                      ),
+                    ].join("、")}
+                    」控制
+                  </span>
+                ) : null}
+                {page.visibilityStatus.fallbackPageId ? (
+                  <span className="text-[10px]">
+                    备用页：{page.visibilityStatus.fallbackPageId}
+                  </span>
+                ) : null}
+              </span>
+            </div>
+          )}
         {page && (
           <PageNavigationOverlay
             pageId={page.id}
@@ -271,6 +365,18 @@ function areSinglePagePreviewPropsEqual(
     prev.onUpdateNavigationHotspot !== next.onUpdateNavigationHotspot ||
     prev.onUpdateNavigationTarget !== next.onUpdateNavigationTarget ||
     prev.onDeleteNavigationHotspot !== next.onDeleteNavigationHotspot
+  ) {
+    return false;
+  }
+  if (
+    prev.previewObservationRegistry !== next.previewObservationRegistry ||
+    prev.previewRevision !== next.previewRevision ||
+    prev.previewObservationContext?.projectId !==
+      next.previewObservationContext?.projectId ||
+    prev.previewObservationContext?.workspaceId !==
+      next.previewObservationContext?.workspaceId ||
+    prev.previewObservationContext?.rootHash !==
+      next.previewObservationContext?.rootHash
   ) {
     return false;
   }

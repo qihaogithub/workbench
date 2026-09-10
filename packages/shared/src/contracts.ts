@@ -254,6 +254,8 @@ export interface WorkspaceMutationRequest {
   projectId: string;
   workspaceId: string;
   sessionId?: string;
+  /** Agent run identity used to correlate receipts with a conversation run. */
+  runId?: string;
   baseRevision: WorkspaceRevision;
   /** Optional frozen root cursor for workflows that approve a complete snapshot. */
   baseRootHash?: string;
@@ -271,6 +273,9 @@ export interface WorkspaceMutationReceipt {
   revision: WorkspaceRevision;
   rootHash: string;
   actor: WorkspaceMutationActor;
+  /** Correlation identity; omitted by legacy non-Agent callers. */
+  sessionId?: string;
+  runId?: string;
   resources: Array<{
     path: string;
     action: "created" | "modified" | "deleted" | "moved";

@@ -1,11 +1,11 @@
 {
   "workspaceId": "live-1786594473578-rchdm4fq4",
   "projectId": "proj_1786594473562_unsc1p",
-  "revision": 9,
-  "rootHash": "25bad5f422b882d62e37d72c60bc08c8a69f10a6c135ce473576ae5ee2ba2dad",
+  "revision": 10,
+  "rootHash": "e30c35012c14e080264337cdfecd44cf789c83943b14f605dc1af1c1c87cca76",
   "resourceHashes": {
     ".canvas-layout.json": "7aabdf98516dfe4fea1be8bba42232f4524f3668e6cedb1bdd1b6ebba1ecd140",
-    "demos/page_udwf/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_udwf/config.schema.json": "e60e8ef12ce527b4b4d0bbea8cfe06d51ab000e478bb13fb5576b216a8e0a209",
     "demos/page_udwf/index.tsx": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_udwf/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_udwf/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
@@ -23,5 +23,5 @@
     "f9d6609d-9cde-404a-94f4-aca36508b77c": "a461453bf33cff932dd462dfa848074e8b9814f19bd66bd11c17505c460baa24",
     "ffc65fa9-7c1a-4d7e-966c-9c256e117cd8": "1d637dc99bb7505b8c4c6ae048ab5ff5590a7760b586392eca82f37d265b6605"
   },
-  "updatedAt": 1786594485244
+  "updatedAt": 1789005941127
 }

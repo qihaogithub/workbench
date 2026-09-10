@@ -59,15 +59,22 @@ export interface UseWorkspaceAuthorityStateOptions {
   enabled?: boolean;
 }
 
-export interface UseWorkspaceAuthorityStateReturn extends WorkspaceAuthorityState {
+export interface UseWorkspaceAuthorityStateReturn
+  extends WorkspaceAuthorityState {
   /** 递增 draftVersion（每次本地变更调用） */
   markDraftChanged: () => void;
   /** 向 Authority 发送预览投影 ack */
-  ackPreview: (revision: WorkspaceRevision, status: "applied" | "failed") => void;
+  ackPreview: (
+    revision: WorkspaceRevision,
+    status: "applied" | "failed",
+  ) => void;
   /** 手动触发一次状态拉取 */
   refresh: () => Promise<void>;
   /** 设置 canonical 同步状态 */
-  setCanonicalStatus: (status: CanonicalStatus, revision?: number | null) => void;
+  setCanonicalStatus: (
+    status: CanonicalStatus,
+    revision?: number | null,
+  ) => void;
   /** 设置资源冲突 */
   setConflict: (conflict: WorkspaceAuthorityConflict | null) => void;
 }
@@ -82,9 +89,11 @@ function publishWorkspaceProjectionAck(
   ack: WorkspaceProjectionAck,
 ): void {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(WORKSPACE_PROJECTION_ACK_EVENT, {
-    detail: { projectId, workspaceId, sessionId, ack },
-  }));
+  window.dispatchEvent(
+    new CustomEvent(WORKSPACE_PROJECTION_ACK_EVENT, {
+      detail: { projectId, workspaceId, sessionId, ack },
+    }),
+  );
 }
 
 export function useWorkspaceAuthorityState(
@@ -108,6 +117,8 @@ export function useWorkspaceAuthorityState(
     hasGap: false,
     conflict: null,
   });
+  const committedRevisionRef = useRef(0);
+  committedRevisionRef.current = state.committedRevision;
 
   /** 跟踪上次拉取事件时的 revision，用于 gap 检测 */
   const lastPolledRevisionRef = useRef<number>(0);
@@ -137,7 +148,10 @@ export function useWorkspaceAuthorityState(
       lastPolledRevisionRef.current = snapshot.revision;
     } catch (error: unknown) {
       if (!mountedRef.current) return;
-      if (error instanceof WorkspaceAuthorityClientError && error.status === 401) {
+      if (
+        error instanceof WorkspaceAuthorityClientError &&
+        error.status === 401
+      ) {
         return;
       }
       setState((prev) => ({
@@ -150,7 +164,8 @@ export function useWorkspaceAuthorityState(
   const pollProjectionAcks = useCallback(async () => {
     if (!authorityReady) return;
     try {
-      const afterRevision = lastPolledProjectionRevisionRef.current as WorkspaceRevision;
+      const afterRevision =
+        lastPolledProjectionRevisionRef.current as WorkspaceRevision;
       const acks = await readWorkspaceProjectionAcksFromBrowser({
         projectId,
         workspaceId,
@@ -170,7 +185,10 @@ export function useWorkspaceAuthorityState(
       setState((prev) => {
         let next = prev;
         for (const ack of acks) {
-          if (ack.revision > next.previewAppliedRevision) {
+          if (
+            ack.status === "applied" &&
+            ack.revision > next.previewAppliedRevision
+          ) {
             next = {
               ...next,
               previewAppliedRevision: ack.revision,
@@ -233,7 +251,10 @@ export function useWorkspaceAuthorityState(
       });
     } catch (error: unknown) {
       if (!mountedRef.current) return;
-      if (error instanceof WorkspaceAuthorityClientError && error.status === 401) {
+      if (
+        error instanceof WorkspaceAuthorityClientError &&
+        error.status === 401
+      ) {
         return;
       }
       consecutiveFailuresRef.current += 1;
@@ -285,12 +306,24 @@ export function useWorkspaceAuthorityState(
 
   const ackPreview = useCallback(
     (revision: WorkspaceRevision, status: "applied" | "failed") => {
-      if (!authorityReady) return;
-      setState((prev) => ({
-        ...prev,
-        previewStatus: status === "applied" ? "applied" : "failed",
-        previewAppliedRevision: revision,
-      }));
+      if (!authorityReady || revision !== committedRevisionRef.current) return;
+      const acknowledgedAt = Date.now();
+      setState((prev) => {
+        if (
+          prev.previewStatus === status &&
+          (status !== "applied" || prev.previewAppliedRevision >= revision)
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          previewStatus: status === "applied" ? "applied" : "failed",
+          previewAppliedRevision:
+            status === "applied"
+              ? Math.max(prev.previewAppliedRevision, revision)
+              : prev.previewAppliedRevision,
+        };
+      });
       publishWorkspaceProjectionAck(projectId, workspaceId, sessionId, {
         projectId,
         workspaceId,
@@ -298,7 +331,7 @@ export function useWorkspaceAuthorityState(
         clientId: sessionId,
         surface: "active-preview",
         status,
-        acknowledgedAt: Date.now(),
+        acknowledgedAt,
       });
       // 异步发送 ack（不阻塞 UI）
       void acknowledgeWorkspaceProjectionFromBrowser({
@@ -309,7 +342,7 @@ export function useWorkspaceAuthorityState(
         clientId: sessionId,
         surface: "active-preview",
         status,
-        acknowledgedAt: Date.now(),
+        acknowledgedAt,
       }).catch(() => {
         // ack 失败静默处理，下次轮询会重新获取
       });

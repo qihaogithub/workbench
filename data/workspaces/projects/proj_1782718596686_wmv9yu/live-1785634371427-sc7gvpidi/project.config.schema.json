@@ -37,6 +37,10 @@
         "visibleWhen": {
           "field": "mediaType",
           "equals": "image"
+        },
+        "widthRule": {
+          "operator": "=",
+          "value": 670
         }
       }
     },

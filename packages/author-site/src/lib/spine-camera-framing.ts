@@ -35,6 +35,71 @@ export interface SpineCameraFrame {
   zoom: number;
 }
 
+/**
+ * The deliberately small, non-secret snapshot exposed by the canonical
+ * preview SDK's Spine probe.  This is runtime structure evidence, not a
+ * compositor guarantee: skeleton bounds are reported as
+ * `runtime-self-reported`, while a sampled painted rectangle projected into
+ * the iframe viewport is reported as `painted-bounds`.
+ */
+export interface SpineProbeSnapshot {
+  kind: "spine";
+  ready: boolean;
+  animationName?: string;
+  animationPlaying?: boolean;
+  loopEnabled?: boolean;
+  trackTime?: number;
+  duration?: number;
+  skeletonBounds?: SpineBounds;
+  camera?: SpineCameraState & { viewportWidth: number; viewportHeight: number };
+  fit: SpineFit;
+  alignment: SpineAlignment;
+  canvas: {
+    cssWidth: number;
+    cssHeight: number;
+    backingWidth: number;
+    backingHeight: number;
+  };
+  paintedBounds?: SpineBounds;
+  sampledAt: number;
+  precision: "runtime-self-reported" | "painted-bounds";
+}
+
+export interface SpineProbeTarget {
+  /** Stable internal property used by the host to find the realm-local API. */
+  __workbenchPreviewProbe__?: {
+    inspect?: () => SpineProbeSnapshot | null;
+  };
+}
+
+const MAX_PROBE_COORDINATE = 100_000;
+const MAX_PROBE_SIZE = 10_000;
+
+function isBoundedFinite(value: unknown, max: number): value is number {
+  return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= max;
+}
+
+/** Reject malformed or unreasonably large rectangles before they leave the iframe. */
+export function isSafeSpineProbeBounds(value: unknown): value is SpineBounds {
+  if (!value || typeof value !== "object") return false;
+  const bounds = value as Partial<SpineBounds>;
+  return (
+    isBoundedFinite(bounds.x, MAX_PROBE_COORDINATE) &&
+    isBoundedFinite(bounds.y, MAX_PROBE_COORDINATE) &&
+    isBoundedFinite(bounds.width, MAX_PROBE_SIZE) &&
+    isBoundedFinite(bounds.height, MAX_PROBE_SIZE) &&
+    bounds.width >= 0 &&
+    bounds.height >= 0
+  );
+}
+
+/** A defensive copy prevents a caller from mutating a registered snapshot. */
+export function copySafeSpineProbeBounds(value: unknown): SpineBounds | undefined {
+  return isSafeSpineProbeBounds(value)
+    ? { x: value.x, y: value.y, width: value.width, height: value.height }
+    : undefined;
+}
+
 const FITS = new Set<SpineFit>(["contain", "cover", "none"]);
 const ALIGNMENTS = new Set<SpineAlignment>([
   "top-left",

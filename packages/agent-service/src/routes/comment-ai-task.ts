@@ -16,6 +16,7 @@
  * 中断恢复：服务启动时调用 recoverCommentTasksOnStartup() 重新入队。
  */
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import crypto from "node:crypto";
 import * as fs from "fs";
 import * as path from "path";
 import type { CommentThread, CommentAiTaskStatus } from "@workbench/shared";
@@ -272,6 +273,9 @@ async function runCommentTaskLoop(session: CommentTaskSession): Promise<void> {
         const sessionId = `comment-task-${projectId}-${authorizationKey}`;
         const config: AgentConfig = {
           sessionId,
+          // Comment batches run outside a browser conversation, but their
+          // mutations still need a durable per-batch correlation identity.
+          runId: `comment:${projectId}:${iteration}:${crypto.randomUUID()}`,
           workingDir,
           projectId,
           model: resolveDefaultModelId(),

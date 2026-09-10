@@ -3,6 +3,7 @@ import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrototypePagePreview } from "./PrototypePagePreview";
+import { PreviewObservationRegistry } from "./preview-observation-registry";
 
 function getPrototypeRoot(container: HTMLElement): HTMLElement {
   const host = container.querySelector<HTMLElement>("[data-prototype-preview]");
@@ -125,6 +126,49 @@ describe("PrototypePagePreview 文本直接编辑", () => {
     expect(
       host.shadowRoot.getElementById("prototype-visual-selection-cursor"),
     ).not.toBeNull();
+  });
+
+  it("等价的观察上下文对象重渲染时不重复触发 content-loaded", () => {
+    const onContentLoaded = vi.fn();
+    const previewObservationRegistry = new PreviewObservationRegistry();
+    const configData = {};
+    const visibilityRegions = {};
+    const visualPropertyChanges: never[] = [];
+    const baseProps = {
+      html: "<button>保存</button>",
+      demoId: "page-1",
+      previewRevision: 3,
+      previewObservationRegistry,
+      onContentLoaded,
+      configData,
+      visibilityRegions,
+      visualPropertyChanges,
+    };
+    const { rerender } = render(
+      <PrototypePagePreview
+        {...baseProps}
+        previewObservationContext={{
+          projectId: "project-1",
+          workspaceId: "workspace-1",
+          rootHash: "hash-1",
+        }}
+      />,
+    );
+
+    expect(onContentLoaded).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <PrototypePagePreview
+        {...baseProps}
+        previewObservationContext={{
+          projectId: "project-1",
+          workspaceId: "workspace-1",
+          rootHash: "hash-1",
+        }}
+      />,
+    );
+
+    expect(onContentLoaded).toHaveBeenCalledTimes(1);
   });
 
   it("点击实际元素不会触发宿主空白清空逻辑", () => {

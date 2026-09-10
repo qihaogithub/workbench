@@ -437,16 +437,29 @@
       "workspaceRevision": 157,
       "workspaceRootHash": "b3030539cbe31d7ec7047def25426b9dcbb778293cf2225c3e1002621ce978cf",
       "note": "停止编辑后自动保存记录"
+    },
+    {
+      "versionId": "v38",
+      "type": "publish_snapshot",
+      "savedAt": 1789027442037,
+      "savedBy": "system",
+      "sessionId": "publish-1789027441962",
+      "snapshotPath": "/Users/qh2/Documents/PGM/1·Work/workbench/data/snapshots/proj_1779608460372/v38",
+      "fileCount": 27,
+      "workspaceId": "live-1784638685509-ygoh75gy6",
+      "workspaceRevision": 161,
+      "workspaceRootHash": "1d2cf8ec81d141f5ad86c77933a43db71af9f2c3bafd8e84a039b55643270bb5",
+      "note": "发布快照"
     }
   ],
   "createdAt": 1779608460372,
-  "updatedAt": 1788494473300,
+  "updatedAt": 1789027442037,
   "activeWorkspaceId": "live-1784638685509-ygoh75gy6",
-  "activeWorkspaceUpdatedAt": 1786699513972,
+  "activeWorkspaceUpdatedAt": 1788494473302,
   "canonicalSyncedWorkspaceId": "live-1784638685509-ygoh75gy6",
-  "canonicalSyncedRevision": 157,
-  "canonicalSyncedRootHash": "b3030539cbe31d7ec7047def25426b9dcbb778293cf2225c3e1002621ce978cf",
-  "canonicalSyncedAt": 1788494473261,
-  "publishedVersion": "v36",
-  "publishedAt": 1786699513996
+  "canonicalSyncedRevision": 161,
+  "canonicalSyncedRootHash": "1d2cf8ec81d141f5ad86c77933a43db71af9f2c3bafd8e84a039b55643270bb5",
+  "canonicalSyncedAt": 1789027439501,
+  "publishedVersion": "v38",
+  "publishedAt": 1789027442064
 }

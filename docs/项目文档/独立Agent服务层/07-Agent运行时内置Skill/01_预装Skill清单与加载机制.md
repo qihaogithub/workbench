@@ -16,7 +16,7 @@ covers:
 
 # Agent 运行时内置 Skill 清单与加载机制
 
-> 更新日期：2026-09-06
+> 更新日期：2026-09-10
 > 状态：已实现
 
 ## 一、定位
@@ -70,7 +70,7 @@ Skill 正文的源码文件是各目录下的 `SKILL.md`；本文只维护清单
 
 `page-deletion` 还会根据当前工具集过滤：只有会话包含页面删除相关工具时，才向 Agent 展示该 Skill。这个过滤只影响首轮提示词展示，不改变服务端权限检查。
 
-主 Agent 和普通子 Agent 使用同一套预装 Skill。子 Agent 不能继续创建子 Agent；在 live Workspace 中，`delegateTask` 当前被 Authority 防线阻止，因此 Skill 共享不代表可以绕过工作区写入边界。
+主 Agent 和普通子 Agent 使用同一套预装 Skill。子 Agent 不能继续创建子 Agent；在 live Workspace 中，`delegateTask` 可运行但文件写入必须经 Authority 的按文件队列、CAS、actor/runId 与 receipt 约束，因此 Skill 共享不代表可以绕过工作区写入边界。
 
 ## 四、Skill 之间的协作边界
 

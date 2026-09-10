@@ -128,6 +128,8 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
 
       try {
         const server = getHocuspocusCollabServer();
+        const validation = server.persistence.validateSession(descriptor);
+        if (!validation.ok) return collabFailure(reply, new Error(validation.reason || "COLLAB_FORBIDDEN"));
         const documentName = encodeDocumentName({
           projectId: descriptor.projectId,
           workspaceId: descriptor.workspaceId,
@@ -173,13 +175,14 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
     },
   );
 
-  // ── Yjs-First unified write endpoint ──────────────────────────────────
-  // All non-collab write paths (Pi tools, HTTP routes) write text content
-  // through this endpoint so that the Yjs room is the single content authority.
+  // ── Internal Yjs room projection endpoint ─────────────────────────────
+  // Human room edits use Yjs. Internal callers may replace a room only with
+  // an optional CAS precondition; Agent tools use Workspace Authority directly
+  // and must not silently fall back to this endpoint.
   fastify.post<{
     Params: CollabParams;
     Querystring: CollabQuery;
-    Body: { content?: string };
+    Body: { content?: string; expectedHash?: string; expectedAbsent?: boolean };
   }>(
     "/api/collab/projects/:projectId/workspaces/:workspaceId/write",
     async (request, reply) => {
@@ -194,10 +197,17 @@ export async function registerCollabRoutes(fastify: FastifyInstance): Promise<vo
         reply.status(400);
         return { success: false, error: { code: "INVALID_REQUEST", message: "content 必须为字符串" } };
       }
+      if (typeof request.body?.expectedHash !== "string" && request.body?.expectedAbsent !== true) {
+        reply.status(400);
+        return { success: false, error: { code: "INVALID_REQUEST", message: "write 必须携带 expectedHash 或 expectedAbsent" } };
+      }
 
       try {
         const server = getHocuspocusCollabServer();
-        const result = await server.writeToResource(descriptor, content);
+        const result = await server.writeToResource(descriptor, content, {
+          ...(typeof request.body?.expectedHash === "string" ? { expectedHash: request.body.expectedHash } : {}),
+          ...(request.body?.expectedAbsent === true ? { expectedAbsent: true } : {}),
+        });
         return { success: true, data: result };
       } catch (error) {
         return collabFailure(reply, error);

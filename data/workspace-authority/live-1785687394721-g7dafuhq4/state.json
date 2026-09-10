@@ -1,14 +1,14 @@
 {
   "workspaceId": "live-1785687394721-g7dafuhq4",
   "projectId": "proj_1785687393956_aa29zz",
-  "revision": 247,
-  "rootHash": "65fad057b8a2d53166d291728b0ec3d13fa8a681c65baf04fb7d9a64128401fb",
+  "revision": 248,
+  "rootHash": "2aa1ef164f958219d1759be40726654a1f1be4e89cca6bd5e062d963b0b15dbc",
   "resourceHashes": {
     ".canvas-layout.json": "f6dd849dbd0cb7cf686e57413e257c9cb6ba97c0a942d475c39606d56ecc898a",
     "convention.md": "2124f6c062cee7256dc600d113de777bb131ff8dfa784b6a47fecbaa7cb39d4e",
-    "demos/config-highfidelity_p3n5/config.schema.json": "1951ae00c7233cf17943ac20e526e2a01bba49d3f9f220007750540026b4ee0d",
+    "demos/config-highfidelity_p3n5/config.schema.json": "d086f4f32e3786bd658d9cb7330684d9d73a4de899aa6917be4c3428f513358e",
     "demos/config-highfidelity_p3n5/index.tsx": "6ae9cd7f1d98fe60f5d64ff2064e1499d650469d617b4de780d3b38481273449",
-    "demos/prototype-mvp_a1b2/config.schema.json": "ca8d6737ed07eeb88f422dee86c4a94d51f6b18fe7f04a511749ce3f373aa75b",
+    "demos/prototype-mvp_a1b2/config.schema.json": "30f9522a16dbda01d60b5280d2212efc32015be40d5c511f7880b9626223996b",
     "demos/prototype-mvp_a1b2/prototype.css": "136d9b583daaf1191124e1bac63345a65b6548a041403370fd0336caf3d26969",
     "demos/prototype-mvp_a1b2/prototype.html": "580d8a9b324658f697ae9046ca415e766b0944503406ac0dde29895d6885b7b9",
     "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
@@ -253,5 +253,5 @@
     "a2bbb166-f4a9-43e4-bbd7-e815cc91b4ed": "a903dc301c99376db19bd57b1af045a53ff0db39889eed2a94d2638fbac665f3",
     "878699ea-8f20-4fd4-b14d-2cc84308532b": "fb2e66f38e805f4b0f66811f8a851c092cb53bc49b9cf98dae6129a9a411664d"
   },
-  "updatedAt": 1785742763014
+  "updatedAt": 1789005913381
 }

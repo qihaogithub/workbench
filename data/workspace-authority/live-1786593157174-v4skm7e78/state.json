@@ -1,19 +1,19 @@
 {
   "workspaceId": "live-1786593157174-v4skm7e78",
   "projectId": "proj_1786593156882_ms9221",
-  "revision": 20,
-  "rootHash": "bed5ee0ed300ccd93d36fbcdc598dd98f6abcea1f41968faa472e9394fa8c55d",
+  "revision": 21,
+  "rootHash": "0be89bc88588e7b43c387d0680ba16cbd0a69ad0dcf24109c4b66417c2b3d593",
   "resourceHashes": {
     ".canvas-layout.json": "bf73ffe821ebd6eae90cd0201e74a5e6b42709ae1f846516cef6eb7d1f5a40c4",
-    "demos/3e818f_y4go/config.schema.json": "86c12c81311665b2f19ef6fc5b991719e8982d40fb58ae13fad07771f0a608f7",
+    "demos/3e818f_y4go/config.schema.json": "98c98a1247564a3110316df6954c8f21119843b7d58a2c85cb8c19d145051ae1",
     "demos/3e818f_y4go/index.tsx": "47a1b543335be1b358ba7ada587a74601838f071d033dfa0150cb91a9e64b043",
     "demos/3e818f_y4go/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/3e818f_y4go/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
-    "demos/page_3e41/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_3e41/config.schema.json": "e60e8ef12ce527b4b4d0bbea8cfe06d51ab000e478bb13fb5576b216a8e0a209",
     "demos/page_3e41/index.tsx": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_3e41/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_3e41/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
-    "demos/page_ijmc/config.schema.json": "86c12c81311665b2f19ef6fc5b991719e8982d40fb58ae13fad07771f0a608f7",
+    "demos/page_ijmc/config.schema.json": "98c98a1247564a3110316df6954c8f21119843b7d58a2c85cb8c19d145051ae1",
     "demos/page_ijmc/index.tsx": "47a1b543335be1b358ba7ada587a74601838f071d033dfa0150cb91a9e64b043",
     "demos/page_ijmc/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_ijmc/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
@@ -44,5 +44,5 @@
     "53801626-c4e4-4b66-b696-f30b108ff63f": "bd7e256085fc9232718d4e98eb9299d09005281d1c5a95076331590495c7e387",
     "c9f3f081-25d7-4d70-949c-9b14da10bf3c": "f5c22845d874797a7d8631a9d8e0f9ccb739d28440473aa98be752a75d8d5bbc"
   },
-  "updatedAt": 1786593276199
+  "updatedAt": 1789005932989
 }

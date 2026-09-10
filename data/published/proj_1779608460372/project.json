@@ -1,9 +1,9 @@
 {
   "id": "proj_1779608460372",
   "name": "底部弹窗",
-  "publishedVersion": "v36",
-  "commitId": "commit_1786699513982_twlwzh",
-  "publishedAt": 1786699513985,
+  "publishedVersion": "v38",
+  "commitId": "commit_1789027442047_rhmnld",
+  "publishedAt": 1789027442048,
   "demoPages": [
     {
       "id": "demo_1779608460501_abc123",
@@ -11,11 +11,23 @@
       "routeKey": "demo",
       "order": 0,
       "parentId": null,
+      "regionIds": [],
       "runtimeType": "prototype-html-css",
       "schemaPath": "demos/demo_1779608460501_abc123/schema.json",
       "previewSize": {
         "width": 375,
         "height": 812
+      },
+      "presentation": {
+        "version": 1,
+        "mode": "responsive-page",
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "heightBehavior": "content",
+        "preset": "custom",
+        "source": "user"
       },
       "screenshotPath": "screenshots/demo_1779608460501_abc123.png",
       "prototypeHtml": "<div class=\"phone-popup-container\">\n  <div class=\"phone-popup-bg\"></div>\n  <div class=\"phone-popup-overlay\">\n    <div class=\"phone-popup-content\">\n      <img\n        class=\"phone-popup-image\"\n        src=\"/data/proj_1779608460372/assets/images/7ff9e09eafad61393f778a43.png\"\n        alt=\"\"\n        data-bind-src=\"popupImage\"\n      />\n      <div class=\"phone-popup-actions\">\n        <div class=\"phone-popup-button\" data-bind-text=\"mainButtonText\">去看看</div>\n        <span class=\"phone-popup-secondary\" data-bind-text=\"secondaryButtonText\">下次再说</span>\n      </div>\n    </div>\n  </div>\n</div>\n",
@@ -36,11 +48,23 @@
       "routeKey": "demo-2",
       "order": 1,
       "parentId": null,
+      "regionIds": [],
       "runtimeType": "prototype-html-css",
       "schemaPath": "demos/demo_1779608460502_def456/schema.json",
       "previewSize": {
         "width": 1024,
         "height": 768
+      },
+      "presentation": {
+        "version": 1,
+        "mode": "responsive-page",
+        "viewport": {
+          "width": 1024,
+          "height": 768
+        },
+        "heightBehavior": "content",
+        "preset": "custom",
+        "source": "user"
       },
       "screenshotPath": "screenshots/demo_1779608460502_def456.png",
       "prototypeHtml": "<div class=\"pad-popup-container\">\n  <div class=\"pad-popup-bg\"></div>\n  <div class=\"pad-popup-overlay\">\n    <div class=\"pad-popup-card\">\n      <img\n        class=\"pad-popup-image\"\n        src=\"/data/proj_1779608460372/assets/images/7ff9e09eafad61393f778a43.png\"\n        alt=\"\"\n        data-bind-src=\"popupImage\"\n      />\n      <div class=\"pad-popup-actions\">\n        <div class=\"pad-popup-actions-inner\">\n          <div class=\"pad-popup-button\" data-bind-text=\"mainButtonText\">去看看</div>\n          <span class=\"pad-popup-secondary\" data-bind-text=\"secondaryButtonText\">下次再说</span>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>\n",
@@ -71,19 +95,21 @@
     "actions": [],
     "state": {}
   },
-  "projectConfigSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"底部弹窗 - 项目级共享配置\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"popupImage\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"弹窗配图\",\n      \"description\": \"两个Demo共用的弹窗展示图片，尺寸要求：宽 750px，高 ≤ 700px\",\n      \"default\": \"/data/proj_1779608460372/assets/images/7ff9e09eafad61393f778a43.png\",\n      \"ui:options\": {\n        \"minWidth\": 750,\n        \"maxWidth\": 750,\n        \"maxHeight\": 700\n      }\n    },\n    \"mainButtonText\": {\n      \"type\": \"string\",\n      \"title\": \"主按钮文案\",\n      \"description\": \"弹窗黄色主按钮文字，手机和平板共用\",\n      \"default\": \"去看看\"\n    },\n    \"secondaryButtonText\": {\n      \"type\": \"string\",\n      \"title\": \"次按钮文案\",\n      \"description\": \"弹窗底部次要操作文字，手机和平板共用\",\n      \"default\": \"下次再说\"\n    }\n  }\n}",
+  "projectConfigSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"底部弹窗 - 项目级共享配置\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"popupImage\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"弹窗配图\",\n      \"description\": \"两个Demo共用的弹窗展示图片，尺寸要求：宽 750px，高 ≤ 700px\",\n      \"default\": \"/data/proj_1779608460372/assets/images/7ff9e09eafad61393f778a43.png\",\n      \"ui:options\": {\n        \"minWidth\": 750,\n        \"maxWidth\": 750,\n        \"maxHeight\": 700,\n        \"widthRule\": {\n          \"operator\": \"=\",\n          \"value\": 750\n        },\n        \"heightRule\": {\n          \"operator\": \"≤\",\n          \"value\": 350\n        }\n      }\n    },\n    \"mainButtonText\": {\n      \"type\": \"string\",\n      \"title\": \"主按钮文案\",\n      \"description\": \"弹窗黄色主按钮文字，手机和平板共用\",\n      \"default\": \"去看看\"\n    },\n    \"secondaryButtonText\": {\n      \"type\": \"string\",\n      \"title\": \"次按钮文案\",\n      \"description\": \"弹窗底部次要操作文字，手机和平板共用\",\n      \"default\": \"下次再说\"\n    }\n  }\n}",
   "projectConfigValues": {
-    "popupImage": "/data/proj_1779608460372/assets/images/7ff9e09eafad61393f778a43.png"
+    "popupImage": "/data/proj_1779608460372/assets/images/7ff9e09eafad61393f778a43.png",
+    "mainButtonText": "去看看",
+    "secondaryButtonText": "下次再说"
   },
   "canvasState": {
     "viewport": {
-      "x": 163.90805328333607,
-      "y": 100.58269372637727,
-      "zoom": 0.8760167357698301
+      "x": 123.90279070508545,
+      "y": 77.59592355542426,
+      "zoom": 0.4743863286408212
     },
     "pages": {
       "demo_1779608460501_abc123": {
-        "x": -76.66877380036732,
+        "x": -77.228707727555,
         "y": -64.53380559755772,
         "width": 418.0047848861307,
         "height": 905.1196942067684,
@@ -100,6 +126,7 @@
       }
     },
     "pageGroups": {},
+    "sections": {},
     "nodes": {},
     "layers": {
       "annotations": {
@@ -117,11 +144,59 @@
       "id": "ds_1786529528454_m0bp4t",
       "title": "手机",
       "createdAt": "2026-08-12T10:12:08.454Z",
-      "updatedAt": "2026-08-14T09:25:08.804Z"
+      "updatedAt": "2026-09-04T03:51:58.012Z"
     }
   ],
+  "markdownReferences": {
+    "version": 1,
+    "projectId": "proj_1779608460372",
+    "publishedVersion": "v38",
+    "canonicalSnapshot": {
+      "versionId": "v38",
+      "workspaceId": "live-1784638685509-ygoh75gy6",
+      "workspaceRevision": 161,
+      "workspaceRootHash": "1d2cf8ec81d141f5ad86c77933a43db71af9f2c3bafd8e84a039b55643270bb5"
+    },
+    "targets": [
+      {
+        "target": {
+          "kind": "project",
+          "projectId": "proj_1779608460372"
+        },
+        "label": "底部弹窗",
+        "publishedPath": "project.json"
+      },
+      {
+        "target": {
+          "kind": "page",
+          "projectId": "proj_1779608460372",
+          "pageId": "demo_1779608460501_abc123"
+        },
+        "label": "手机",
+        "publishedPath": "demos/demo_1779608460501_abc123",
+        "aliases": [
+          "demo"
+        ]
+      },
+      {
+        "target": {
+          "kind": "page",
+          "projectId": "proj_1779608460372",
+          "pageId": "demo_1779608460502_def456"
+        },
+        "label": "平板",
+        "publishedPath": "demos/demo_1779608460502_def456",
+        "aliases": [
+          "demo-2"
+        ]
+      }
+    ],
+    "documentPaths": {},
+    "edges": [],
+    "unresolvedCount": 0
+  },
   "previewRuntime": {
-    "version": "2026-06-preview-runtime-v6",
+    "version": "2026-09-preview-runtime-v7",
     "source": "local",
     "basePath": "/data/proj_1779608460372/preview-runtime"
   }

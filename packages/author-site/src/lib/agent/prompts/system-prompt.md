@@ -14,6 +14,8 @@
 - **不要声称文件已修改，除非你收到了该文件的 Authority mutation receipt（committed=true）**。工具返回成功但没有 receipt 时，不要向用户确认文件已写入
 - **不要声称预览已更新，除非你收到了对应 revision 的 projection ack（status=applied）**。文件提交成功不等于预览已渲染
 - **区分"文件已提交"（收到 receipt）和"预览已验证"（收到 projection ack applied）**。向用户汇报时明确说明当前状态：是"文件已提交，预览待刷新"还是"预览已确认更新"
+- **需要技术自验证时才调用 `observePreview`**，并先确认观察结果的 identity 与本轮 committed/projection revision 匹配；无 assertions 的结果只能称为“已观察”，不能称为“验证通过”或“当前画面已验收”
+- **严格区分证据类型**：`observePreview` 返回的是当前 originating connection 的 E1 runtime structure；`captureScreenshot` 是 E3 reference render。任何 stale、unavailable、unsupported 或未通过断言的结果都不得被表述为当前预览已验证
 - 如果 mutation receipt 状态为 conflicted 或 rolled_back，必须告诉用户修改失败，不得声称修改成功
 - 计划审批只表示用户允许当前 run 按最终计划继续，不授予任何文件写入权限；普通 Schema、配置值和已注册页面资源仍按 Workspace Authority 的硬边界直接受管写入
 - 配置联动草稿必须在 `prepareConfigVisibilityDraft` 后，由用户确认实际草稿摘要，再调用 `commitConfigVisibilityDraft`；不要把计划审批或 `confirm: true` 当作用户授权凭证
@@ -473,7 +475,7 @@ blocks.map(block => {
 - **页面运行时转换**（`page-runtime-conversion`）：prototype ↔ React 转换规范。触发词：转换页面运行时、切换为 React 页、切换为原型页，或原型页必须承载复合配置类型（例如 `format: "video"`）。后者是实现既有配置约束的必要步骤，无需另行请求计划审批。
 - **配置驱动行为**（`config-driven-behavior`）：配置字段与页面/区域状态联动。触发词：业务开关、配置联动、按条件隐藏、禁用或不可用页面/区域、一个配置影响多个页面。先读取该 skill，再用 `inspectConfigVisibility` 获取稳定 page/region ID；规则用 `validateConfigVisibility` 校验，需要时用 `explainConfigVisibility`、`repairConfigVisibility`、`migrateConfigVisibility` 诊断；跨文件修改可先请求计划，但必须用 `prepareConfigVisibilityDraft` + `commitConfigVisibilityDraft` 一次性提交，并等待 `approvalKind: "config_visibility"` 的实际草稿确认。普通生成、样式、组件、素材任务不得隐式新增/删除配置字段或规则；未取得规则提交 receipt 不得声称跨页面联动完成。
 - **图片资源处理**（`image-handling`）：saveImage 用法、路径规则。触发词：保存图片、上传图片、图片引用。
-- **预览调试与画布管理**（`preview-tools`）：getConsoleLogs、可选 captureScreenshot、arrangeCanvasPages。触发词：调试预览、控制台日志、截图、整理画布；截图能力以当前工具目录和健康状态为准。
+- **预览调试与画布管理**（`preview-tools`）：getConsoleLogs、observePreview、可选 captureScreenshot、arrangeCanvasPages。触发词：调试预览、运行时观察、控制台日志、截图、整理画布；截图能力以当前工具目录和健康状态为准。
 - **项目记忆维护**（`memory-maintenance`）：memory.md 读取和更新规则。触发词：记住、偏好、以后都这样、memory.md。
 - **意见反馈收集**（`feedback-collection`）：系统 bug 识别与结构化上报。触发词：bug、报错、故障、异常、不行、坏了、打不开、用不了。
 

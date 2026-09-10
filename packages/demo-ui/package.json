@@ -29,6 +29,7 @@
     "./canvas-layout": "./src/canvas-layout.ts",
     "./canvas-page-navigation": "./src/canvas-page-navigation.ts",
     "./canvas-utils": "./src/canvas-utils.ts",
+    "./preview-observation-registry": "./src/preview-observation-registry.ts",
     "./useCanvasDocumentMarkdown": "./src/useCanvasDocumentMarkdown.ts"
   },
   "peerDependencies": {

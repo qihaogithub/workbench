@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   applyPrototypeBindings,
   buildPrototypePreviewHtmlFragment,
@@ -17,6 +23,7 @@ import type {
   VisualAnnotation,
   VisualStyleChange,
 } from "./types";
+import type { PreviewObservationRegistry } from "./preview-observation-registry";
 
 export interface PrototypePagePreviewProps {
   html?: string;
@@ -52,6 +59,18 @@ export interface PrototypePagePreviewProps {
   visualAnnotations?: VisualAnnotation[];
   visualAnnotationMode?: boolean;
   visibilityRegions?: Record<string, { visible: boolean; enabled: boolean }>;
+  previewRevision?: number;
+  onContentLoaded?: (details?: {
+    previewInstanceId?: string;
+    renderGeneration?: number;
+    revision?: number;
+  }) => void;
+  previewObservationRegistry?: PreviewObservationRegistry;
+  previewObservationContext?: {
+    projectId: string;
+    workspaceId: string;
+    rootHash?: string;
+  };
   onVisualAnnotationCreate?: (
     node: VisualNodeInfo,
     text?: string,
@@ -66,7 +85,10 @@ function isVisualElement(value: unknown): value is VisualElement {
   return value instanceof HTMLElement || value instanceof SVGElement;
 }
 
-function resolveVisualEventTarget(target: EventTarget | null, root: Element): VisualElement | null {
+function resolveVisualEventTarget(
+  target: EventTarget | null,
+  root: Element,
+): VisualElement | null {
   if (!isVisualElement(target) || !root.contains(target)) return null;
   if (target instanceof SVGElement) {
     const svg = target.closest("svg");
@@ -144,17 +166,28 @@ function getDomPath(element: Element, root: Element): string {
     parts.unshift(`${tag}:nth-of-type(${Math.max(index, 1)})`);
     current = parent;
   }
-  return parts.length ? `prototype-root > ${parts.join(" > ")}` : "prototype-root";
+  return parts.length
+    ? `prototype-root > ${parts.join(" > ")}`
+    : "prototype-root";
 }
 
-function getElementByVisualId(root: ParentNode, id?: string | null): VisualElement | null {
+function getElementByVisualId(
+  root: ParentNode,
+  id?: string | null,
+): VisualElement | null {
   if (!id) return null;
-  const escaped = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(id) : id.replace(/"/g, '\\"');
+  const escaped =
+    typeof CSS !== "undefined" && CSS.escape
+      ? CSS.escape(id)
+      : id.replace(/"/g, '\\"');
   const element = root.querySelector(`[data-ow-id="${escaped}"]`);
   return isVisualElement(element) ? element : null;
 }
 
-function queryByDomPath(root: ParentNode, domPath?: string | null): VisualElement | null {
+function queryByDomPath(
+  root: ParentNode,
+  domPath?: string | null,
+): VisualElement | null {
   if (!domPath) return null;
   const selector = domPath.replace(/^prototype-root\s*>\s*/, "");
   if (!selector || selector === "prototype-root") {
@@ -178,15 +211,24 @@ function getNodeInfo(element: VisualElement, root: Element): VisualNodeInfo {
   )
     .replace(/\s+/g, " ")
     .trim();
-  const text = (element.children.length === 0 ? aggregateText : ownText).slice(0, 180);
+  const text = (element.children.length === 0 ? aggregateText : ownText).slice(
+    0,
+    180,
+  );
   const style = window.getComputedStyle(element);
   const domPath = getDomPath(element, root);
   const className = element.getAttribute("class")?.trim() || undefined;
   const textBindingKey = element.getAttribute("data-bind-text")?.trim();
-  const caps: VisualNodeInfo["editCapabilities"] = ["annotate", "style", "structure"];
+  const caps: VisualNodeInfo["editCapabilities"] = [
+    "annotate",
+    "style",
+    "structure",
+  ];
   if (text && element.children.length === 0) caps.push("text");
-  if (element instanceof HTMLImageElement || element.getAttribute("src")) caps.push("image");
-  if (element instanceof HTMLAnchorElement || element.getAttribute("href")) caps.push("link");
+  if (element instanceof HTMLImageElement || element.getAttribute("src"))
+    caps.push("image");
+  if (element instanceof HTMLAnchorElement || element.getAttribute("href"))
+    caps.push("link");
   if (className) caps.push("className");
 
   return {
@@ -196,19 +238,22 @@ function getNodeInfo(element: VisualElement, root: Element): VisualNodeInfo {
     className,
     textContent: text || undefined,
     domPath,
-    parentPath: element.parentElement ? getDomPath(element.parentElement, root) : undefined,
+    parentPath: element.parentElement
+      ? getDomPath(element.parentElement, root)
+      : undefined,
     rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
     attrs: {
       src: element.getAttribute("src") || undefined,
-      currentSrc: element instanceof HTMLImageElement ? element.currentSrc || element.src || undefined : undefined,
+      currentSrc:
+        element instanceof HTMLImageElement
+          ? element.currentSrc || element.src || undefined
+          : undefined,
       alt: element.getAttribute("alt") || undefined,
       href: element.getAttribute("href") || undefined,
       role: element.getAttribute("role") || undefined,
       ariaLabel: element.getAttribute("aria-label") || undefined,
     },
-    binding: textBindingKey
-      ? { kind: "text", key: textBindingKey }
-      : undefined,
+    binding: textBindingKey ? { kind: "text", key: textBindingKey } : undefined,
     computedStyle: {
       color: style.color || undefined,
       backgroundColor: style.backgroundColor || undefined,
@@ -256,8 +301,16 @@ function getNodeInfo(element: VisualElement, root: Element): VisualNodeInfo {
 
 function formatSelectedLabel(element: VisualElement): string {
   const tag = element.tagName.toLowerCase();
-  const className = element.getAttribute("class")?.trim().split(/\s+/).slice(0, 2).join(".");
-  const text = (element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 24);
+  const className = element
+    .getAttribute("class")
+    ?.trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .join(".");
+  const text = (element.textContent || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 24);
   const parts: string[] = [tag];
   if (className) parts.push(`.${className}`);
   if (text) parts.push(` "${text}"`);
@@ -269,7 +322,9 @@ function updateSelectedLabel(
   host: HTMLElement,
   element: VisualElement | null,
 ) {
-  const label = shadow.querySelector<HTMLElement>("[data-prototype-selected-label]");
+  const label = shadow.querySelector<HTMLElement>(
+    "[data-prototype-selected-label]",
+  );
   if (!label) return;
   if (!element) {
     label.style.display = "none";
@@ -318,7 +373,9 @@ function collectPointNodeStack(
   const pointElements = pointShadow.elementsFromPoint?.(clientX, clientY) ?? [];
   const visualHits = pointElements
     .map((element) => resolveVisualEventTarget(element, root))
-    .filter((element): element is VisualElement => !!element && element !== root)
+    .filter(
+      (element): element is VisualElement => !!element && element !== root,
+    )
     .reverse();
 
   const ordered: VisualElement[] = [];
@@ -391,12 +448,19 @@ function normalizeStyleValue(property: string, value: string): string {
   }
   if (property === "opacity" && /^\d+(\.\d+)?%?$/.test(trimmed)) {
     const numeric = Number(trimmed.replace("%", ""));
-    return String(numeric > 1 ? Math.max(0, Math.min(100, numeric)) / 100 : Math.max(0, Math.min(1, numeric)));
+    return String(
+      numeric > 1
+        ? Math.max(0, Math.min(100, numeric)) / 100
+        : Math.max(0, Math.min(1, numeric)),
+    );
   }
   return trimmed;
 }
 
-function applyPropertyChanges(root: ParentNode, changes: VisualPropertyChange[]) {
+function applyPropertyChanges(
+  root: ParentNode,
+  changes: VisualPropertyChange[],
+) {
   for (const change of changes) {
     const element =
       getElementByVisualId(root, change.nodeId) ||
@@ -408,12 +472,18 @@ function applyPropertyChanges(root: ParentNode, changes: VisualPropertyChange[])
       if (change.value) element.setAttribute(change.property, change.value);
       else element.removeAttribute(change.property);
     } else {
-      element.style.setProperty(change.property.replace(/[A-Z]/g, (part) => `-${part.toLowerCase()}`), normalizeStyleValue(change.property, change.value));
+      element.style.setProperty(
+        change.property.replace(/[A-Z]/g, (part) => `-${part.toLowerCase()}`),
+        normalizeStyleValue(change.property, change.value),
+      );
     }
   }
 }
 
-function buildNodeTree(element: VisualElement, root: Element): VisualNodeTreeItem {
+function buildNodeTree(
+  element: VisualElement,
+  root: Element,
+): VisualNodeTreeItem {
   return {
     ...getNodeInfo(element, root),
     children: Array.from(element.children)
@@ -451,25 +521,40 @@ export function PrototypePagePreview({
   visualAnnotationMode = false,
   onVisualAnnotationCreate,
   visibilityRegions,
+  previewRevision,
+  onContentLoaded,
+  previewObservationRegistry,
+  previewObservationContext,
 }: PrototypePagePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const visibilityRegionStylesRef = useRef(
-    new WeakMap<HTMLElement | SVGElement, {
-      display: string;
-      displayPriority: string;
-      opacity: string;
-      opacityPriority: string;
-      pointerEvents: string;
-      pointerEventsPriority: string;
-      ariaDisabled: string | null;
-    }>(),
+    new WeakMap<
+      HTMLElement | SVGElement,
+      {
+        display: string;
+        displayPriority: string;
+        opacity: string;
+        opacityPriority: string;
+        pointerEvents: string;
+        pointerEventsPriority: string;
+        ariaDisabled: string | null;
+      }
+    >(),
   );
   const shadowRef = useRef<ShadowRoot | null>(null);
+  const previewInstanceIdRef = useRef<string>(
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `prototype-preview-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  const renderGenerationRef = useRef(0);
   // 内容高度回调保持最新引用，避免其身份变化触发下方测量 effect 重建 shadow DOM。
   // 重建会导致可滚动容器裁解除失效、root 瞬时回到一屏高度，进而与上报高度形成正反馈闪烁。
   const onContentHeightChangeRef = useRef(onContentHeightChange);
   onContentHeightChangeRef.current = onContentHeightChange;
+  const onContentLoadedRef = useRef(onContentLoaded);
+  onContentLoadedRef.current = onContentLoaded;
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -490,8 +575,12 @@ export function PrototypePagePreview({
     const nextWidth = normalizeMeasuredSize(width);
     const nextHeight = normalizeMeasuredSize(height);
     if (nextWidth <= 0 || nextHeight <= 0) return;
-    setContainerWidth((current) => (current === nextWidth ? current : nextWidth));
-    setContainerHeight((current) => (current === nextHeight ? current : nextHeight));
+    setContainerWidth((current) =>
+      current === nextWidth ? current : nextWidth,
+    );
+    setContainerHeight((current) =>
+      current === nextHeight ? current : nextHeight,
+    );
   }, []);
 
   const measureContainer = useCallback(() => {
@@ -527,16 +616,19 @@ export function PrototypePagePreview({
     return () => observer.disconnect();
   }, [hasContainerSizeOverride, shouldScaleToPreviewSize, updateContainerSize]);
 
-  const effectiveContainerWidth = containerSizeOverride?.width ?? containerWidth;
-  const effectiveContainerHeight = containerSizeOverride?.height ?? containerHeight;
+  const effectiveContainerWidth =
+    containerSizeOverride?.width ?? containerWidth;
+  const effectiveContainerHeight =
+    containerSizeOverride?.height ?? containerHeight;
 
-  const { designWidth, designHeight, wrapperStyle, contentStyle } = computePreviewScale(
-    previewSize,
-    effectiveContainerWidth,
-    effectiveContainerHeight,
-    fillContainer,
-    effectiveHeight,
-  );
+  const { designWidth, designHeight, wrapperStyle, contentStyle } =
+    computePreviewScale(
+      previewSize,
+      effectiveContainerWidth,
+      effectiveContainerHeight,
+      fillContainer,
+      effectiveHeight,
+    );
 
   // 归一化视口单位、以及 .prototype-root 的固定设计画板尺寸，必须使用页面的
   // 真实设计尺寸（previewSize），而不是 computePreviewScale 返回的 designHeight。
@@ -551,13 +643,14 @@ export function PrototypePagePreview({
     if (!host) return;
     const shadow = shadowRef.current ?? host.attachShadow({ mode: "open" });
     shadowRef.current = shadow;
-    const assetRewrite = sessionId && demoId
-      ? {
-          sessionId,
-          demoId,
-          origin: window.location.origin,
-        }
-      : undefined;
+    const assetRewrite =
+      sessionId && demoId
+        ? {
+            sessionId,
+            demoId,
+            origin: window.location.origin,
+          }
+        : undefined;
     shadow.innerHTML = buildPrototypePreviewHtmlFragment({
       html,
       css,
@@ -573,7 +666,9 @@ export function PrototypePagePreview({
     if (root) {
       applyPrototypeBindings(root, configData, assetRewrite);
       applyPropertyChanges(root, visualPropertyChanges);
-      for (const element of root.querySelectorAll<HTMLElement | SVGElement>("[data-region-id]")) {
+      for (const element of root.querySelectorAll<HTMLElement | SVGElement>(
+        "[data-region-id]",
+      )) {
         const regionId = element.getAttribute("data-region-id");
         const state = regionId ? visibilityRegions?.[regionId] : undefined;
         if (!state) continue;
@@ -585,7 +680,8 @@ export function PrototypePagePreview({
             opacity: element.style.getPropertyValue("opacity"),
             opacityPriority: element.style.getPropertyPriority("opacity"),
             pointerEvents: element.style.getPropertyValue("pointer-events"),
-            pointerEventsPriority: element.style.getPropertyPriority("pointer-events"),
+            pointerEventsPriority:
+              element.style.getPropertyPriority("pointer-events"),
             ariaDisabled: element.getAttribute("aria-disabled"),
           };
           visibilityRegionStylesRef.current.set(element, original);
@@ -593,7 +689,12 @@ export function PrototypePagePreview({
         if (!state.visible) {
           element.style.setProperty("display", "none", "important");
         } else {
-          if (original.display) element.style.setProperty("display", original.display, original.displayPriority);
+          if (original.display)
+            element.style.setProperty(
+              "display",
+              original.display,
+              original.displayPriority,
+            );
           else element.style.removeProperty("display");
         }
         if (!state.enabled) {
@@ -601,16 +702,58 @@ export function PrototypePagePreview({
           element.style.setProperty("pointer-events", "none");
           element.setAttribute("aria-disabled", "true");
         } else {
-          if (original.opacity) element.style.setProperty("opacity", original.opacity, original.opacityPriority);
+          if (original.opacity)
+            element.style.setProperty(
+              "opacity",
+              original.opacity,
+              original.opacityPriority,
+            );
           else element.style.removeProperty("opacity");
-          if (original.pointerEvents) element.style.setProperty("pointer-events", original.pointerEvents, original.pointerEventsPriority);
+          if (original.pointerEvents)
+            element.style.setProperty(
+              "pointer-events",
+              original.pointerEvents,
+              original.pointerEventsPriority,
+            );
           else element.style.removeProperty("pointer-events");
-          if (original.ariaDisabled === null) element.removeAttribute("aria-disabled");
+          if (original.ariaDisabled === null)
+            element.removeAttribute("aria-disabled");
           else element.setAttribute("aria-disabled", original.ariaDisabled);
         }
       }
     }
-    if (!onContentHeightChangeRef.current || !shouldScaleToPreviewSize || !root) return;
+    renderGenerationRef.current += 1;
+    const renderGeneration = renderGenerationRef.current;
+    if (
+      root &&
+      previewObservationRegistry &&
+      previewObservationContext &&
+      demoId
+    ) {
+      previewObservationRegistry.register({
+        identity: {
+          schemaVersion: 1,
+          projectId: previewObservationContext.projectId,
+          workspaceId: previewObservationContext.workspaceId,
+          pageId: demoId,
+          runtimeType: "prototype-html-css",
+          surface: "active-single-page",
+          previewInstanceId: previewInstanceIdRef.current,
+          renderGeneration,
+          revision: previewRevision ?? 0,
+          rootHash: previewObservationContext.rootHash,
+        },
+        root: root as Element,
+        selectedElement: null,
+      });
+    }
+    onContentLoadedRef.current?.({
+      previewInstanceId: previewInstanceIdRef.current,
+      renderGeneration,
+      revision: previewRevision,
+    });
+    if (!onContentHeightChangeRef.current || !shouldScaleToPreviewSize || !root)
+      return;
     const reportHeight = (height: number) => {
       if (Number.isFinite(height) && height > 0) {
         onContentHeightChangeRef.current?.(height);
@@ -657,11 +800,24 @@ export function PrototypePagePreview({
     shouldScaleToPreviewSize,
     visualPropertyChanges,
     visibilityRegions,
+    previewObservationContext?.projectId,
+    previewObservationContext?.workspaceId,
+    previewObservationContext?.rootHash,
+    previewObservationRegistry,
+    previewRevision,
   ]);
+
+  useEffect(
+    () => () => {
+      previewObservationRegistry?.invalidate(previewInstanceIdRef.current);
+    },
+    [previewObservationRegistry],
+  );
 
   useEffect(() => {
     const shadow = shadowRef.current;
-    if (!shadow || !onVisualNodeTreeChange || visualNodeTreeRequestKey == null) return;
+    if (!shadow || !onVisualNodeTreeChange || visualNodeTreeRequestKey == null)
+      return;
     const root = shadow.querySelector<HTMLElement>(".prototype-root");
     if (!root) return;
     onVisualNodeTreeChange(
@@ -674,16 +830,22 @@ export function PrototypePagePreview({
   useEffect(() => {
     const shadow = shadowRef.current;
     if (!shadow) return;
-    shadow.querySelectorAll("[data-prototype-selected], [data-prototype-hovered]").forEach((element) => {
-      element.removeAttribute("data-prototype-selected");
-      element.removeAttribute("data-prototype-hovered");
-    });
+    shadow
+      .querySelectorAll("[data-prototype-selected], [data-prototype-hovered]")
+      .forEach((element) => {
+        element.removeAttribute("data-prototype-selected");
+        element.removeAttribute("data-prototype-hovered");
+      });
     const root = shadow.querySelector<HTMLElement>(".prototype-root");
     if (!root) return;
     if (visualEditMode) {
-      const selected = getElementByVisualId(root, selectedVisualNodeId) || queryByDomPath(root, selectedVisualNodeId);
+      const selected =
+        getElementByVisualId(root, selectedVisualNodeId) ||
+        queryByDomPath(root, selectedVisualNodeId);
       selected?.setAttribute("data-prototype-selected", "true");
-      const hovered = getElementByVisualId(root, visualHoverNodeId) || queryByDomPath(root, visualHoverNodeId);
+      const hovered =
+        getElementByVisualId(root, visualHoverNodeId) ||
+        queryByDomPath(root, visualHoverNodeId);
       hovered?.setAttribute("data-prototype-hovered", "true");
     }
     const host = hostRef.current;
@@ -696,7 +858,8 @@ export function PrototypePagePreview({
     const shadow = shadowRef.current;
     const host = hostRef.current;
     if (!shadow || !host) return;
-    const update = () => updateSelectedLabel(shadow, host, resolveLabelElement(shadow));
+    const update = () =>
+      updateSelectedLabel(shadow, host, resolveLabelElement(shadow));
     host.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", update);
     return () => {
@@ -728,7 +891,9 @@ export function PrototypePagePreview({
   useEffect(() => {
     const shadow = shadowRef.current;
     if (!shadow) return;
-    shadow.querySelectorAll("[data-prototype-annotation-pin]").forEach((pin) => pin.remove());
+    shadow
+      .querySelectorAll("[data-prototype-annotation-pin]")
+      .forEach((pin) => pin.remove());
     if (!visualEditMode) return;
     const root = shadow.querySelector<HTMLElement>(".prototype-root");
     if (!root) return;
@@ -774,7 +939,14 @@ export function PrototypePagePreview({
       });
       root.appendChild(pin);
     });
-  }, [configData, css, html, visualAnnotations, visualEditMode, visualPropertyChanges]);
+  }, [
+    configData,
+    css,
+    html,
+    visualAnnotations,
+    visualEditMode,
+    visualPropertyChanges,
+  ]);
 
   useEffect(() => {
     const shadow = shadowRef.current;
@@ -798,8 +970,8 @@ export function PrototypePagePreview({
     `;
     shadow.appendChild(style);
     return () => style.remove();
-  // 页面内容会在配置、样式或临时属性变化时重建 Shadow DOM；这些输入变化后必须
-  // 重新注入选择光标，不能只依赖编辑模式开关。
+    // 页面内容会在配置、样式或临时属性变化时重建 Shadow DOM；这些输入变化后必须
+    // 重新注入选择光标，不能只依赖编辑模式开关。
   }, [
     allowScroll,
     configData,
@@ -838,30 +1010,44 @@ export function PrototypePagePreview({
 
     const handlePointerOver = (event: Event) => {
       if (
-        event.composedPath().some(
-          (item) => item instanceof Element && item.hasAttribute("data-prototype-text-editor"),
-        )
+        event
+          .composedPath()
+          .some(
+            (item) =>
+              item instanceof Element &&
+              item.hasAttribute("data-prototype-text-editor"),
+          )
       ) {
         return;
       }
-      const target = resolveVisualEventTarget(event.composedPath()[0] ?? null, root);
+      const target = resolveVisualEventTarget(
+        event.composedPath()[0] ?? null,
+        root,
+      );
       setHoveredElement(target);
     };
     const handleClick = (event: Event) => {
       if (
-        event.composedPath().some(
-          (item) => item instanceof Element && item.hasAttribute("data-prototype-text-editor"),
-        )
+        event
+          .composedPath()
+          .some(
+            (item) =>
+              item instanceof Element &&
+              item.hasAttribute("data-prototype-text-editor"),
+          )
       ) {
         return;
       }
-      const pinnedElement = (event.composedPath()[0] as Element | null)?.closest(
-        "[data-prototype-annotation-pin]",
-      );
+      const pinnedElement = (
+        event.composedPath()[0] as Element | null
+      )?.closest("[data-prototype-annotation-pin]");
       if (pinnedElement) return;
       setContextMenu(null);
       const mouseEvent = event as MouseEvent;
-      const target = resolveVisualEventTarget(event.composedPath()[0] ?? null, root);
+      const target = resolveVisualEventTarget(
+        event.composedPath()[0] ?? null,
+        root,
+      );
       if (!target || target === root) {
         event.preventDefault();
         event.stopPropagation();
@@ -904,7 +1090,8 @@ export function PrototypePagePreview({
       if (visualAnnotationMode) {
         const container = containerRef.current;
         const containerRect = container?.getBoundingClientRect();
-        const targetEl = getElementByVisualId(root, node.nodeId) ||
+        const targetEl =
+          getElementByVisualId(root, node.nodeId) ||
           queryByDomPath(root, node.domPath);
         const rect = targetEl?.getBoundingClientRect();
         setAnnotationDraft({
@@ -944,7 +1131,8 @@ export function PrototypePagePreview({
     };
 
     const startTextEdit = (target: VisualElement) => {
-      if (!(target instanceof HTMLElement) || target.children.length > 0) return;
+      if (!(target instanceof HTMLElement) || target.children.length > 0)
+        return;
       const node = getNodeInfo(target, root);
       if (!node.editCapabilities.includes("text")) return;
 
@@ -952,8 +1140,10 @@ export function PrototypePagePreview({
       const previousText = target.textContent ?? "";
       const targetRect = target.getBoundingClientRect();
       const rootRect = root.getBoundingClientRect();
-      const scaleX = root.offsetWidth > 0 ? rootRect.width / root.offsetWidth : 1;
-      const scaleY = root.offsetHeight > 0 ? rootRect.height / root.offsetHeight : scaleX;
+      const scaleX =
+        root.offsetWidth > 0 ? rootRect.width / root.offsetWidth : 1;
+      const scaleY =
+        root.offsetHeight > 0 ? rootRect.height / root.offsetHeight : scaleX;
       const computed = getComputedStyle(target);
       const editor = document.createElement("textarea");
       editor.setAttribute("data-prototype-text-editor", "true");
@@ -1002,7 +1192,9 @@ export function PrototypePagePreview({
       target.style.textShadow = "none";
       root.appendChild(editor);
 
-      editor.addEventListener("pointerdown", (event) => event.stopPropagation());
+      editor.addEventListener("pointerdown", (event) =>
+        event.stopPropagation(),
+      );
       editor.addEventListener("click", (event) => event.stopPropagation());
       editor.addEventListener("dblclick", (event) => event.stopPropagation());
       editor.addEventListener("compositionstart", () => {
@@ -1017,7 +1209,11 @@ export function PrototypePagePreview({
           finishTextEdit(false);
           return;
         }
-        if (event.key === "Enter" && !event.shiftKey && !activeTextEditor?.composing) {
+        if (
+          event.key === "Enter" &&
+          !event.shiftKey &&
+          !activeTextEditor?.composing
+        ) {
           event.preventDefault();
           finishTextEdit(true);
         }
@@ -1029,7 +1225,10 @@ export function PrototypePagePreview({
 
     const handleDoubleClick = (event: Event) => {
       if (visualAnnotationMode) return;
-      const target = resolveVisualEventTarget(event.composedPath()[0] ?? null, root);
+      const target = resolveVisualEventTarget(
+        event.composedPath()[0] ?? null,
+        root,
+      );
       if (!target || target === root) return;
       const node = getNodeInfo(target, root);
       if (!node.editCapabilities.includes("text")) return;
@@ -1093,7 +1292,10 @@ export function PrototypePagePreview({
     };
     const handleContextMenu = (event: Event) => {
       const mouseEvent = event as MouseEvent;
-      const target = resolveVisualEventTarget(event.composedPath()[0] ?? null, root);
+      const target = resolveVisualEventTarget(
+        event.composedPath()[0] ?? null,
+        root,
+      );
       if (target && target !== root) {
         event.preventDefault();
         event.stopPropagation();
@@ -1196,7 +1398,9 @@ export function PrototypePagePreview({
       8,
       Math.min(
         ownerWidth - bubbleWidth - 8,
-        annotationDraft.rect.x + annotationDraft.rect.width / 2 - bubbleWidth / 2,
+        annotationDraft.rect.x +
+          annotationDraft.rect.width / 2 -
+          bubbleWidth / 2,
       ),
     );
     const below = annotationDraft.rect.y + annotationDraft.rect.height + 8;
@@ -1237,7 +1441,11 @@ export function PrototypePagePreview({
               if (!draft) return;
               const trimmed = draft.text.trim();
               if (trimmed || draft.annotationId) {
-                onVisualAnnotationCreate?.(draft.node, trimmed, draft.annotationId);
+                onVisualAnnotationCreate?.(
+                  draft.node,
+                  trimmed,
+                  draft.annotationId,
+                );
               }
               setAnnotationDraft(null);
             }}
@@ -1256,7 +1464,14 @@ export function PrototypePagePreview({
         "relative h-full w-full overflow-auto bg-white",
         !shouldScaleToPreviewSize && className,
       )}
-      style={shouldScaleToPreviewSize ? { scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties : undefined}
+      style={
+        shouldScaleToPreviewSize
+          ? ({
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+            } as React.CSSProperties)
+          : undefined
+      }
       data-prototype-preview
       tabIndex={visualEditMode ? 0 : undefined}
     />
@@ -1275,7 +1490,10 @@ export function PrototypePagePreview({
   return (
     <div
       ref={containerRef}
-      className={cn("relative flex h-full w-full items-center justify-center", className)}
+      className={cn(
+        "relative flex h-full w-full items-center justify-center",
+        className,
+      )}
       data-prototype-preview-container
       onClick={(event) => {
         // 缩放预览的页面外空白位于此容器，而非 Shadow DOM 宿主。仅当事件直接命中
@@ -1293,7 +1511,11 @@ export function PrototypePagePreview({
       `}</style>
       <div
         style={wrapperStyle}
-        className={fillContainer ? "relative" : "relative rounded-lg border border-border bg-white shadow-sm"}
+        className={
+          fillContainer
+            ? "relative"
+            : "relative rounded-lg border border-border bg-white shadow-sm"
+        }
       >
         <div style={contentStyle}>{previewHost}</div>
       </div>

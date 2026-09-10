@@ -83,12 +83,12 @@ export default function PadSquare(props: DemoProps) {
           ))}
         </div>
 
-        {/* 底部课程卡片区 */}
+        {/* 底部课程卡片区 - 用户上传素材（原图 1902×361，按 2x 等比显示） */}
         <img
-          src="../../assets/images/1a9aaecb82ea-pad-bottom-course.png"
-          alt="course-section"
+          src="/api/images/img_5htP5MlfKx_RAQ"
+          alt="免费试一试课程区：标题与副标题、K1学什么下拉、横向课程卡片"
           className="relative object-cover max-w-none"
-          style={{ width: 951, height: 228 }}
+          style={{ width: 951, height: 180.5 }}
         />
       </div>
 

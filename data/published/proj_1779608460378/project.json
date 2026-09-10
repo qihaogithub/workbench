@@ -1,9 +1,9 @@
 {
   "id": "proj_1779608460378",
   "name": "广场页面",
-  "publishedVersion": "v76",
-  "commitId": "commit_1786010306277_g37kk1",
-  "publishedAt": 1786010306277,
+  "publishedVersion": "v77",
+  "commitId": "commit_1789026445364_16zvdo",
+  "publishedAt": 1789026445364,
   "demoPages": [
     {
       "id": "demo_1779608460379_a1b2c3",
@@ -11,6 +11,7 @@
       "routeKey": "page",
       "order": 0,
       "parentId": null,
+      "regionIds": [],
       "runtimeType": "high-fidelity-react",
       "compiledJsPath": "demos/demo_1779608460379_a1b2c3/compiled.js",
       "schemaPath": "demos/demo_1779608460379_a1b2c3/schema.json",
@@ -18,9 +19,20 @@
         "width": 375,
         "height": 812
       },
+      "presentation": {
+        "version": 1,
+        "mode": "responsive-page",
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "heightBehavior": "content",
+        "preset": "custom",
+        "source": "user"
+      },
       "screenshotPath": "screenshots/demo_1779608460379_a1b2c3.png",
-      "iframeHtmlPath": "demos/demo_1779608460379_a1b2c3/iframe.html?v=1786010300352",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1779608460379_a1b2c3/iframe.html?v=1786010300352\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+      "iframeHtmlPath": "demos/demo_1779608460379_a1b2c3/iframe.html?v=1789026443365",
+      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1779608460379_a1b2c3/iframe.html?v=1789026443365\"\n  sandbox=\"allow-scripts\"\n  width=\"375\"\n  height=\"812\"\n  style=\"width: min(100%, 375px); height: 812px; border: none;\"\n/>"
     },
     {
       "id": "demo_1779608460380_d4e5f6",
@@ -28,6 +40,7 @@
       "routeKey": "page-2",
       "order": 1,
       "parentId": null,
+      "regionIds": [],
       "runtimeType": "high-fidelity-react",
       "compiledJsPath": "demos/demo_1779608460380_d4e5f6/compiled.js",
       "schemaPath": "demos/demo_1779608460380_d4e5f6/schema.json",
@@ -35,9 +48,20 @@
         "width": 1024,
         "height": 768
       },
+      "presentation": {
+        "version": 1,
+        "mode": "responsive-page",
+        "viewport": {
+          "width": 1024,
+          "height": 768
+        },
+        "heightBehavior": "content",
+        "preset": "custom",
+        "source": "user"
+      },
       "screenshotPath": "screenshots/demo_1779608460380_d4e5f6.png",
-      "iframeHtmlPath": "demos/demo_1779608460380_d4e5f6/iframe.html?v=1786010300352",
-      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1779608460380_d4e5f6/iframe.html?v=1786010300352\"\n  sandbox=\"allow-scripts\"\n  style=\"width: 100%; border: none;\"\n/>"
+      "iframeHtmlPath": "demos/demo_1779608460380_d4e5f6/iframe.html?v=1789026443365",
+      "embedCode": "<iframe\n  src=\"/data/proj_1779608460378/demos/demo_1779608460380_d4e5f6/iframe.html?v=1789026443365\"\n  sandbox=\"allow-scripts\"\n  width=\"1024\"\n  height=\"768\"\n  style=\"width: min(100%, 1024px); height: 768px; border: none;\"\n/>"
     }
   ],
   "demoFolders": [],
@@ -57,7 +81,7 @@
     "actions": [],
     "state": {}
   },
-  "projectConfigSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"广场页面 - 项目级共享配置\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"bigBannerForeground\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"大Banner前景图\",\n      \"description\": \"手机和平板共用的大Banner前景图片，推荐尺寸 1248×384\",\n      \"default\": \"/data/proj_1779608460378/assets/images/a5b9ed28a447cc7ed5a5216a.png\",\n      \"ui:options\": {\n        \"accept\": \"image/*\",\n        \"maxSize\": 5242880,\n        \"minWidth\": 1248,\n        \"maxWidth\": 1248,\n        \"minHeight\": 384,\n        \"maxHeight\": 384\n      }\n    },\n    \"bigBannerBackground\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"大Banner背景图\",\n      \"description\": \"手机和平板共用的大Banner背景图片，推荐尺寸 1248×344\",\n      \"default\": \"/data/proj_1779608460378/assets/images/54ae7aef6bd771a728037113.png\",\n      \"ui:options\": {\n        \"accept\": \"image/*\",\n        \"maxSize\": 5242880,\n        \"minWidth\": 1248,\n        \"maxWidth\": 1248,\n        \"minHeight\": 344,\n        \"maxHeight\": 344\n      }\n    },\n    \"miniBanners\": {\n      \"type\": \"array\",\n      \"title\": \"小Banner图片列表\",\n      \"description\": \"小Banner滚动区域的图片列表，每张推荐尺寸 480×270\",\n      \"ui:widget\": \"imageList\",\n      \"ui:options\": {\n        \"maxItems\": 10,\n        \"minWidth\": 480,\n        \"maxWidth\": 480,\n        \"minHeight\": 270,\n        \"maxHeight\": 270\n      },\n      \"items\": {\n        \"type\": \"string\",\n        \"format\": \"image\"\n      },\n      \"default\": [\n        \"/data/proj_1779608460378/assets/images/febf858c881f562d9f93760d.png\",\n        \"/data/proj_1779608460378/assets/images/86d76ee04b2d6ec2e87907d0.png\",\n        \"/data/proj_1779608460378/assets/images/473f0b45c9266c867cf9a942.png\",\n        \"/data/proj_1779608460378/assets/images/61e147c8b72a4b2a0f96a1fa.png\",\n        \"/data/proj_1779608460378/assets/images/65cc0cd1305c527ebac81d08.png\"\n      ]\n    }\n  }\n}",
+  "projectConfigSchema": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"title\": \"广场页面 - 项目级共享配置\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"bigBannerForeground\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"大Banner前景图\",\n      \"description\": \"手机和平板共用的大Banner前景图片，推荐尺寸 1248×384\",\n      \"default\": \"/data/proj_1779608460378/assets/images/a5b9ed28a447cc7ed5a5216a.png\",\n      \"ui:options\": {\n        \"accept\": \"image/*\",\n        \"maxSize\": 5242880,\n        \"minWidth\": 1248,\n        \"maxWidth\": 1248,\n        \"minHeight\": 384,\n        \"maxHeight\": 384,\n        \"widthRule\": {\n          \"operator\": \"=\",\n          \"value\": 1248\n        },\n        \"heightRule\": {\n          \"operator\": \"=\",\n          \"value\": 384\n        }\n      }\n    },\n    \"bigBannerBackground\": {\n      \"type\": \"string\",\n      \"format\": \"image\",\n      \"title\": \"大Banner背景图\",\n      \"description\": \"手机和平板共用的大Banner背景图片，推荐尺寸 1248×344\",\n      \"default\": \"/data/proj_1779608460378/assets/images/54ae7aef6bd771a728037113.png\",\n      \"ui:options\": {\n        \"accept\": \"image/*\",\n        \"maxSize\": 5242880,\n        \"minWidth\": 1248,\n        \"maxWidth\": 1248,\n        \"minHeight\": 344,\n        \"maxHeight\": 344,\n        \"widthRule\": {\n          \"operator\": \"=\",\n          \"value\": 1248\n        },\n        \"heightRule\": {\n          \"operator\": \"=\",\n          \"value\": 344\n        }\n      }\n    },\n    \"miniBanners\": {\n      \"type\": \"array\",\n      \"title\": \"小Banner图片列表\",\n      \"description\": \"小Banner滚动区域的图片列表，每张推荐尺寸 480×270\",\n      \"ui:widget\": \"imageList\",\n      \"ui:options\": {\n        \"maxItems\": 10,\n        \"minWidth\": 480,\n        \"maxWidth\": 480,\n        \"minHeight\": 270,\n        \"maxHeight\": 270,\n        \"widthRule\": {\n          \"operator\": \"=\",\n          \"value\": 480\n        },\n        \"heightRule\": {\n          \"operator\": \"=\",\n          \"value\": 270\n        }\n      },\n      \"items\": {\n        \"type\": \"string\",\n        \"format\": \"image\"\n      },\n      \"default\": [\n        \"/data/proj_1779608460378/assets/images/febf858c881f562d9f93760d.png\",\n        \"/data/proj_1779608460378/assets/images/86d76ee04b2d6ec2e87907d0.png\",\n        \"/data/proj_1779608460378/assets/images/473f0b45c9266c867cf9a942.png\",\n        \"/data/proj_1779608460378/assets/images/61e147c8b72a4b2a0f96a1fa.png\",\n        \"/data/proj_1779608460378/assets/images/65cc0cd1305c527ebac81d08.png\"\n      ]\n    }\n  }\n}",
   "projectConfigValues": {
     "miniBanners": [
       "/data/proj_1779608460378/assets/images/febf858c881f562d9f93760d.png",
@@ -72,7 +96,7 @@
   "canvasState": {
     "viewport": {
       "x": 35.06809077915847,
-      "y": 159.13332115373686,
+      "y": 181.63332115373686,
       "zoom": 0.4454844306558205
     },
     "pages": {
@@ -102,10 +126,60 @@
       "documents": {
         "nodes": {}
       }
-    }
+    },
+    "sections": {}
+  },
+  "knowledge": [],
+  "markdownReferences": {
+    "version": 1,
+    "projectId": "proj_1779608460378",
+    "publishedVersion": "v77",
+    "canonicalSnapshot": {
+      "versionId": "v77",
+      "workspaceId": "live-1786369936216-n1m4g1g8f",
+      "workspaceRevision": 14,
+      "workspaceRootHash": "88e977b28bff573ad5a87c4baebe15045ca730d3e0f8720d555fcd8bac1a38ae"
+    },
+    "targets": [
+      {
+        "target": {
+          "kind": "project",
+          "projectId": "proj_1779608460378"
+        },
+        "label": "广场页面",
+        "publishedPath": "project.json"
+      },
+      {
+        "target": {
+          "kind": "page",
+          "projectId": "proj_1779608460378",
+          "pageId": "demo_1779608460379_a1b2c3"
+        },
+        "label": "广场页面-手机",
+        "publishedPath": "demos/demo_1779608460379_a1b2c3",
+        "aliases": [
+          "page"
+        ]
+      },
+      {
+        "target": {
+          "kind": "page",
+          "projectId": "proj_1779608460378",
+          "pageId": "demo_1779608460380_d4e5f6"
+        },
+        "label": "广场页面-平板",
+        "publishedPath": "demos/demo_1779608460380_d4e5f6",
+        "aliases": [
+          "page-2"
+        ]
+      }
+    ],
+    "documentPaths": {},
+    "edges": [],
+    "unresolvedCount": 0
   },
   "previewRuntime": {
-    "version": "2026-06-preview-runtime-v5",
+    "version": "2026-09-preview-runtime-v7",
     "source": "local",
     "basePath": "/data/proj_1779608460378/preview-runtime"
   }

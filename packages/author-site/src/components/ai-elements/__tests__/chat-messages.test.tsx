@@ -53,7 +53,9 @@ describe("ChatMessages 流式占位", () => {
       messages: [{ id: "user-1", role: "user", content: "创建页面" }],
     });
 
-    expect(await screen.findByTestId("ai-working-indicator")).toBeInTheDocument();
+    expect(
+      await screen.findByTestId("ai-working-indicator"),
+    ).toBeInTheDocument();
   });
 
   it("最终 assistant 消息已落入历史后不再渲染空处理中占位", async () => {
@@ -65,10 +67,12 @@ describe("ChatMessages 流式占位", () => {
     });
 
     expect(await screen.findByText("页面已创建")).toBeInTheDocument();
-    expect(screen.queryByTestId("ai-working-indicator")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("ai-working-indicator"),
+    ).not.toBeInTheDocument();
   });
 
-  it("仅展示服务端回执确认的 mutation 与 projection 状态", async () => {
+  it("不在聊天区展示 mutation 与 projection 的技术摘要", async () => {
     renderChatMessages({
       isStreaming: false,
       messages: [
@@ -96,29 +100,41 @@ describe("ChatMessages 流式占位", () => {
       ],
     });
 
-    expect(await screen.findByText("已提交 1 项修改；1 项预览同步失败")).toBeInTheDocument();
+    expect(await screen.findByText("页面已更新")).toBeInTheDocument();
+    expect(
+      screen.queryByText("已提交 1 项修改；1 项预览同步失败"),
+    ).not.toBeInTheDocument();
   });
 
-  it("projection 尚未返回 ack 时显示待验证而不是已更新", async () => {
+  it("不在聊天区展示待验证的 projection 状态", async () => {
     renderChatMessages({
       isStreaming: false,
-      messages: [{
-        id: "assistant-2",
-        role: "assistant",
-        content: "页面已更新",
-        runSummary: {
-          mutations: [{
-            mutationId: "mutation-2",
-            revision: 8,
-            status: "committed",
-            resources: [],
-            actor: "agent",
-          }],
-          projections: [{ revision: 8, surface: "active-preview", status: "pending" }],
+      messages: [
+        {
+          id: "assistant-2",
+          role: "assistant",
+          content: "页面已更新",
+          runSummary: {
+            mutations: [
+              {
+                mutationId: "mutation-2",
+                revision: 8,
+                status: "committed",
+                resources: [],
+                actor: "agent",
+              },
+            ],
+            projections: [
+              { revision: 8, surface: "active-preview", status: "pending" },
+            ],
+          },
         },
-      }],
+      ],
     });
 
-    expect(await screen.findByText("已提交 1 项修改；1 项预览待验证")).toBeInTheDocument();
+    expect(await screen.findByText("页面已更新")).toBeInTheDocument();
+    expect(
+      screen.queryByText("已提交 1 项修改；1 项预览待验证"),
+    ).not.toBeInTheDocument();
   });
 });

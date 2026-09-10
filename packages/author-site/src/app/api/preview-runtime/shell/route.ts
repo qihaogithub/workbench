@@ -6,11 +6,15 @@ import { shouldUsePreviewRuntimeCdn } from "@/lib/preview-runtime-manifest";
 
 export async function GET(request: NextRequest) {
   const requestedSource = request.nextUrl.searchParams.get("runtimeSource");
-  const useCdnRuntime = requestedSource === "cdn" || shouldUsePreviewRuntimeCdn();
+  const previewInstanceId =
+    request.nextUrl.searchParams.get("previewInstanceId") || undefined;
+  const useCdnRuntime =
+    requestedSource === "cdn" || shouldUsePreviewRuntimeCdn();
   const html = generateIframeHtml({
     supportUrlMode: true,
     cdnBaseUrl: getCdnBaseUrl(),
     useCdnRuntime,
+    previewInstanceId,
   });
 
   return new NextResponse(html, {

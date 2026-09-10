@@ -531,6 +531,20 @@
       "contentHash": "cba99715758a4159c236270cf73a2133606d8647516e52787eac97a9a4db27cb",
       "mimeType": "image/png",
       "sourceType": "upload"
+    },
+    {
+      "id": "321ea947bb0f",
+      "filename": "image_1789026530414_0.png",
+      "url": "/api/images/img_5htP5MlfKx_RAQ",
+      "size": 233402,
+      "format": "png",
+      "createdAt": 1789026530714,
+      "createdBy": "ai",
+      "width": 1902,
+      "height": 361,
+      "contentHash": "321ea947bb0fe04762c8eb49c3ada956ee66c3f27b32291d47df8b32e29f10be",
+      "mimeType": "image/png",
+      "sourceType": "upload"
     }
   ]
 }

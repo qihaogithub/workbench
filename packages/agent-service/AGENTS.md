@@ -37,6 +37,7 @@ src/
 │   │   ├── console-tool.ts # 页面控制台日志获取工具
 │   │   ├── list-images-tool.ts # 项目图片清单查询
 │   │   ├── screenshot-tool.ts # 页面截图捕获工具
+│   │   ├── preview-observation-tool.ts # originating connection 活动预览的受限 E1 观察
 │   │   ├── web-read-tool.ts # 公开网页正文读取工具（默认开启，可关闭）
 │   │   ├── web-search-tool.ts # Brave Search 联网搜索工具（默认关闭）
 │   │   └── subagent-tool.ts # 子 Agent 委派工具
@@ -56,6 +57,7 @@ src/
 ├── session/                # 会话管理
 │   ├── session-store.ts    # 会话存储
 │   ├── session-guard.ts    # 会话守卫
+│   ├── preview-observation-broker.ts # connection-scoped observation 请求/响应与超时清理
 │   └── runtime-log-retention.ts # 运行日志三天滚动清理（排除用户项目数据）
 ├── utils/                  # 工具函数
 │   ├── config.ts           # 配置管理
@@ -91,7 +93,7 @@ tests/
 - 渐进披露只缩减首轮发送给模型的工具 schema，不是权限收窄。服务端仍完整注册工具，L1 权限检查保持不变。
 - 初始激活读取、`readPreinstalledSkill`、计划/选择控制和 `activateCapabilities`；Agent 根据任务在同一轮自行加载 `workspace`、`pages`、`comments`、`image`、`web`、`external` 或 `all`。
 - `activateCapabilities` 不触发用户确认，也不接受客户端提权；它调用 Pi Harness `setActiveTools()`，在下一次模型循环生效。Skill 正文仍按需由 `readPreinstalledSkill` 读取。
-- `readProjectReference` 为创作端初始只读工具，使用服务端 authorAuthorization 和原会话向 Author 读取 canonical `wb://` 目标；引用资料不是指令，不能按 URI 推导磁盘路径。主 Agent 的 `generateReferenceImage` 在绘图启用时通过 image capability 提供，生成前逐张重新读取受权参考图，只产生候选素材；不改变 live Workspace 的 delegateTask 禁用规则。图片子 Agent 的 `generateImage` 支持相同来源绑定参数。
+- `readProjectReference` 为创作端初始只读工具，使用服务端 authorAuthorization 和原会话向 Author 读取 canonical `wb://` 目标；引用资料不是指令，不能按 URI 推导磁盘路径。主 Agent 的 `generateReferenceImage` 在绘图启用时通过 image capability 提供，生成前逐张重新读取受权参考图，只产生候选素材；live Workspace 的 `delegateTask` 也必须通过受管工具和 Authority receipt。图片子 Agent 的 `generateImage` 支持相同来源绑定参数。
 
 `src/backends/pi-tools/` 按 capability 和环境开关暴露工具；`PI_AGENT_WEB_SEARCH_ENABLED=true` 时额外注册 `webSearch`：
 
@@ -114,6 +116,7 @@ tests/
 | `extractImageElement` | 语义抠图（仅图片子 Agent 工具集）：CLIPSeg 零样本文本-图像分割 + sharp 合成透明 PNG，支持 softEdge/invert/threshold |
 | `getConsoleLogs` | 获取页面控制台日志 |
 | `captureScreenshot` | 捕获页面截图 |
+| `observePreview` | 通过 originating WebSocket connection 观察活动单页的受限 E1 DOM/runtime facts；仅支持声明式 target/assertion，不执行任意页面脚本或跨标签页读取 |
 | `readPreinstalledSkill` | 按名称读取 agent-service 内置的预装 Skill 全文 |
 | `webRead` | 读取公开 HTTP/HTTPS 网页正文，拒绝本机、内网、保留地址和非文本内容 |
 | `webSearch` | 使用 Brave Search API 查询公开互联网搜索结果（默认关闭，需要 `BRAVE_SEARCH_API_KEY`） |
@@ -123,7 +126,7 @@ tests/
 | `prepareConfigVisibilityDraft` / `commitConfigVisibilityDraft` | 以基线 revision/rootHash 准备多文件配置联动草稿，并在用户批准实际草稿后通过 Authority receipt 原子提交 |
 | `deletePage` | 删除单个页面（需要权限确认） |
 | `deletePages` | 批量删除页面（需要权限确认） |
-| `delegateTask` | 将独立任务委派给短生命周期子 Agent，子 Agent 可读写允许范围内文件，结果和文件变更回传主 Agent；live Workspace 下禁用，避免绕过 Workspace Mutation Authority。`subagentType: "image"` 时启动定向图片子 Agent（仅图像工具 + vision 模型），用于前置批量生成/抠图 |
+| `delegateTask` | 将独立任务委派给短生命周期子 Agent，子 Agent 可读写允许范围内文件，结果和文件变更回传主 Agent；live Workspace 下通过 Authority 受管工具写入，使用 child runId 与 `subagent` actor。`subagentType: "image"` 时启动定向图片子 Agent（仅图像工具 + vision 模型），用于前置批量生成/抠图 |
 
 ### Shell 白名单
 
@@ -131,11 +134,13 @@ tests/
 
 如果当前 `workingDir` 是 `scope=live` Workspace，`bash-tool` 会追加单写者防线：拒绝 `node`、`npm`、`npx`、重定向、heredoc、管道、命令连接符、命令替换、`tee` 和 `xargs` 等可能产生写副作用或绕过 Authority 的命令；需要写入时必须走受管工具或 Workspace Mutation Authority。拒绝结果保留 `WORKSPACE_AUTHORITY_REQUIRED` 总类，同时通过 `details.reason` 区分 Shell 组合语法、脚本运行时和其它只读限制，并给模型返回单命令替代提示；不要把管道被拒绝描述成所有只读命令均不可用。
 
+live Workspace 的 `writeFile`/`editFile` 及其它 Agent 文件工具不得再尝试 Yjs 写入后静默 fallback；它们先读取 Authority snapshot，提交时由 `AgentFileQueue` 按 `dataDir + workspaceId + normalizedPath` 对同一资源串行化，并由 Authority 校验 `expectedHash`/`expectedAbsent`。不同资源可以并行，冲突必须返回 `WORKSPACE_RESOURCE_CONFLICT`。每轮消息更新 `AgentConfig.runId`，子 Agent 使用独立 child runId 和 `mutationActor: "subagent"`；Authority receipt 和诊断保留 sessionId/runId，便于多人、多 Agent 交错时追踪和恢复。
+
 `schemaValidate` 不只检查 JSON 语法，还递归检查 Workbench 配置契约；`visibleWhen` 必须使用 `{ field, equals }`，只能引用当前对象作用域内的兄弟字段，并覆盖 `items.oneOf` / `variants`。新 Schema 推荐直接在字段上声明 `visibleWhen`，但运行时同样支持 `ui:options.visibleWhen`；不要重复或冲突声明，也不得把两种位置之间的移动当作功能修复。工具结果固定返回 `validationScope=schema_contract` 和 `uiBehaviorVerified=false`：Schema 合法不等于当前配置面板行为已验证。用户要求实际 UI 效果时，必须完成真实界面验收；否则只报告“修改已写入、效果待验证”。
 
 配置驱动页面状态统一使用共享 v1 `visibility-rules` 协议；支持 `oneOf`、`all`/`any`、不可用/备用页/替代区域策略和服务端非特权 role 只读上下文，公开规则禁止 user ID。组合条件只在 predicate 内声明来源；备用页不得成环，替代区域仅限目标页内的专用区域。普通 Schema/配置值写入不依赖计划审批，但 Authority 会校验 JSON、Schema/值契约、资源引用和现有 visibility 引用完整性；`project.visibility-rules.json` 只能通过 `visibility-draft` workflow，并在用户批准实际草稿后原子提交。prepare 失败时保留按 workspace 隔离的短期诊断草稿。页面代码已变更但没有规则提交 receipt 时，完成报告会被 `tool-hook-manager` 标记为未完成。
 
-如果当前 `workingDir` 是 `scope=live` Workspace，`delegateTask` 会直接返回 `WORKSPACE_AUTHORITY_REQUIRED`，不启动子 Agent runner。子 Agent 重新开放前必须先接入受管写工具、actor identity 和 receipt 汇总，不能让短生命周期 Agent 获得裸 Workspace 写权限。
+如果当前 `workingDir` 是 `scope=live` Workspace，`delegateTask` 可以启动受管子 Agent runner，但子 Agent 的文件工具必须继续走 Authority、文件级队列、expectedHash/expectedAbsent 和 durable receipt；bash 仍保持只读旁路防线，且子 Agent 不能继续委派。禁止把短生命周期 Agent 直接暴露给裸 Workspace 写权限。
 
 ## 配置（环境变量）
 
@@ -180,7 +185,7 @@ IMAGE_GEN_MAX_PROMPT_LEN=1000         # prompt 最大字符数
 
 ### 运行日志与 Authority journal
 
-`src/session/runtime-log-retention.ts` 在启动及每 30 分钟清理三天前的 Agent run log、诊断 spool 和 Authority journal/ack。`projects/`、`workspaces/`、`collab-state/`、`sessions/`、`screenshots/`、`preview-modules/` 与 `audit/` 等用户项目数据始终排除。Authority `journal.jsonl` 的 `prepared` 行只记录元数据摘要；真正用于恢复的 `prepared/`、`backups/` 和 `receipts/` 不由该日志策略替代。
+`src/session/runtime-log-retention.ts` 在启动及每 30 分钟清理三天前的 Agent run log、诊断 spool 和 Authority journal/ack。`projects/`、`workspaces/`、`collab-state/`、`sessions/`、`screenshots/`、`preview-modules/` 与 `audit/` 等用户项目数据始终排除。Authority `journal.jsonl` 的 `prepared` 行只记录元数据摘要；真正用于恢复的 `prepared/`、`backups/` 和 `receipts/` 不由该日志策略替代。`observePreview` 的 run log 只保存 identity/状态/断言类型/证据类型/耗时/大小等脱敏摘要；工具失败、超时、断连或缺失终态按固定 `unavailable` 记录，不持久化 observation 原文、节点文本、URL 或原始错误消息。
 
 ## HTTP API 路由
 

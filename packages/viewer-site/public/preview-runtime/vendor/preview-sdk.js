@@ -31,6 +31,89 @@ function cx() {
   return Array.from(arguments).filter(Boolean).join(' ');
 }
 
+// Realm-local, connection-local preview probes.  The WeakMap intentionally
+// keeps the registry private to this SDK realm; the stable
+// element.__workbenchPreviewProbe__ property is only a narrow host bridge
+// and never exposes user code, textures, or raw assets.
+const previewProbeRegistry = new WeakMap();
+function safeProbeBounds(value) {
+  if (!value || typeof value !== 'object') return null;
+  const x = Number(value.x), y = Number(value.y), width = Number(value.width), height = Number(value.height);
+  if (![x, y, width, height].every(Number.isFinite) || width < 0 || height < 0) return null;
+  if (Math.abs(x) > 100000 || Math.abs(y) > 100000 || width > 10000 || height > 10000) return null;
+  return { x, y, width, height };
+}
+function safeProbeNumber(value, max = 100000) {
+  const number = Number(value);
+  return Number.isFinite(number) && Math.abs(number) <= max ? number : undefined;
+}
+function sanitizePreviewProbeSnapshot(value) {
+  if (!value || typeof value !== 'object' || value.kind !== 'spine') return null;
+  const canvas = value.canvas && typeof value.canvas === 'object' ? value.canvas : null;
+  const cssWidth = safeProbeNumber(canvas && canvas.cssWidth, 10000);
+  const cssHeight = safeProbeNumber(canvas && canvas.cssHeight, 10000);
+  const backingWidth = safeProbeNumber(canvas && canvas.backingWidth, 10000);
+  const backingHeight = safeProbeNumber(canvas && canvas.backingHeight, 10000);
+  if (![cssWidth, cssHeight, backingWidth, backingHeight].every((number) => number !== undefined && number >= 0)) return null;
+  const result = {
+    kind: 'spine', ready: value.ready === true,
+    fit: value.fit === 'cover' || value.fit === 'none' ? value.fit : 'contain',
+    alignment: typeof value.alignment === 'string' ? value.alignment : 'center',
+    canvas: { cssWidth, cssHeight, backingWidth, backingHeight },
+    sampledAt: Number.isFinite(Number(value.sampledAt)) ? Number(value.sampledAt) : Date.now(),
+    precision: value.precision === 'painted-bounds' ? 'painted-bounds' : 'runtime-self-reported',
+  };
+  const skeletonBounds = safeProbeBounds(value.skeletonBounds);
+  if (skeletonBounds) result.skeletonBounds = skeletonBounds;
+  const paintedBounds = safeProbeBounds(value.paintedBounds);
+  if (paintedBounds) result.paintedBounds = paintedBounds;
+  if (value.camera && typeof value.camera === 'object') {
+    const x = safeProbeNumber(value.camera.x), y = safeProbeNumber(value.camera.y), zoom = safeProbeNumber(value.camera.zoom, 10000);
+    const viewportWidth = safeProbeNumber(value.camera.viewportWidth, 10000);
+    const viewportHeight = safeProbeNumber(value.camera.viewportHeight, 10000);
+    if (x !== undefined && y !== undefined && zoom !== undefined && zoom > 0 && viewportWidth !== undefined && viewportWidth >= 0 && viewportHeight !== undefined && viewportHeight >= 0) {
+      result.camera = { x, y, zoom, viewportWidth, viewportHeight };
+    }
+  }
+  const animationName = typeof value.animationName === 'string' ? value.animationName.slice(0, 256) : undefined;
+  const trackTime = safeProbeNumber(value.trackTime, 100000);
+  const duration = safeProbeNumber(value.duration, 100000);
+  if (animationName !== undefined) result.animationName = animationName;
+  if (typeof value.animationPlaying === 'boolean') result.animationPlaying = value.animationPlaying;
+  if (typeof value.loopEnabled === 'boolean') result.loopEnabled = value.loopEnabled;
+  if (trackTime !== undefined) result.trackTime = trackTime;
+  if (duration !== undefined) result.duration = duration;
+  return result;
+}
+const previewProbeBridge = {
+  register(target, inspector) {
+    if (!target || (typeof target !== 'object' && typeof target !== 'function') || typeof inspector !== 'function') return () => {};
+    const entry = { inspector };
+    previewProbeRegistry.set(target, entry);
+    const bridge = { inspect: () => previewProbeBridge.inspect(target) };
+    try { target.__workbenchPreviewProbe__ = bridge; } catch (e) {}
+    return () => {
+      if (previewProbeRegistry.get(target) !== entry) return;
+      previewProbeRegistry.delete(target);
+      try { if (target.__workbenchPreviewProbe__ === bridge) delete target.__workbenchPreviewProbe__; } catch (e) {}
+    };
+  },
+  unregister(target) {
+    const entry = previewProbeRegistry.get(target);
+    if (!entry) return;
+    previewProbeRegistry.delete(target);
+    try { delete target.__workbenchPreviewProbe__; } catch (e) {}
+  },
+  inspect(target) {
+    const entry = target && previewProbeRegistry.get(target);
+    if (!entry) return null;
+    try { return sanitizePreviewProbeSnapshot(entry.inspector()); } catch (e) { return null; }
+  },
+};
+if (typeof window !== 'undefined') {
+  window.__WORKBENCH_PREVIEW_PROBES__ = previewProbeBridge;
+}
+
 export function Icon(props) {
   const { name = 'circle', icon, className, title, ...rest } = props || {};
   const rawName = String(icon || name || 'circle');
@@ -475,6 +558,7 @@ export function SpinePlayer(props) {
     let audioContext = null;
     let audioUnlocked = false;
     let audioGestureObserved = false;
+    let spineProbeUnregister = null;
     const audioBufferCache = new Map();
     const activeAudioSources = new Set();
     let spineFit = fit;
@@ -501,6 +585,46 @@ export function SpinePlayer(props) {
     canvas.style.display = 'block';
     container.appendChild(canvas);
     canvasRef.current = canvas;
+
+    function readSpineBounds() {
+      if (!skeletonObj) return null;
+      const offset = { x: 0, y: 0, set(x, y) { this.x = x; this.y = y; return this; } };
+      const size = { x: 0, y: 0, set(x, y) { this.x = x; this.y = y; return this; } };
+      try { skeletonObj.getBounds(offset, size); } catch (e) { return null; }
+      return safeProbeBounds({ x: offset.x, y: offset.y, width: size.x, height: size.y });
+    }
+    function readProjectedPaintedBounds(bounds, camera, width, height, originX = 0, originY = 0) {
+      if (!bounds || !camera || !(camera.zoom > 0) || !(width > 0) || !(height > 0)) return null;
+      const left = width / 2 + (bounds.x - camera.x) / camera.zoom;
+      const right = width / 2 + (bounds.x + bounds.width - camera.x) / camera.zoom;
+      const top = height / 2 - (bounds.y + bounds.height - camera.y) / camera.zoom;
+      const bottom = height / 2 - (bounds.y - camera.y) / camera.zoom;
+      return safeProbeBounds({ x: left + originX, y: top + originY, width: right - left, height: bottom - top });
+    }
+    function snapshotSpineProbe() {
+      const cssWidth = canvas.clientWidth || canvas.width || 0;
+      const cssHeight = canvas.clientHeight || canvas.height || 0;
+      const canvasRect = canvas.getBoundingClientRect();
+      const camera = sceneRenderer && sceneRenderer.camera
+        ? { x: Number(sceneRenderer.camera.position.x), y: Number(sceneRenderer.camera.position.y), zoom: Number(sceneRenderer.camera.zoom), viewportWidth: cssWidth, viewportHeight: cssHeight }
+        : undefined;
+      const skeletonBounds = readSpineBounds();
+      const animationEntry = state && state.tracks && state.tracks[0];
+      return {
+        kind: 'spine', ready: !!(sceneRenderer && skeletonObj && state),
+        animationName: animationEntry && animationEntry.animation && typeof animationEntry.animation.name === 'string' ? animationEntry.animation.name : undefined,
+        animationPlaying: animationEntry ? animationEntry.isComplete !== true : undefined,
+        loopEnabled: animationEntry ? animationEntry.loop === true : undefined,
+        trackTime: animationEntry ? Number(animationEntry.trackTime) : undefined,
+        duration: animationEntry && animationEntry.animation ? Number(animationEntry.animation.duration) : undefined,
+        skeletonBounds, camera,
+        fit: normalizeSpineFit(spineFit), alignment: normalizeSpineAlignment(spineAlignment),
+        canvas: { cssWidth, cssHeight, backingWidth: canvas.width || 0, backingHeight: canvas.height || 0 },
+        paintedBounds: readProjectedPaintedBounds(skeletonBounds, camera, cssWidth, cssHeight, Number(canvasRect.x) || 0, Number(canvasRect.y) || 0),
+        sampledAt: Date.now(), precision: 'painted-bounds',
+      };
+    }
+    spineProbeUnregister = previewProbeBridge.register(canvas, snapshotSpineProbe);
 
     function unlockAudio() {
       audioGestureObserved = true;
@@ -694,6 +818,8 @@ export function SpinePlayer(props) {
       disposed = true;
       cancelled = true;
       unlockAudioRef.current = () => {};
+      if (spineProbeUnregister) spineProbeUnregister();
+      spineProbeUnregister = null;
       unlockEvents.forEach((eventName) => window.removeEventListener(eventName, unlockAudio));
       if (animFrame) cancelAnimationFrame(animFrame);
       activeAudioSources.forEach((source) => { try { source.stop(); } catch (e) {} });

@@ -49,7 +49,9 @@ describe("useWorkspaceAuthorityState", () => {
   });
 
   it("初始化时应拉取 Authority 状态", async () => {
-    const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
+    const { result } = renderHook(() =>
+      useWorkspaceAuthorityState(BASE_OPTIONS),
+    );
 
     await act(async () => {
       jest.advanceTimersByTime(0);
@@ -64,7 +66,9 @@ describe("useWorkspaceAuthorityState", () => {
   });
 
   it("markDraftChanged 应递增 draftVersion", async () => {
-    const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
+    const { result } = renderHook(() =>
+      useWorkspaceAuthorityState(BASE_OPTIONS),
+    );
 
     await act(async () => {
       jest.advanceTimersByTime(0);
@@ -86,7 +90,9 @@ describe("useWorkspaceAuthorityState", () => {
   });
 
   it("轮询事件应更新 committedRevision", async () => {
-    const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
+    const { result } = renderHook(() =>
+      useWorkspaceAuthorityState(BASE_OPTIONS),
+    );
 
     await act(async () => {
       jest.advanceTimersByTime(0);
@@ -126,7 +132,9 @@ describe("useWorkspaceAuthorityState", () => {
   });
 
   it("轮询事件应检测 revision gap", async () => {
-    const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
+    const { result } = renderHook(() =>
+      useWorkspaceAuthorityState(BASE_OPTIONS),
+    );
 
     await act(async () => {
       jest.advanceTimersByTime(0);
@@ -168,7 +176,9 @@ describe("useWorkspaceAuthorityState", () => {
   it("拉取失败时应设置 isConnected = false", async () => {
     mockReadState.mockRejectedValueOnce(new Error("network error"));
 
-    const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
+    const { result } = renderHook(() =>
+      useWorkspaceAuthorityState(BASE_OPTIONS),
+    );
 
     await act(async () => {
       jest.advanceTimersByTime(0);
@@ -180,7 +190,9 @@ describe("useWorkspaceAuthorityState", () => {
   });
 
   it("单次轮询失败不应标记离线，连续两次失败后才标记", async () => {
-    const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
+    const { result } = renderHook(() =>
+      useWorkspaceAuthorityState(BASE_OPTIONS),
+    );
 
     await act(async () => {
       jest.advanceTimersByTime(0);
@@ -223,7 +235,9 @@ describe("useWorkspaceAuthorityState", () => {
   });
 
   it("ackPreview 应更新 previewAppliedRevision", async () => {
-    const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
+    const { result } = renderHook(() =>
+      useWorkspaceAuthorityState(BASE_OPTIONS),
+    );
 
     await act(async () => {
       jest.advanceTimersByTime(0);
@@ -236,6 +250,28 @@ describe("useWorkspaceAuthorityState", () => {
     expect(result.current.previewAppliedRevision).toBe(5);
     expect(result.current.previewStatus).toBe("applied");
     expect(mockAckPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it("重复 applied ack 不重复触发状态更新", async () => {
+    const { result } = renderHook(() =>
+      useWorkspaceAuthorityState(BASE_OPTIONS),
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(0);
+    });
+
+    act(() => {
+      result.current.ackPreview(5 as never, "applied");
+    });
+    const stateAfterFirstAck = result.current;
+
+    act(() => {
+      result.current.ackPreview(5 as never, "applied");
+    });
+
+    expect(result.current).toBe(stateAfterFirstAck);
+    expect(mockAckPreview).toHaveBeenCalledTimes(2);
   });
 
   it("投影 ack 使用独立 revision 游标并发布给对话摘要回流", async () => {
@@ -253,7 +289,9 @@ describe("useWorkspaceAuthorityState", () => {
     mockReadAcks.mockResolvedValueOnce([projectionAck]);
 
     try {
-      const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
+      const { result } = renderHook(() =>
+        useWorkspaceAuthorityState(BASE_OPTIONS),
+      );
 
       await act(async () => {
         jest.advanceTimersByTime(0);
@@ -288,7 +326,9 @@ describe("useWorkspaceAuthorityState", () => {
   });
 
   it("setCanonicalStatus 应更新 canonical 状态", async () => {
-    const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
+    const { result } = renderHook(() =>
+      useWorkspaceAuthorityState(BASE_OPTIONS),
+    );
 
     await act(async () => {
       jest.advanceTimersByTime(0);
@@ -303,7 +343,9 @@ describe("useWorkspaceAuthorityState", () => {
   });
 
   it("setConflict 应设置冲突", async () => {
-    const { result } = renderHook(() => useWorkspaceAuthorityState(BASE_OPTIONS));
+    const { result } = renderHook(() =>
+      useWorkspaceAuthorityState(BASE_OPTIONS),
+    );
 
     await act(async () => {
       jest.advanceTimersByTime(0);

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import {
@@ -673,8 +674,14 @@ export async function POST(
       access.projectId &&
       isLiveWorkspace(access.workspaceId)
     ) {
-      // Yjs-First: write through collab room — this IS the write, no need to
-      // flush first or read expectedHash from disk.
+      // Legacy server-side canvas writes still go through the Yjs room, but
+      // carry the canonical file precondition so a stale request cannot
+      // replace a newer room state. The normal editor path writes Yjs
+      // directly and does not use this endpoint.
+      const workspaceLayoutPath = getCanvasLayoutPath(access.workspacePath);
+      const previous = fs.existsSync(workspaceLayoutPath)
+        ? fs.readFileSync(workspaceLayoutPath, "utf-8")
+        : undefined;
       const agentServiceUrl = getServerAgentServiceUrl();
       const writeResponse = await fetch(
         `${agentServiceUrl}/api/collab/projects/${encodeURIComponent(access.projectId!)}` +
@@ -685,7 +692,12 @@ export async function POST(
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({
+            content,
+            ...(previous === undefined
+              ? { expectedAbsent: true }
+              : { expectedHash: crypto.createHash("sha256").update(previous).digest("hex") }),
+          }),
         },
       );
       if (!writeResponse.ok) {

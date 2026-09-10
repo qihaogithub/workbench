@@ -28,6 +28,7 @@
 | 创作端 CLI 工具维护 | [cli-maintenance](./contexts/cli-maintenance.md) | [daily-check](./runbooks/daily-check.md) | [cli-maintenance-current](./state/cli-maintenance-current.md) |
 | 测试工具与脚本治理 | [test-tools-maintenance](./contexts/test-tools-maintenance.md) | [daily-check](./runbooks/daily-check.md)、[weekly-regression](./runbooks/weekly-regression.md) | [test-tools-current](./state/test-tools-current.md) |
 | 问题排查与清理 | [issue-triage-and-cleanup](./contexts/issue-triage-and-cleanup.md) | [weekly-cleanup](./runbooks/weekly-cleanup.md) | [issue-triage-current](./state/issue-triage-current.md) |
+| 非 viewer 服务自动部署 | [non-viewer-auto-deploy](./contexts/non-viewer-auto-deploy.md) | [non-viewer-auto-deploy](./runbooks/non-viewer-auto-deploy.md) | [non-viewer-auto-deploy-current](./state/non-viewer-auto-deploy-current.md) |
 
 ## 高频诊断
 

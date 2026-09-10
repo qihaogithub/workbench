@@ -1,4 +1,7 @@
-import type { ConfigCommentTarget as SharedConfigCommentTarget, PagePresentationProfile } from "@workbench/shared";
+import type {
+  ConfigCommentTarget as SharedConfigCommentTarget,
+  PagePresentationProfile,
+} from "@workbench/shared";
 import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
 import type {
   ConsoleLogPayload,
@@ -10,6 +13,7 @@ import type {
   VisualPropertyChange,
   VisualStyleChange,
   AppActionPayload,
+  PreviewLifecycleIdentity,
 } from "./iframe-types";
 import type { FieldConfig } from "./schema-parser";
 import type { ConfigFieldType } from "./config-categories";
@@ -18,6 +22,7 @@ import type {
   MarkdownReferenceContext,
   MarkdownReferenceProvider,
 } from "./DocumentEditor";
+import type { PreviewObservationRegistry } from "./preview-observation-registry";
 
 export type {
   IframeOutMessageType,
@@ -34,6 +39,7 @@ export type {
   VisualPropertyChangeKind,
   VisualStyleChange,
   AppActionPayload,
+  PreviewLifecycleIdentity,
 } from "./iframe-types";
 
 export interface PreviewSize {
@@ -101,6 +107,14 @@ export interface PreviewPanelProps {
   compiledJsUrl?: string;
   cssImports?: string[];
   configData?: Record<string, unknown>;
+  /** Authority revision frozen when the current render generation starts. */
+  previewRevision?: number;
+  previewObservationRegistry?: PreviewObservationRegistry;
+  previewObservationContext?: {
+    projectId: string;
+    workspaceId: string;
+    rootHash?: string;
+  };
   appState?: Record<string, unknown>;
   routeParams?: Record<string, unknown>;
   sdkFiles?: Record<string, string>;
@@ -113,7 +127,12 @@ export interface PreviewPanelProps {
   onConsoleEntry?: (entry: ConsoleLogPayload) => void;
   onAppAction?: (action: AppActionPayload & { pageId?: string }) => void;
   onContentHeightChange?: (contentHeight: number) => void;
-  onContentLoaded?: (details?: { requestId: number }) => void;
+  onContentLoaded?: (details?: {
+    requestId: number;
+    previewInstanceId?: string;
+    renderGeneration?: number;
+    revision?: number;
+  }) => void;
   activityState?: "active" | "sleeping";
   effectiveHeight?: number;
   onPositionableSizes?: (sizes: Record<string, PositionableSizeItem>) => void;
@@ -131,7 +150,12 @@ export interface PreviewPanelProps {
   staticPrototypeRequestKey?: number;
   onStaticPrototypeSnapshot?: (
     result:
-      | { ok: true; html: string; css: string; rejectionReasons: SnapshotRejectionReason[] }
+      | {
+          ok: true;
+          html: string;
+          css: string;
+          rejectionReasons: SnapshotRejectionReason[];
+        }
       | { ok: false; error: string },
   ) => void;
   /** @deprecated 右键图层菜单已由 PreviewPanel 在预览位置内渲染，仅保留兼容旧调用方。 */
@@ -228,13 +252,25 @@ export interface ConfigFormProps {
   /** 创作端从规范详情跳转至文档视图；浏览端不传。 */
   onEditDesignSpec?: (docId: string, entryId: string) => void;
   /** 打开配置项关联的设计规范侧边气泡。 */
-  onOpenDesignSpec?: (spec: DesignSpecEntryLink, fieldTitle: string, anchor?: { top: number; bottom: number }, trigger?: HTMLElement | null) => void;
+  onOpenDesignSpec?: (
+    spec: DesignSpecEntryLink,
+    fieldTitle: string,
+    anchor?: { top: number; bottom: number },
+    trigger?: HTMLElement | null,
+  ) => void;
   /** 创作端提供时，字段标题可打开对应的配置定义编辑器；浏览端不传。 */
-  onEditConfigDefinition?: (fieldKey: string, field: FieldConfig, schemaFieldPath?: string) => void;
+  onEditConfigDefinition?: (
+    fieldKey: string,
+    field: FieldConfig,
+    schemaFieldPath?: string,
+  ) => void;
   /** Per-field capabilities. Omit to retain the legacy readonly behaviour. */
   configItemCapabilities?: ConfigItemCapabilities;
   /** Opens the host-owned config comment flow for a field. */
-  onAddConfigComment?: (target: ConfigCommentTarget, trigger?: HTMLElement | null) => void;
+  onAddConfigComment?: (
+    target: ConfigCommentTarget,
+    trigger?: HTMLElement | null,
+  ) => void;
   /** Returns whether any comment thread exists for a field target. */
   hasConfigComment?: (target: ConfigCommentTarget) => boolean;
   /** 浏览端只在存在批注时展示标签；创作端留空以保留悬浮发现入口。 */
@@ -319,7 +355,6 @@ export interface ImageConfigTarget {
   onCommit?: (url: string) => void;
 }
 
-
 /** 宿主提供的白板启动能力；demo-ui 不进行项目或网络 IO。 */
 export type WhiteboardLauncher = (target: ImageConfigTarget) => void;
 
@@ -355,7 +390,13 @@ export interface ConfigDefinitionFocus {
 export type PreviewMode = "single" | "canvas" | "document";
 
 /** 画布工具模式：hand=拖动工具（仅平移画布），select=选择工具（可移动/缩放页面） */
-export type CanvasToolMode = "hand" | "select" | "text" | "image" | "navigation" | "section";
+export type CanvasToolMode =
+  | "hand"
+  | "select"
+  | "text"
+  | "image"
+  | "navigation"
+  | "section";
 
 export type CanvasInteractionMode = "readonly" | "viewer" | "editor";
 
@@ -451,11 +492,11 @@ export interface CanvasPageData {
   sketchScene?: string;
   sketchMeta?: Record<string, unknown>;
   configData?: Record<string, unknown>;
-  schema?: string;                    // config.schema.json 原始 JSON 字符串
+  schema?: string; // config.schema.json 原始 JSON 字符串
   /** 未筛选的页面配置总数；未知时省略，画布入口沿用默认详情行为。 */
   configCount?: number;
-  isReference?: boolean;              // 是否为引用页
-  sourceProjectId?: string;           // 引用页的源项目 ID
+  isReference?: boolean; // 是否为引用页
+  sourceProjectId?: string; // 引用页的源项目 ID
   /** 业务配置驱动的页面状态；创作端保留页面卡片并以置灰方式提示。 */
   visibilityStatus?: {
     visible: boolean;

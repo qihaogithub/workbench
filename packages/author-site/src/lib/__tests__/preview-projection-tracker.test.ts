@@ -17,7 +17,8 @@ describe("PreviewProjectionTracker", () => {
     it("所有 surface 初始状态应为 revision=0 且未失效", () => {
       for (const surface of ALL_SURFACES) {
         const state = tracker.getSurfaceState(surface);
-        expect(state.appliedRevision).toBe(0);
+        expect(state.committedRevision).toBe(0);
+        expect(state.projectedRevision).toBe(0);
         expect(state.invalidated).toBe(false);
       }
     });
@@ -40,7 +41,8 @@ describe("PreviewProjectionTracker", () => {
       expect(affected).toContain("active-preview");
       const state = tracker.getSurfaceState("active-preview");
       expect(state.invalidated).toBe(true);
-      expect(state.appliedRevision).toBe(1);
+      expect(state.committedRevision).toBe(1);
+      expect(state.projectedRevision).toBe(0);
     });
 
     it("canvas 相关资源变更时应使 canvas-preview 失效", () => {
@@ -70,9 +72,10 @@ describe("PreviewProjectionTracker", () => {
         revision: 3, // 旧 revision
         resources: [{ path: "b.ts", action: "modified" }],
       });
-      // appliedRevision 应保持 5
+      // committed baseline 应保持 5，projected 仍未推进
       const state = tracker.getSurfaceState("active-preview");
-      expect(state.appliedRevision).toBe(5);
+      expect(state.committedRevision).toBe(5);
+      expect(state.projectedRevision).toBe(0);
     });
   });
 
@@ -101,14 +104,14 @@ describe("PreviewProjectionTracker", () => {
       expect(ack).toBeNull();
     });
 
-    it("更新到更高 revision 的 ack 应成功", () => {
+    it("未提交的更高 revision ack 应被拒绝", () => {
       tracker.onCommitted({
         revision: 3,
         resources: [{ path: "a.ts", action: "modified" }],
       });
       const ack = tracker.ackPreview(5, "active-preview");
-      expect(ack).not.toBeNull();
-      expect(tracker.getSurfaceState("active-preview").appliedRevision).toBe(5);
+      expect(ack).toBeNull();
+      expect(tracker.getSurfaceState("active-preview").projectedRevision).toBe(0);
     });
   });
 
@@ -134,7 +137,8 @@ describe("PreviewProjectionTracker", () => {
 
       for (const surface of ALL_SURFACES) {
         const state = tracker.getSurfaceState(surface);
-        expect(state.appliedRevision).toBe(10);
+        expect(state.committedRevision).toBe(10);
+        expect(state.projectedRevision).toBe(0);
         expect(state.invalidated).toBe(true);
       }
     });

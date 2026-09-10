@@ -308,6 +308,7 @@ autosave/collab/preview 三类专项查询均包含 `autosave`、`collab`、`pre
 
 - `workspaceFlows`：按 Workspace + Authority revision 串联 mutation received/committed、projection applied/failed/gap 和 canonical materialization。
 - `performance.metrics`：固定输出 autosave debounce wait、queue wait、commit latency、remote update latency、draft preview latency、projection latency、reconnect convergence 和 canonical lag 的 `count/min/p50/p95/p99/max/average`。无样本时 count 为 `0`，分位值为 `null`。
+- `previewObservations`：只读扫描已脱敏的 `agent-run-logs`，汇总选定日志样本中的 Agent `runCount`、发起过 observation 的 `observationRunCount`、`observationRate`、observation 调用量、`observed/stale/unavailable/unsupported` 状态、延迟与载荷 `p50/p90/p95/p99`、断言结果、E1/E2/E3 evidence 分布、timeout/stale 计数，以及按“mutation committed + 显式断言 + finish 成功 + projection applied + 至少一条断言通过”定义的技术修复成功率。缺少 run 样本时 `observationRate` 为 `null`；缺少 observation 样本时各 observation 计数为 `0`，分位值和成功率为 `null`；工具失败、超时、断连或已发起但缺失终态的调用会以 `unavailable` 计入，不会回传 observation 原文。`runCount` 包含没有调用 observation 的 Agent run，便于计算实际调用率；按项目过滤时优先使用 `run_start` 的显式 `projectId`，否则从受限 `workingDir` 的 `projects/<projectId>` 段推导，历史 `demoId` 仅作兜底，无法确定归属的记录 fail-closed。
 
 ---
 

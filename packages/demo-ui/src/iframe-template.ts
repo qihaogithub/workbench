@@ -9,6 +9,8 @@ export interface IframeTemplateOptions {
   supportUrlMode?: boolean;
   baseOrigin?: string;
   spineAssetBaseUrl?: string;
+  /** Identity of the host preview instance; echoed by lifecycle messages. */
+  previewInstanceId?: string;
 }
 
 const DEFAULT_CDN_BASE = "https://esm.sh";
@@ -20,11 +22,12 @@ const DEFAULT_RUNTIME_IMPORTS: Record<string, string> = {
   "react/jsx-dev-runtime": "/preview-runtime/vendor/react-jsx-dev-runtime.js",
   "lucide-react": "/preview-runtime/vendor/lucide-react.js",
   "framer-motion": "/preview-runtime/vendor/framer-motion.js",
-  "svgaplayerweb": "/preview-runtime/vendor/svgaplayerweb.js",
+  svgaplayerweb: "/preview-runtime/vendor/svgaplayerweb.js",
   "lottie-web": "/preview-runtime/vendor/lottie-web.js",
   "@rive-app/canvas": "/preview-runtime/vendor/rive-app-canvas.js",
   "@esotericsoftware/spine-webgl": "/preview-runtime/vendor/spine-webgl.js",
-  "@esotericsoftware/spine-webgl-42": "/preview-runtime/vendor/spine-webgl-42.js",
+  "@esotericsoftware/spine-webgl-42":
+    "/preview-runtime/vendor/spine-webgl-42.js",
   "@preview/sdk": "/preview-runtime/vendor/preview-sdk.js",
 };
 
@@ -2052,7 +2055,11 @@ function generateCssLinks(cssImports: string[], cdnBase: string): string {
 }
 
 function resolveRuntimeUrl(url: string, runtimeBaseUrl?: string): string {
-  if (/^https?:\/\//.test(url) || url.startsWith("data:") || url.startsWith("blob:")) {
+  if (
+    /^https?:\/\//.test(url) ||
+    url.startsWith("data:") ||
+    url.startsWith("blob:")
+  ) {
     return url;
   }
   if (!runtimeBaseUrl) return url;
@@ -2080,10 +2087,13 @@ function buildRuntimeImports(
       "react/jsx-dev-runtime": `${cdnBase}/react@19.2.3/jsx-dev-runtime`,
       "lucide-react": `${cdnBase}/lucide-react@0.575.0?deps=react@19.2.3,react-dom@19.2.3`,
       "framer-motion": `${cdnBase}/framer-motion@12.38.0?deps=react@19.2.3,react-dom@19.2.3`,
-      "svgaplayerweb": `${cdnBase}/svgaplayerweb@2.3.1`,
+      svgaplayerweb: `${cdnBase}/svgaplayerweb@2.3.1`,
       "lottie-web": `${cdnBase}/lottie-web@5.13.0`,
       "@rive-app/canvas": `${cdnBase}/@rive-app/canvas@2.38.1`,
-      "@preview/sdk": resolveRuntimeUrl(DEFAULT_RUNTIME_IMPORTS["@preview/sdk"], runtimeBaseUrl),
+      "@preview/sdk": resolveRuntimeUrl(
+        DEFAULT_RUNTIME_IMPORTS["@preview/sdk"],
+        runtimeBaseUrl,
+      ),
     };
   }
 
@@ -2109,9 +2119,14 @@ export function generateIframeHtml(
     supportUrlMode = true,
     baseOrigin,
     spineAssetBaseUrl,
+    previewInstanceId,
   } = options;
   const cdnBase = cdnBaseUrl || DEFAULT_CDN_BASE;
-  const runtimeImports = buildRuntimeImports(cdnBase, runtimeBaseUrl, useCdnRuntime);
+  const runtimeImports = buildRuntimeImports(
+    cdnBase,
+    runtimeBaseUrl,
+    useCdnRuntime,
+  );
   const tailwindRuntimeUrl = useCdnRuntime
     ? "https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"
     : resolveRuntimeUrl(
@@ -2121,9 +2136,12 @@ export function generateIframeHtml(
 
   const cssLinks = generateCssLinks(cssImports, cdnBase);
   const initialCode = compiledCode ? JSON.stringify(compiledCode) : "null";
-  const initialCodeUrl = compiledCodeUrl ? JSON.stringify(compiledCodeUrl) : "null";
+  const initialCodeUrl = compiledCodeUrl
+    ? JSON.stringify(compiledCodeUrl)
+    : "null";
   const initialConfig = JSON.stringify(configData || {});
   const initialSpineAssetBaseUrl = JSON.stringify(spineAssetBaseUrl || "");
+  const initialPreviewInstanceId = JSON.stringify(previewInstanceId || null);
 
   const loadModuleFn = `
     function reportRuntimeError(payload) {
@@ -2138,7 +2156,7 @@ export function generateIframeHtml(
           timestamp: Date.now()
         }));
       } catch (_err) {}
-      window.parent.postMessage({ type: 'RUNTIME_ERROR', requestId: currentRequestId, ...safePayload }, '*');
+      window.parent.postMessage({ type: 'RUNTIME_ERROR', requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision, ...safePayload }, '*');
     }
 
     function reportRuntimeTiming(stage, details) {
@@ -2148,7 +2166,10 @@ export function generateIframeHtml(
           source: 'preview-runtime',
           stage: stage,
           sinceShellStart: Math.round(now - shellStartedAt),
-          requestId: currentRequestId
+          requestId: currentRequestId,
+          previewInstanceId: currentPreviewInstanceId,
+          renderGeneration: currentRenderGeneration,
+          revision: currentRevision
         }, details || {});
         try { console.info('[PreviewRuntime]', payload); } catch (_consoleErr) {}
         window.parent.postMessage({
@@ -2261,6 +2282,9 @@ export function generateIframeHtml(
         var isModuleUrl = type === 'UPDATE_MODULE' || !!isUrl;
         var incomingCode = moduleUrl || code;
         currentRequestId = typeof requestId === 'number' ? requestId : null;
+        currentRenderGeneration = typeof event.data.renderGeneration === 'number' ? event.data.renderGeneration : currentRequestId;
+        currentRevision = typeof event.data.revision === 'number' ? event.data.revision : null;
+        if (typeof event.data.previewInstanceId === 'string') currentPreviewInstanceId = event.data.previewInstanceId;
         reportRuntimeTiming('update_code_received', { isUrl: isModuleUrl });
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
@@ -2278,6 +2302,9 @@ export function generateIframeHtml(
     : `
       if (type === 'UPDATE_CODE') {
         currentRequestId = typeof requestId === 'number' ? requestId : null;
+        currentRenderGeneration = typeof event.data.renderGeneration === 'number' ? event.data.renderGeneration : currentRequestId;
+        currentRevision = typeof event.data.revision === 'number' ? event.data.revision : null;
+        if (typeof event.data.previewInstanceId === 'string') currentPreviewInstanceId = event.data.previewInstanceId;
         reportRuntimeTiming('update_code_received', { isUrl: false });
         currentConfig = newConfigData || {};
         window.__DEMO_PROPS__ = currentConfig;
@@ -2317,7 +2344,7 @@ export function generateIframeHtml(
           });
       }`;
 
-  const baseTag = baseOrigin ? `<base href="${baseOrigin}/">` : '';
+  const baseTag = baseOrigin ? `<base href="${baseOrigin}/">` : "";
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -2361,6 +2388,9 @@ ${cssLinks}
     let currentComponent = null;
     let updateVersion = 0;
     let currentRequestId = null;
+    let currentPreviewInstanceId = ${initialPreviewInstanceId};
+    let currentRenderGeneration = null;
+    let currentRevision = null;
     let isSleeping = false;
 
     window.__DEMO_PROPS__ = currentConfig;
@@ -2469,7 +2499,7 @@ ${cssLinks}
       React.useLayoutEffect(function() {
         if (props.version !== updateVersion || props.requestId !== currentRequestId) return;
         reportRuntimeTiming('render_committed', { version: props.version });
-        window.parent.postMessage({ type: 'LOADED', requestId: props.requestId }, '*');
+        window.parent.postMessage({ type: 'LOADED', requestId: props.requestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
       }, [props.version, props.requestId]);
       return null;
     }
@@ -2498,7 +2528,7 @@ ${cssLinks}
       requestAnimationFrame(function() {
         var h = measureFullContentHeight();
         if (h >= 50) {
-          window.parent.postMessage({ type: 'RESIZE', height: h, requestId: currentRequestId }, '*');
+          window.parent.postMessage({ type: 'RESIZE', height: h, requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
         }
       });
       setTimeout(function() {
@@ -2570,7 +2600,10 @@ ${cssLinks}
     window.addEventListener('message', (event) => {
       if (event.source !== window.parent) return;
 
-      const { type, code, moduleUrl, configData: newConfigData, cssImports: newCssImports, appState, routeParams, spineAssetBaseUrl, requestId${supportUrlMode ? ", isUrl" : ""} } = event.data;
+      const { type, code, moduleUrl, configData: newConfigData, cssImports: newCssImports, appState, routeParams, spineAssetBaseUrl, requestId, previewInstanceId: incomingPreviewInstanceId, renderGeneration: incomingRenderGeneration, revision: incomingRevision${supportUrlMode ? ", isUrl" : ""} } = event.data;
+      if (typeof incomingPreviewInstanceId === 'string') currentPreviewInstanceId = incomingPreviewInstanceId;
+      if (typeof incomingRenderGeneration === 'number') currentRenderGeneration = incomingRenderGeneration;
+      if (typeof incomingRevision === 'number') currentRevision = incomingRevision;
       if (typeof spineAssetBaseUrl === 'string') window.__WORKBENCH_SPINE_ASSET_BASE__ = spineAssetBaseUrl;
 
       if (type === 'SLEEP') {
@@ -2581,7 +2614,7 @@ ${cssLinks}
       if (type === 'WAKE') {
         isSleeping = false;
         requestAnimationFrame(function() {
-          window.parent.postMessage({ type: 'RESIZE', height: measureFullContentHeight(), requestId: currentRequestId }, '*');
+          window.parent.postMessage({ type: 'RESIZE', height: measureFullContentHeight(), requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
         });
         return;
       }
@@ -2593,6 +2626,7 @@ ${cssLinks}
         window.__DEMO_PROPS__ = currentConfig;
         updateAppRuntime(appState, routeParams);
         if (currentComponent) {
+          updateVersion += 1;
           renderComponent();
           requestAnimationFrame(applyVisibilityRegions);
         }
@@ -2636,7 +2670,7 @@ ${cssLinks}
                   sizes2[key2] = { width: Math.round(rect.width), height: Math.round(rect.height) };
                 }
               }
-              window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: sizes2, requestId: currentRequestId }, '*');
+              window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: sizes2, requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
             }
             if (pendingImages.length > 0) {
               // 等待所有图片加载完成后再测量
@@ -2663,7 +2697,7 @@ ${cssLinks}
               measureAndReport();
             }
           } catch (err) {
-            window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: {}, requestId: currentRequestId }, '*');
+          window.parent.postMessage({ type: 'POSITIONABLE_SIZES_RESULT', sizes: {}, requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
           }
         });
       }
@@ -2769,7 +2803,7 @@ ${cssLinks}
       const height = measureFullContentHeight();
       if (Math.abs(height - lastReportedHeight) <= 1) return;
       lastReportedHeight = height;
-      window.parent.postMessage({ type: 'RESIZE', height, requestId: currentRequestId }, '*');
+      window.parent.postMessage({ type: 'RESIZE', height, requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
     });
     resizeObserver.observe(document.body);
 
@@ -2781,7 +2815,7 @@ ${cssLinks}
         var h = measureFullContentHeight();
         if (Math.abs(h - lastReportedHeight) > 1) {
           lastReportedHeight = h;
-          window.parent.postMessage({ type: 'RESIZE', height: h, requestId: currentRequestId }, '*');
+      window.parent.postMessage({ type: 'RESIZE', height: h, requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
         }
       });
     }
@@ -2803,7 +2837,7 @@ ${cssLinks}
     });
 
     reportRuntimeTiming('ready_sent');
-    window.parent.postMessage({ type: 'READY' }, '*');
+    window.parent.postMessage({ type: 'READY', previewInstanceId: currentPreviewInstanceId }, '*');
 
     const initialCode = ${initialCode};
     const initialCodeUrl = ${initialCodeUrl};
@@ -2829,7 +2863,7 @@ ${cssLinks}
           });
           renderComponent();
           URL.revokeObjectURL(moduleUrl);
-          window.parent.postMessage({ type: 'COMPONENT_READY', requestId: currentRequestId }, '*');
+          window.parent.postMessage({ type: 'COMPONENT_READY', requestId: currentRequestId, previewInstanceId: currentPreviewInstanceId, renderGeneration: currentRenderGeneration, revision: currentRevision }, '*');
         })
         .catch((err) => {
           reportRuntimeError({ stage: 'dependency_import', error: err.message });

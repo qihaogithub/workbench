@@ -286,6 +286,12 @@ export async function registerWorkspaceAuthorityRoutes(
       if (!body || body.projectId !== request.params.projectId || body.workspaceId !== request.params.workspaceId) {
         reply.code(400); return { success: false, error: { code: "INVALID_REQUEST", message: "Workspace mutation 参数不匹配" } };
       }
+      // `collab` and `system` are server-internal actors. They must be
+      // produced by the Yjs persistence or recovery paths, never selected by
+      // an arbitrary HTTP body to bypass Agent CAS checks.
+      if (body.actor === "collab" || body.actor === "system") {
+        return failure(reply, new Error("INVALID_REQUEST"));
+      }
       try { return { success: true, data: await persistence.commitMutation(body) }; }
       catch (error) { return failure(reply, error); }
     },

@@ -1,9 +1,9 @@
-import { AgentConfig, AgentResult, SendMessageOptions } from './types';
-import { BaseAgent } from './agent';
-import { BackendAgent } from './backend-agent';
-import { AgentFactory, getAgentFactory } from './agent-factory';
-import { logger } from '../utils/logger';
-import { PROCESSING_MAX_TIMEOUT_MS } from './timeouts';
+import { AgentConfig, AgentResult, SendMessageOptions } from "./types";
+import { BaseAgent } from "./agent";
+import { BackendAgent } from "./backend-agent";
+import { AgentFactory, getAgentFactory } from "./agent-factory";
+import { logger } from "../utils/logger";
+import { PROCESSING_MAX_TIMEOUT_MS } from "./timeouts";
 
 const DEFAULT_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
@@ -13,7 +13,11 @@ export interface IAgentManager {
   has(sessionId: string): boolean;
   destroy(sessionId: string): Promise<void>;
   destroyAll(): Promise<void>;
-  sendMessage(sessionId: string, content: string, options?: SendMessageOptions): Promise<AgentResult>;
+  sendMessage(
+    sessionId: string,
+    content: string,
+    options?: SendMessageOptions,
+  ): Promise<AgentResult>;
   list(): AgentInfo[];
   count(): number;
   cleanupIdleAgents(timeoutMs?: number): number;
@@ -34,8 +38,8 @@ export function createAgentBusyResult(): AgentResult {
   return {
     success: false,
     error: {
-      code: 'AGENT_BUSY',
-      message: '上一轮 AI 请求仍在运行或正在取消，请等待其完全结束后再发送。',
+      code: "AGENT_BUSY",
+      message: "上一轮 AI 请求仍在运行或正在取消，请等待其完全结束后再发送。",
       retryable: true,
     },
   };
@@ -47,10 +51,17 @@ export class AgentManager implements IAgentManager {
   private idleCheckTimer: ReturnType<typeof setInterval> | null = null;
 
   private isRunActive(agent: BaseAgent): boolean {
-    return agent.status === 'processing' || agent.status === 'cancelling';
+    return agent.status === "processing" || agent.status === "cancelling";
   }
 
-  constructor(factory?: AgentFactory, private idleTimeoutMs: number = DEFAULT_IDLE_TIMEOUT_MS) {
+  private isConnectionBound(agent: BaseAgent): boolean {
+    return agent.status === "initializing" || this.isRunActive(agent);
+  }
+
+  constructor(
+    factory?: AgentFactory,
+    private idleTimeoutMs: number = DEFAULT_IDLE_TIMEOUT_MS,
+  ) {
     this.factory = factory || getAgentFactory();
     this.startIdleCheck();
   }
@@ -75,17 +86,20 @@ export class AgentManager implements IAgentManager {
         if (this.isRunActive(existingAgent)) {
           logger.warn(
             { sessionId, currentVersion, newVersion: config.toolVersion },
-            'Agent tool version changed while processing; keeping current agent until next turn',
+            "Agent tool version changed while processing; keeping current agent until next turn",
           );
           return existingAgent;
         }
 
         logger.info(
           { sessionId, currentVersion, newVersion: config.toolVersion },
-          'Agent tool version changed, rebuilding agent',
+          "Agent tool version changed, rebuilding agent",
         );
         void existingAgent.kill().catch((error) => {
-          logger.warn({ sessionId, error }, 'Failed to cleanly kill outdated agent');
+          logger.warn(
+            { sessionId, error },
+            "Failed to cleanly kill outdated agent",
+          );
         });
         this.agents.delete(sessionId);
       } else if (
@@ -94,33 +108,58 @@ export class AgentManager implements IAgentManager {
       ) {
         if (this.isRunActive(existingAgent)) {
           logger.warn(
-            { sessionId, currentMode: existingAgent.getConfig().toolMode, newMode: config.toolMode },
-            'Agent tool mode changed while processing; keeping current agent until next turn',
+            {
+              sessionId,
+              currentMode: existingAgent.getConfig().toolMode,
+              newMode: config.toolMode,
+            },
+            "Agent tool mode changed while processing; keeping current agent until next turn",
           );
           return existingAgent;
         }
 
         logger.info(
-          { sessionId, currentMode: existingAgent.getConfig().toolMode, newMode: config.toolMode },
-          'Agent tool mode changed, rebuilding agent',
+          {
+            sessionId,
+            currentMode: existingAgent.getConfig().toolMode,
+            newMode: config.toolMode,
+          },
+          "Agent tool mode changed, rebuilding agent",
         );
         void existingAgent.kill().catch((error) => {
-          logger.warn({ sessionId, error }, 'Failed to cleanly kill agent with old tool mode');
+          logger.warn(
+            { sessionId, error },
+            "Failed to cleanly kill agent with old tool mode",
+          );
         });
         this.agents.delete(sessionId);
       } else {
-      if (this.hasConfigChanged(existingAgent, config)) {
-        logger.info(
-          { sessionId, oldConfig: existingAgent.getConfig(), newConfig: config },
-          'Agent config changed, updating',
-        );
-        existingAgent.updateConfig(config);
-      }
-      return existingAgent;
+        // A running turn must keep the originating browser connection.  A
+        // second tab can reuse the same session while the first turn is still
+        // processing; updating connectionId here would route observePreview
+        // requests to the wrong tab.  Other config fields may still refresh.
+        const currentConfig = existingAgent.getConfig();
+        const configForUpdate =
+          this.isConnectionBound(existingAgent) &&
+          currentConfig.connectionId !== config.connectionId
+            ? { ...config, connectionId: currentConfig.connectionId }
+            : config;
+        if (this.hasConfigChanged(existingAgent, configForUpdate)) {
+          logger.info(
+            {
+              sessionId,
+              oldConfig: existingAgent.getConfig(),
+              newConfig: configForUpdate,
+            },
+            "Agent config changed, updating",
+          );
+          existingAgent.updateConfig(configForUpdate);
+        }
+        return existingAgent;
       }
     }
 
-    logger.info({ workingDir: config.workingDir }, 'Agent getOrCreate')
+    logger.info({ workingDir: config.workingDir }, "Agent getOrCreate");
 
     const agent = this.factory.create({ ...config, sessionId });
     this.agents.set(sessionId, agent);
@@ -134,6 +173,7 @@ export class AgentManager implements IAgentManager {
     return (
       current.workingDir !== newConfig.workingDir ||
       current.demoId !== newConfig.demoId ||
+      current.connectionId !== newConfig.connectionId ||
       current.toolMode !== newConfig.toolMode ||
       JSON.stringify(current.backendProviders ?? null) !==
         JSON.stringify(newConfig.backendProviders ?? null) ||
@@ -163,7 +203,9 @@ export class AgentManager implements IAgentManager {
       clearInterval(this.idleCheckTimer);
       this.idleCheckTimer = null;
     }
-    const promises = Array.from(this.agents.values()).map((agent) => agent.kill());
+    const promises = Array.from(this.agents.values()).map((agent) =>
+      agent.kill(),
+    );
     await Promise.all(promises);
     this.agents.clear();
   }
@@ -171,7 +213,7 @@ export class AgentManager implements IAgentManager {
   async sendMessage(
     sessionId: string,
     content: string,
-    options?: SendMessageOptions
+    options?: SendMessageOptions,
   ): Promise<AgentResult> {
     const agent = this.agents.get(sessionId);
     if (!agent) {
@@ -182,7 +224,7 @@ export class AgentManager implements IAgentManager {
       return createAgentBusyResult();
     }
 
-    if (agent.status === 'initializing') {
+    if (agent.status === "initializing") {
       await agent.start();
     }
 
@@ -214,9 +256,9 @@ export class AgentManager implements IAgentManager {
 
     for (const [sessionId, agent] of this.agents.entries()) {
       const lastActivity = agent.lastActivityAtPub.getTime();
-      const isIdle = (now - lastActivity) > timeout;
+      const isIdle = now - lastActivity > timeout;
 
-      if (isIdle && agent.status !== 'processing') {
+      if (isIdle && agent.status !== "processing") {
         void agent.kill().then(() => {
           this.agents.delete(sessionId);
         });
@@ -224,12 +266,12 @@ export class AgentManager implements IAgentManager {
       }
 
       // processing 状态兜底：超过阈值强制 kill
-      if (agent.status === 'processing') {
+      if (agent.status === "processing") {
         const processingDuration = now - agent.lastActivityAtPub.getTime();
         if (processingDuration > PROCESSING_MAX_TIMEOUT_MS) {
           logger.warn(
             { sessionId, processingDurationMs: processingDuration },
-            'Agent stuck in processing state, force killing',
+            "Agent stuck in processing state, force killing",
           );
           void agent.kill().then(() => {
             this.agents.delete(sessionId);

@@ -46,6 +46,7 @@ export class HocuspocusCollabServer {
   readonly persistence: WorkspaceFilePersistence;
   private readonly authorityPersistence: AuthorityPersistenceExtension;
   private readonly unregisterDraftProvider: () => void;
+  private readonly unregisterMutationListener: () => void;
 
   constructor(persistence = new WorkspaceFilePersistence()) {
     this.persistence = persistence;
@@ -75,6 +76,12 @@ export class HocuspocusCollabServer {
           this.flushDraftsForMutation(request),
       },
     );
+    this.unregisterMutationListener = this.persistence.onMutationCommitted((event) => {
+      if (event.receipt.actor === "collab") return;
+      void this.projectCommittedReceipt(event.receipt).catch((error) => {
+        logger.error({ error, mutationId: event.receipt.mutationId }, "Failed to project Authority receipt into collab rooms");
+      });
+    });
   }
 
   /**
@@ -286,6 +293,45 @@ export class HocuspocusCollabServer {
   }
 
   /**
+   * Keep active Yjs rooms aligned after a non-collab Authority commit. A room
+   * with local unsaved edits is not force-replaced: the extension marks it
+   * conflicted, removes its stale persisted state, and rejects its next flush
+   * so the newer Authority revision cannot be overwritten by an old room.
+   */
+  private async projectCommittedReceipt(receipt: WorkspaceMutationReceipt): Promise<void> {
+    const workspacePath = this.persistence.getWorkspacePath(receipt.workspaceId);
+    if (!workspacePath) return;
+
+    for (const [documentName, document] of this.hocuspocus.documents) {
+      const descriptor = decodeDocumentName(documentName);
+      if (!descriptor || descriptor.projectId !== receipt.projectId || descriptor.workspaceId !== receipt.workspaceId) {
+        continue;
+      }
+      const resource = receipt.resources.find((candidate) => normalizeRoomPath(candidate.path) === normalizeRoomPath(descriptor.resourcePath));
+      if (!resource) continue;
+      const state = this.persistence.readResourceState(
+        workspacePath,
+        descriptor.resourcePath,
+        descriptor.kind,
+      );
+      const result = this.authorityPersistence.applyCommittedResource({
+        documentName,
+        document,
+        descriptor,
+        beforeHash: resource.beforeHash,
+        afterHash: resource.afterHash,
+        canonicalContent: state.exists ? state.content : "",
+      });
+      if (result === "conflicted") {
+        logger.warn(
+          { projectId: receipt.projectId, workspaceId: receipt.workspaceId, resourcePath: descriptor.resourcePath, revision: receipt.revision },
+          "Active collab room held stale content after Authority commit",
+        );
+      }
+    }
+  }
+
+  /**
    * Flush all rooms whose resourcePath is targeted by a mutation request.
    * Called by the collab draft provider before Authority commits.
    */
@@ -295,10 +341,10 @@ export class HocuspocusCollabServer {
     const targetPaths = new Set<string>();
     for (const op of request.operations) {
       if (op.type === "move_path") {
-        targetPaths.add(op.from);
-        targetPaths.add(op.to);
+        targetPaths.add(normalizeRoomPath(op.from));
+        targetPaths.add(normalizeRoomPath(op.to));
       } else {
-        targetPaths.add(op.path);
+        targetPaths.add(normalizeRoomPath(op.path));
       }
     }
     if (targetPaths.size === 0) return;
@@ -309,7 +355,7 @@ export class HocuspocusCollabServer {
       if (
         decoded.projectId === request.projectId &&
         decoded.workspaceId === request.workspaceId &&
-        targetPaths.has(decoded.resourcePath)
+        targetPaths.has(normalizeRoomPath(decoded.resourcePath))
       ) {
         await this.flush(name);
       }
@@ -318,9 +364,14 @@ export class HocuspocusCollabServer {
 
   dispose(): void {
     this.unregisterDraftProvider();
+    this.unregisterMutationListener();
     this.hocuspocus.closeConnections();
     this.hocuspocus.flushPendingStores();
   }
+}
+
+function normalizeRoomPath(resourcePath: string): string {
+  return resourcePath.replace(/\\/g, "/").replace(/^\/+/, "").replace(/^(?:\.\/)+/, "");
 }
 
 let _server: HocuspocusCollabServer | null = null;

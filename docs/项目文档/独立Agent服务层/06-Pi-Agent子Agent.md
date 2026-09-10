@@ -3,13 +3,15 @@ covers:
   - packages/agent-service/src/backends/pi-agent.ts
   - packages/agent-service/src/backends/pi-tools/index.ts
   - packages/agent-service/src/backends/pi-tools/subagent-tool.ts
+  - packages/agent-service/src/workspace/agent-file-queue.ts
+  - packages/agent-service/src/workspace/workspace-mutation-authority.ts
   - packages/agent-service/src/core/types.ts
   - packages/agent-service/src/utils/config.ts
 ---
 
 # Pi Agent 子 Agent
 
-> 更新日期：2026-08-05
+> 更新日期：2026-09-10
 
 ## 一、定位
 
@@ -23,19 +25,20 @@ Pi Agent 子 Agent 是主 Agent 的内部委派能力。它不新增 HTTP 或 We
 
 1. 主 Agent 调用一个或多个 `delegateTask`，传入任务说明和可选上下文。
 2. `delegateTask` 按并行工具执行模式交给 `PiAgentBackend`，每个委派任务都会创建独立的 `AgentHarness`、执行环境和内存会话。
-3. 子 Agent 使用与主 Agent 相同的 Workbench 工具执行任务，但没有委派工具。
+3. 子 Agent 使用与主 Agent 相同的 Workbench 工具执行任务，但没有委派工具；它携带独立 child `runId`，并将文件 mutation 标记为 `subagent` actor。
 4. 子 Agent 结束后，backend 提取文本结果，并把该子 Agent 本次新增的文件变更写回父会话的 `files` 列表。
 5. 前端按工具调用展示 `delegateTask`。单个子 Agent 完成只表示委派任务已返回；整轮 AI 回复仍需等待主 Agent 汇总和验收。
 
 ## 三、权限与变更边界
 
-子 Agent 可以读写允许范围内的工作空间文件，但仍受现有权限系统约束：
+子 Agent 可以读写允许范围内的工作空间文件，但仍受现有权限系统和 live Workspace Authority 约束：
 
 - 路径访问继续走工作空间白名单、黑名单和越界检查。
 - 知识库文件只允许读取，不允许由 Agent 写入。
 - 修改 `config.schema.json` 仍受工作空间路径权限和 L2 配置规则约束。
 - `deletePage` 和 `deletePages` 继续复用现有权限确认流程。
 - 预装 Skill 只能通过 `readPreinstalledSkill` 读取，不写入工作空间，也不扩大文件工具白名单。
+- live Workspace 的写入按 `workspaceId + normalizedPath` 进入 AgentFileQueue，再由 Authority 校验 `expectedHash`/`expectedAbsent`；成功后以 durable receipt 作为唯一提交证明，冲突不会静默改走 Yjs 或磁盘。
 
 文件变更收集由 `PiAgentBackend` 统一处理。主 Agent 和子 Agent 的 `writeFile`、`editFile`、`deletePage`、`deletePages` 工具结果都会进入同一套变更汇总逻辑，因此 `/files` 查询和消息完成结果可以看到子 Agent 产生的变更。
 

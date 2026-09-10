@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   getDocumentSaveStatusLabel,
+  isDocumentSaveAttentionStatus,
   type DocumentSaveSnapshot,
 } from "@/lib/document-save-coordinator";
 import { cn } from "@/lib/utils";
@@ -34,9 +35,9 @@ export function DocumentSaveStatusBar({
   onDiscardDraft,
   testId,
 }: DocumentSaveStatusBarProps) {
-  if (snapshot.status === "clean") return null;
+  if (!isDocumentSaveAttentionStatus(snapshot.status)) return null;
 
-  const isError = Boolean(snapshot.error);
+  const isError = isDocumentSaveAttentionStatus(snapshot.status);
   const canRetry =
     isError &&
     snapshot.status !== "permission-denied" &&

@@ -26,6 +26,7 @@ import {
   appendWorkspaceProjectionDiagnostic,
 } from "./workspace-authority-diagnostics";
 import { validateConfigResourceMutation } from "../backends/pi-tools/config-mutation-validation";
+import { AgentFileQueue } from "./agent-file-queue";
 
 function hashWorkspaceContent(content: string | Buffer): string {
   return crypto.createHash("sha256").update(content).digest("hex");
@@ -109,6 +110,7 @@ export class WorkspaceMutationAuthority {
   private static readonly listeners = new Map<string, Set<(event: WorkspaceMutationCommittedEvent) => void>>();
   private static readonly projectionListeners = new Map<string, Set<(event: WorkspaceProjectionAcknowledgedEvent) => void>>();
   private static readonly draftProviders = new Map<string, Set<CollabDraftProvider>>();
+  private readonly agentFileQueue = new AgentFileQueue();
 
   constructor(
     private readonly options: {
@@ -553,6 +555,24 @@ export class WorkspaceMutationAuthority {
   }
 
   async mutate(request: WorkspaceMutationRequest): Promise<WorkspaceMutationReceipt> {
+    const normalizedRequest = this.normalizeMutationRequest(request);
+    if (normalizedRequest.actor === "ai" || normalizedRequest.actor === "subagent") {
+      return this.agentFileQueue.run(
+        {
+          dataDir: this.options.dataDir,
+          workspaceId: normalizedRequest.workspaceId,
+          resourcePaths: this.mutationResourcePaths(normalizedRequest),
+        },
+        ({ waitMs }) => this.mutateInternal(normalizedRequest, waitMs),
+      );
+    }
+    return this.mutateInternal(normalizedRequest, 0);
+  }
+
+  private async mutateInternal(
+    request: WorkspaceMutationRequest,
+    agentQueueWaitMs: number,
+  ): Promise<WorkspaceMutationReceipt> {
     const startedAt = Date.now();
     const resourcePaths = this.mutationResourcePaths(request);
     let terminalRecorded = false;
@@ -560,8 +580,10 @@ export class WorkspaceMutationAuthority {
       mutationId: request.mutationId,
       baseRevision: request.baseRevision,
       actor: request.actor,
+      ...(request.runId ? { runId: request.runId } : {}),
       resourcePaths,
       operationCount: request.operations.length,
+      agentQueueWaitMs,
     });
     try {
       this.assertProjectNotRecovering(request.projectId);
@@ -640,6 +662,8 @@ export class WorkspaceMutationAuthority {
             revision: state.revision + 1,
             rootHash: this.rootHash(nextHashes),
             actor: request.actor,
+            ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+            ...(request.runId ? { runId: request.runId } : {}),
             resources,
             committedAt: Date.now(),
           };
@@ -670,6 +694,7 @@ export class WorkspaceMutationAuthority {
             queueWaitMs,
             commitLatencyMs: receipt.committedAt - startedAt,
             outcome: "committed",
+            agentQueueWaitMs,
           });
           const event: WorkspaceMutationCommittedEvent = { type: "workspace_mutation_committed", receipt };
           WorkspaceMutationAuthority.listenersFor(this.options.dataDir).forEach((listener) => {
@@ -745,7 +770,7 @@ export class WorkspaceMutationAuthority {
 
   /**
    * The sole Workspace write entry point for an already-approved document
-   * proposal. Unlike ordinary Yjs-first mutations, this preserves per-file
+   * proposal. Unlike ordinary collaborative autosaves, this preserves per-file
    * preconditions and validates them while the Authority owns its workspace
    * lease. Callers must compile operations from a frozen server-side proposal;
    * this API intentionally accepts no client supplied proposal payload.
@@ -775,9 +800,33 @@ export class WorkspaceMutationAuthority {
       operation.type === "move_path"
         ? [operation.from, operation.to]
         : operation.type === "commit_html_import"
-          ? []
+          // The import expands into a new page directory plus a tree update
+          // inside the Authority critical section. Queue the stable tree
+          // resource before expansion so concurrent imports cannot race on a
+          // stale page list; the receipt records the concrete generated paths.
+          ? ["workspace-tree.json"]
           : [operation.path]
     )))].sort();
+  }
+
+  private normalizeMutationRequest(request: WorkspaceMutationRequest): WorkspaceMutationRequest {
+    let changed = false;
+    const normalize = (value: string): string => {
+      const normalized = normalizeWorkspaceResourcePath(value.replace(/^(?:\.\/)+/, ""));
+      if (normalized && normalized !== value) changed = true;
+      return normalized ?? value;
+    };
+    const operations = request.operations.map((operation) => {
+      if (operation.type === "move_path") {
+        const from = normalize(operation.from);
+        const to = normalize(operation.to);
+        return from === operation.from && to === operation.to ? operation : { ...operation, from, to };
+      }
+      if (operation.type === "commit_html_import") return operation;
+      const path = normalize(operation.path);
+      return path === operation.path ? operation : { ...operation, path };
+    });
+    return changed ? { ...request, operations } : request;
   }
 
   private recordMutationDiagnostic(
@@ -792,6 +841,10 @@ export class WorkspaceMutationAuthority {
       : typeof payload.commitLatencyMs === "number"
         ? payload.commitLatencyMs
         : 0;
+    const diagnosticPayload = {
+      ...payload,
+      ...(request.runId ? { runId: request.runId } : {}),
+    };
     appendWorkspaceAuthorityDiagnostic({
       dataDir: this.options.dataDir,
       projectId: request.projectId,
@@ -806,7 +859,7 @@ export class WorkspaceMutationAuthority {
       durationMs,
       level,
       message: eventType,
-      payload,
+      payload: diagnosticPayload,
     });
   }
 
@@ -818,6 +871,8 @@ export class WorkspaceMutationAuthority {
         mutationId: request.mutationId,
         baseRevision: request.baseRevision,
         actor: request.actor,
+        ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+        ...(request.runId ? { runId: request.runId } : {}),
         errorCode,
       });
     } catch {
@@ -894,7 +949,9 @@ export class WorkspaceMutationAuthority {
     const treeFile = path.join(workspacePath, "workspace-tree.json");
     if (!fs.existsSync(treeFile))
       throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
-    const tree = this.readJson<{ folders?: Array<{ id: string }>; pages?: Array<{ id: string; name: string; routeKey?: string; order: number; parentId?: string | null }> }>(treeFile);
+    const treeContent = fs.readFileSync(treeFile, "utf8");
+    const treeHash = hashWorkspaceContent(treeContent);
+    const tree = JSON.parse(treeContent) as { folders?: Array<{ id: string }>; pages?: Array<{ id: string; name: string; routeKey?: string; order: number; parentId?: string | null }> };
     const folders = tree.folders ?? [];
     const pages = tree.pages ?? [];
     if (command.parentId && !folders.some((folder) => folder.id === command.parentId))
@@ -917,14 +974,14 @@ export class WorkspaceMutationAuthority {
           { type: "put_text", path: `${prefix}/sandbox.html`, content: analysis.normalizedHtml, expectedAbsent: true },
           { type: "put_text", path: `${prefix}/html-import.meta.json`, content: meta, expectedAbsent: true },
           { type: "put_text", path: `${prefix}/config.schema.json`, content: schema, expectedAbsent: true },
-          { type: "put_text", path: "workspace-tree.json", content: treeText },
+          { type: "put_text", path: "workspace-tree.json", content: treeText, expectedHash: treeHash },
         ]
       : [
           { type: "put_text", path: `${prefix}/prototype.html`, content: analysis.normalizedHtml, expectedAbsent: true },
           { type: "put_text", path: `${prefix}/prototype.css`, content: "", expectedAbsent: true },
           { type: "put_text", path: `${prefix}/prototype.meta.json`, content: JSON.stringify({ source: "html-import", generatedBy: "html-import" }, null, 2) + "\n", expectedAbsent: true },
           { type: "put_text", path: `${prefix}/config.schema.json`, content: schema, expectedAbsent: true },
-          { type: "put_text", path: "workspace-tree.json", content: treeText },
+          { type: "put_text", path: "workspace-tree.json", content: treeText, expectedHash: treeHash },
         ];
     return { ...request, operations };
   }
@@ -1025,6 +1082,8 @@ export class WorkspaceMutationAuthority {
 
   private prepare(request: WorkspaceMutationRequest, payloadHash: string, state: WorkspaceAuthorityState, workspacePath: string): PreparedMutation {
     if (!request.mutationId || request.operations.length === 0) throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION");
+    const requiresAgentBaseline = request.actor === "ai" || request.actor === "subagent";
+    const requiresCollabBaseline = request.reason === "collab_autosave";
     const before: PreparedMutation["before"] = {};
     for (const operation of request.operations) {
       const paths = operation.type === "move_path" ? [operation.from, operation.to] : [operation.path];
@@ -1074,7 +1133,30 @@ export class WorkspaceMutationAuthority {
         }
         this.assertManagedTextWrite(operation.path, text, operation.type);
       }
-      // Normal Yjs-first writes merge in the collab room. Approved document
+      // Agent writes and collab autosaves with an explicit room baseline are
+      // optimistic concurrency operations. The model/editor may spend
+      // arbitrary time generating a replacement, so Authority must reject a
+      // stale resource hash instead of letting an old snapshot win. Config
+      // patches are intentionally excluded: they are expanded against the
+      // current object inside this same serial section.
+      const expandedConfigPatch = operation.type === "put_text"
+        && request.reason === "update_page_config_values"
+        && Boolean(normalizeWorkspaceResourcePath(operation.path)?.endsWith("config.values.json"));
+      if ((requiresAgentBaseline || requiresCollabBaseline) && !expandedConfigPatch && operation.type !== "patch_config_values" && operation.type !== "commit_html_import") {
+        if (operation.type === "move_path") {
+          if (!operation.expectedHash) throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION", "Agent move requires expectedHash", { resourcePath: operation.from });
+          this.assertExpected(before[operation.from], operation.expectedHash, false, operation.from);
+          if (operation.expectedTargetAbsent) this.assertExpected(before[operation.to], undefined, true, operation.to);
+        } else if (operation.type === "delete_path") {
+          this.assertExpected(before[operation.path], operation.expectedHash, false, operation.path);
+        } else {
+          if (!operation.expectedHash && operation.expectedAbsent !== true) {
+            throw new WorkspaceMutationAuthorityError("WORKSPACE_INVALID_OPERATION", "Agent write requires expectedHash or expectedAbsent", { resourcePath: operation.path });
+          }
+          this.assertExpected(before[operation.path], operation.expectedHash, operation.expectedAbsent, operation.path);
+        }
+      }
+      // Normal collaboration writes merge in the Yjs room. Approved document
       // proposals and visibility drafts are deliberately different: users
       // approved a frozen snapshot, so their preconditions are checked inside
       // this serial + lease section.
@@ -1587,6 +1669,8 @@ export class WorkspaceMutationAuthority {
         projectId: request.projectId,
         workspaceId: request.workspaceId,
         actor: request.actor,
+        ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+        ...(request.runId ? { runId: request.runId } : {}),
         reason: request.reason,
         baseRevision: request.baseRevision,
         payloadHash: prepared.payloadHash,

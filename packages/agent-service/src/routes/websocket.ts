@@ -40,6 +40,7 @@ import {
 } from "../services/viewer-readonly-mode";
 import type { BaseAgent } from "../core/agent";
 import { getConversationLedgerClient } from "../services/conversation-ledger-client";
+import { previewObservationBroker } from "../session/preview-observation-broker";
 
 function resolveDefaultModelId(): string {
   const raw =
@@ -57,16 +58,22 @@ function resolveAuthorAuthorization(
   requestedProjectId?: string,
 ): AgentAuthorAuthorization {
   const authorization = getSessionAuthorizations().get(sessionId);
-  if (authorization && requestedProjectId && authorization.projectId !== requestedProjectId) {
+  if (
+    authorization &&
+    requestedProjectId &&
+    authorization.projectId !== requestedProjectId
+  ) {
     throw new Error("SESSION_PROJECT_MISMATCH");
   }
-  return authorization ?? {
-    userId: "",
-    role: null,
-    projectId: requestedProjectId || "",
-    expiresAt: 0,
-    source: "author-session",
-  };
+  return (
+    authorization ?? {
+      userId: "",
+      role: null,
+      projectId: requestedProjectId || "",
+      expiresAt: 0,
+      source: "author-session",
+    }
+  );
 }
 
 interface StreamParams {
@@ -87,7 +94,10 @@ interface ClientMessage {
     | "get_models"
     | "permission_response"
     | "user_choice_response"
-    | "console_data";
+    | "console_data"
+    | "preview_register"
+    | "preview_unregister"
+    | "preview_observe_result";
   id?: string;
   conversationId?: string;
   messageId?: string;
@@ -136,6 +146,12 @@ interface ClientMessage {
   /** user_choice_response: 需求确认响应 */
   requestId?: string;
   choice?: UserChoiceResponse;
+  previewInstanceId?: string;
+  registration?: {
+    identity?: unknown;
+    capabilities?: unknown;
+  };
+  result?: unknown;
 }
 
 interface ActiveConnection {
@@ -199,12 +215,16 @@ function normalizeModelId(modelId: string | undefined): string | undefined {
 
 function heartbeat(): void {
   const now = Date.now();
-  for (const [sessionId, conn] of connections) {
+  for (const [connectionId, conn] of connections) {
     if (now - conn.lastPing > HEARTBEAT_TIMEOUT) {
-      logger.info({ sessionId }, "WebSocket connection timed out, closing");
+      logger.info(
+        { sessionId: conn.sessionId },
+        "WebSocket connection timed out, closing",
+      );
+      previewObservationBroker.unregisterConnection(connectionId);
       void conn.eventRouter.destroy();
       conn.socket.terminate();
-      connections.delete(sessionId);
+      connections.delete(connectionId);
     }
   }
 }
@@ -228,10 +248,13 @@ export async function registerWebSocketRoutes(
     },
     async (
       socket: WebSocket,
-      request: FastifyRequest<{ Params: StreamParams; Querystring: StreamQuery }>,
+      request: FastifyRequest<{
+        Params: StreamParams;
+        Querystring: StreamQuery;
+      }>,
     ) => {
       const { sessionId } = request.params;
-      const connectionId = `${sessionId}-${Date.now()}`;
+      const connectionId = `${sessionId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
       // 连接级 mode 默认值；单条消息体里的 mode 优先
       const connectionMode: AgentMode = normalizeAgentMode(request.query?.mode);
 
@@ -250,6 +273,12 @@ export async function registerWebSocketRoutes(
         sessionId,
         sendMessage,
         () => {},
+      );
+
+      previewObservationBroker.registerConnection(
+        connectionId,
+        sessionId,
+        (message) => sendMessage(message as ServerMessage),
       );
 
       const connection: ActiveConnection = {
@@ -282,6 +311,50 @@ export async function registerWebSocketRoutes(
         if (message.type === "console_data" && Array.isArray(message.entries)) {
           for (const entry of message.entries) {
             consoleBuffer.addEntry(sessionId, entry);
+          }
+          return;
+        }
+
+        if (message.type === "preview_register") {
+          const accepted = previewObservationBroker.registerPreview(
+            connectionId,
+            message.registration as never,
+          );
+          if (!accepted) {
+            sendMessage({
+              type: "error",
+              id: message.id || "preview-register",
+              sessionId,
+              error: {
+                code: "INVALID_PARAMS",
+                message: "预览注册信息无效或超出大小限制",
+              },
+            });
+          }
+          return;
+        }
+
+        if (message.type === "preview_unregister") {
+          previewObservationBroker.unregisterPreview(
+            connectionId,
+            message.previewInstanceId,
+          );
+          return;
+        }
+
+        if (message.type === "preview_observe_result") {
+          if (
+            !message.requestId ||
+            !previewObservationBroker.resolve(
+              connectionId,
+              message.requestId,
+              message.result,
+            )
+          ) {
+            logger.debug(
+              { sessionId, connectionId, requestId: message.requestId },
+              "Ignoring invalid or late preview observation response",
+            );
           }
           return;
         }
@@ -337,9 +410,7 @@ export async function registerWebSocketRoutes(
                     id: message.id || "unknown",
                     error: {
                       code: notFound ? "PROJECT_NOT_FOUND" : "INTERNAL_ERROR",
-                      message: notFound
-                        ? "项目不存在"
-                        : "浏览端会话初始化失败",
+                      message: notFound ? "项目不存在" : "浏览端会话初始化失败",
                     },
                   });
                   return;
@@ -350,11 +421,13 @@ export async function registerWebSocketRoutes(
               const currentModelId = await resolveCurrentModelId(existingAgent);
               const requestedModelId = normalizeModelId(message.model);
 
-              const authorAuthorization = mode === "viewer-readonly"
-                ? undefined
-                : resolveAuthorAuthorization(sessionId, message.projectId);
+              const authorAuthorization =
+                mode === "viewer-readonly"
+                  ? undefined
+                  : resolveAuthorAuthorization(sessionId, message.projectId);
               const config: AgentConfig = {
                 sessionId,
+                connectionId,
                 workingDir: message.workingDir,
                 projectId: authorAuthorization?.projectId || message.projectId,
                 demoId: message.demoId,
@@ -370,7 +443,8 @@ export async function registerWebSocketRoutes(
               };
 
               let agent = manager.getOrCreate(sessionId, config);
-              let shouldRestoreLedgerHistory = !existingAgent || agent !== existingAgent;
+              let shouldRestoreLedgerHistory =
+                !existingAgent || agent !== existingAgent;
 
               eventRouter.bindAgent(agent);
 
@@ -420,21 +494,41 @@ export async function registerWebSocketRoutes(
               }
 
               const stableIdentity = message.options?.conversation;
-              const messageId = message.messageId || stableIdentity?.messageId || message.id || generateMessageId();
-              const conversationId = message.conversationId || stableIdentity?.conversationId || "";
+              const messageId =
+                message.messageId ||
+                stableIdentity?.messageId ||
+                message.id ||
+                generateMessageId();
+              const conversationId =
+                message.conversationId || stableIdentity?.conversationId || "";
               const runId = message.runId || stableIdentity?.runId || "";
-              const assistantMessageId = message.assistantMessageId || stableIdentity?.assistantMessageId || "";
-              const conversationRevision = message.conversationRevision ?? stableIdentity?.conversationRevision;
-              if (mode !== "viewer-readonly" && (
-                !conversationId || !runId || !assistantMessageId || conversationRevision === undefined
-              )) {
+              const assistantMessageId =
+                message.assistantMessageId ||
+                stableIdentity?.assistantMessageId ||
+                "";
+              const conversationRevision =
+                message.conversationRevision ??
+                stableIdentity?.conversationRevision;
+              if (
+                mode !== "viewer-readonly" &&
+                (!conversationId ||
+                  !runId ||
+                  !assistantMessageId ||
+                  conversationRevision === undefined)
+              ) {
                 throw new Error("CONVERSATION_IDENTITY_REQUIRED");
               }
+              // A session may host many conversation runs. Keep the active
+              // run identity on the Agent config so every managed mutation
+              // receipt can be correlated without trusting tool payloads.
+              if (runId) agent.updateConfig({ runId });
               if (agent instanceof BackendAgent && agent.isBusy()) {
                 const result = createAgentBusyResult();
                 if (!eventRouter.isActive()) {
                   eventRouter.startMessage(messageId, {
-                    conversationId, runId, assistantMessageId,
+                    conversationId,
+                    runId,
+                    assistantMessageId,
                     contentLength: message.content.length,
                     workingDir: message.workingDir,
                     demoId: message.demoId,
@@ -475,7 +569,10 @@ export async function registerWebSocketRoutes(
               // viewer-readonly 使用服务端规则；普通模式只能传入项目规则，不能覆盖安全骨架。
               if (mode === "viewer-readonly" && agent instanceof BackendAgent) {
                 await agent.updateProjectRules(buildViewerAiSystemPrompt());
-              } else if (message.projectRules && agent instanceof BackendAgent) {
+              } else if (
+                message.projectRules &&
+                agent instanceof BackendAgent
+              ) {
                 logger.info(
                   { sessionId, rulesLength: message.projectRules.length },
                   "WebSocket: updating project rules",
@@ -511,7 +608,9 @@ export async function registerWebSocketRoutes(
                 message.options?.timeout,
               );
               eventRouter.startMessage(messageId, {
-                conversationId, runId, assistantMessageId,
+                conversationId,
+                runId,
+                assistantMessageId,
                 contentLength: message.content.length,
                 workingDir: message.workingDir,
                 demoId: message.demoId,
@@ -550,14 +649,22 @@ export async function registerWebSocketRoutes(
                     )
                   : rawUserContent;
 
-                const ledger = mode === "viewer-readonly" ? null : getConversationLedgerClient();
-                const ledgerStart = ledger ? await ledger.startRun({
-                  conversationId, runId, messageId, assistantMessageId,
-                  ownerUserId: authorAuthorization?.userId || "",
-                  projectId: config.projectId || message.projectId || "",
-                  agentSessionId: sessionId,
-                  modelId: config.model,
-                }) : null;
+                const ledger =
+                  mode === "viewer-readonly"
+                    ? null
+                    : getConversationLedgerClient();
+                const ledgerStart = ledger
+                  ? await ledger.startRun({
+                      conversationId,
+                      runId,
+                      messageId,
+                      assistantMessageId,
+                      ownerUserId: authorAuthorization?.userId || "",
+                      projectId: config.projectId || message.projectId || "",
+                      agentSessionId: sessionId,
+                      modelId: config.model,
+                    })
+                  : null;
                 if (
                   ledgerStart &&
                   !shouldRestoreLedgerHistory &&
@@ -585,21 +692,37 @@ export async function registerWebSocketRoutes(
                       );
                       restoredMessageCount += 1;
                       for (const tail of contextSummary.tailMessages) {
-                        if ((tail.role === "user" || tail.role === "assistant") && tail.content) {
-                          await agent.appendHistoryMessage(tail.role, tail.content);
+                        if (
+                          (tail.role === "user" || tail.role === "assistant") &&
+                          tail.content
+                        ) {
+                          await agent.appendHistoryMessage(
+                            tail.role,
+                            tail.content,
+                          );
                           restoredMessageCount += 1;
                         }
                       }
                     }
-                    const coveredThroughSequence = contextSummary?.coveredThroughSequence ?? -1;
-                    for (const history of ledgerStart.historyBeforeRun as Array<{ role?: string; content?: string }>) {
-                      const sequence = (history as { sequence?: unknown }).sequence;
+                    const coveredThroughSequence =
+                      contextSummary?.coveredThroughSequence ?? -1;
+                    for (const history of ledgerStart.historyBeforeRun as Array<{
+                      role?: string;
+                      content?: string;
+                    }>) {
+                      const sequence = (history as { sequence?: unknown })
+                        .sequence;
                       if (
-                        (history.role === "user" || history.role === "assistant") &&
+                        (history.role === "user" ||
+                          history.role === "assistant") &&
                         history.content &&
-                        (typeof sequence !== "number" || sequence > coveredThroughSequence)
+                        (typeof sequence !== "number" ||
+                          sequence > coveredThroughSequence)
                       ) {
-                        await agent.appendHistoryMessage(history.role, history.content);
+                        await agent.appendHistoryMessage(
+                          history.role,
+                          history.content,
+                        );
                         restoredMessageCount += 1;
                       }
                     }
@@ -613,7 +736,10 @@ export async function registerWebSocketRoutes(
                       success: false,
                       restoredMessageCount,
                       durationMs: Date.now() - restoreStartedAt,
-                      errorCode: error instanceof Error ? error.name : "CONTEXT_RESTORE_FAILED",
+                      errorCode:
+                        error instanceof Error
+                          ? error.name
+                          : "CONTEXT_RESTORE_FAILED",
                     });
                     throw error;
                   }
@@ -628,35 +754,59 @@ export async function registerWebSocketRoutes(
                 eventRouter.recordFinish(result);
 
                 const capturedContextSummary = eventRouter.getContextSummary();
-                const currentUserSequence = ledgerStart &&
-                  typeof (ledgerStart.currentUserMessage as { sequence?: unknown })?.sequence === "number"
-                  ? (ledgerStart.currentUserMessage as { sequence: number }).sequence
-                  : undefined;
-                const terminalContextSummary = capturedContextSummary &&
+                const currentUserSequence =
+                  ledgerStart &&
+                  typeof (
+                    ledgerStart.currentUserMessage as { sequence?: unknown }
+                  )?.sequence === "number"
+                    ? (ledgerStart.currentUserMessage as { sequence: number })
+                        .sequence
+                    : undefined;
+                const terminalContextSummary =
+                  capturedContextSummary &&
                   ledgerStart &&
                   currentUserSequence !== undefined
-                  ? {
-                      ...capturedContextSummary,
-                      sourceRevision: capturedContextSummary.reason === "preflight"
-                        ? ledgerStart.historyBaseRevision
-                        : ledgerStart.conversationRevision,
-                      coveredThroughSequence: capturedContextSummary.reason === "preflight"
-                        ? Math.max(0, currentUserSequence - 1)
-                        : currentUserSequence,
-                    }
-                  : undefined;
-                const ledgerTerminal = ledger ? await ledger.commitTerminal({
-                  conversationId, runId, messageId, assistantMessageId,
-                  ownerUserId: authorAuthorization?.userId || "",
-                  projectId: config.projectId || message.projectId || "",
-                  status: result.success ? "completed" : (eventRouter.isCancelled() ? "cancelled" : "failed"),
-                  content: result.success ? result.content : undefined,
-                  displayParts: result.success ? eventRouter.getLedgerDisplayParts() : undefined,
-                  errorCode: result.success ? undefined : result.error?.code,
-                  usage: result.metadata?.tokens ? { tokens: result.metadata.tokens } : undefined,
-                  summary: result.success ? undefined : { message: result.error?.message },
-                  contextSummary: terminalContextSummary,
-                }) : null;
+                    ? {
+                        ...capturedContextSummary,
+                        sourceRevision:
+                          capturedContextSummary.reason === "preflight"
+                            ? ledgerStart.historyBaseRevision
+                            : ledgerStart.conversationRevision,
+                        coveredThroughSequence:
+                          capturedContextSummary.reason === "preflight"
+                            ? Math.max(0, currentUserSequence - 1)
+                            : currentUserSequence,
+                      }
+                    : undefined;
+                const ledgerTerminal = ledger
+                  ? await ledger.commitTerminal({
+                      conversationId,
+                      runId,
+                      messageId,
+                      assistantMessageId,
+                      ownerUserId: authorAuthorization?.userId || "",
+                      projectId: config.projectId || message.projectId || "",
+                      status: result.success
+                        ? "completed"
+                        : eventRouter.isCancelled()
+                          ? "cancelled"
+                          : "failed",
+                      content: result.success ? result.content : undefined,
+                      displayParts: result.success
+                        ? eventRouter.getLedgerDisplayParts()
+                        : undefined,
+                      errorCode: result.success
+                        ? undefined
+                        : result.error?.code,
+                      usage: result.metadata?.tokens
+                        ? { tokens: result.metadata.tokens }
+                        : undefined,
+                      summary: result.success
+                        ? undefined
+                        : { message: result.error?.message },
+                      contextSummary: terminalContextSummary,
+                    })
+                  : null;
 
                 const checkpoint =
                   (Boolean(ledgerTerminal) || isCanonicalCheckpointEnabled()) &&
@@ -665,19 +815,24 @@ export async function registerWebSocketRoutes(
                   message.options?.conversation?.assistantMessageId
                     ? getConversationCheckpointStore().recordTurn(
                         sessionId,
-                        { id: messageId, role: "user", content: rawUserContent },
-                      {
-                        id: message.options.conversation.assistantMessageId,
-                        role: "assistant",
-                        content: result.content,
-                      },
-                      ledgerTerminal
-                        ? {
-                            conversationId: ledgerTerminal.conversationId,
-                            conversationRevision: ledgerTerminal.conversationRevision,
-                          }
-                        : undefined,
-                    )
+                        {
+                          id: messageId,
+                          role: "user",
+                          content: rawUserContent,
+                        },
+                        {
+                          id: message.options.conversation.assistantMessageId,
+                          role: "assistant",
+                          content: result.content,
+                        },
+                        ledgerTerminal
+                          ? {
+                              conversationId: ledgerTerminal.conversationId,
+                              conversationRevision:
+                                ledgerTerminal.conversationRevision,
+                            }
+                          : undefined,
+                      )
                     : undefined;
 
                 if (result.success) {
@@ -791,6 +946,7 @@ export async function registerWebSocketRoutes(
               );
               const config: AgentConfig = {
                 sessionId: resumeSessionId,
+                connectionId,
                 workingDir: message.workingDir,
                 projectId: authorAuthorization.projectId || message.projectId,
                 demoId: message.demoId,
@@ -947,16 +1103,19 @@ export async function registerWebSocketRoutes(
               }
 
               let agent = manager.get(sessionId);
-              const authorAuthorization = mode === "viewer-readonly"
-                ? undefined
-                : resolveAuthorAuthorization(sessionId, message.projectId);
+              const authorAuthorization =
+                mode === "viewer-readonly"
+                  ? undefined
+                  : resolveAuthorAuthorization(sessionId, message.projectId);
               const sessionBackendProviders =
                 getSessionModelConfigs().get(sessionId);
               if (!agent) {
                 const config: AgentConfig = {
                   sessionId,
+                  connectionId,
                   workingDir: message.workingDir || process.cwd(),
-                  projectId: authorAuthorization?.projectId || message.projectId,
+                  projectId:
+                    authorAuthorization?.projectId || message.projectId,
                   demoId: message.demoId,
                   model: DEFAULT_MODEL_ID,
                   toolVersion: getWorkbenchToolCapabilities().toolVersion,
@@ -977,12 +1136,18 @@ export async function registerWebSocketRoutes(
                   });
                   await agent.start();
                 }
-              } else if (sessionBackendProviders || authorAuthorization !== undefined) {
+              } else if (
+                sessionBackendProviders ||
+                authorAuthorization !== undefined
+              ) {
                 agent = manager.getOrCreate(sessionId, {
                   ...agent.getConfig(),
                   workingDir:
                     message.workingDir || agent.getConfig().workingDir,
-                  projectId: authorAuthorization?.projectId || message.projectId || agent.getConfig().projectId,
+                  projectId:
+                    authorAuthorization?.projectId ||
+                    message.projectId ||
+                    agent.getConfig().projectId,
                   demoId: message.demoId || agent.getConfig().demoId,
                   toolVersion: getWorkbenchToolCapabilities().toolVersion,
                   backendProviders: sessionBackendProviders,
@@ -1166,6 +1331,7 @@ export async function registerWebSocketRoutes(
           "WebSocket connection closed",
         );
 
+        previewObservationBroker.unregisterConnection(connectionId);
         await eventRouter.destroy();
         connections.delete(connectionId);
 
@@ -1208,6 +1374,7 @@ export async function registerWebSocketRoutes(
 
       socket.on("error", (error) => {
         logger.error({ sessionId, connectionId, error }, "WebSocket error");
+        previewObservationBroker.unregisterConnection(connectionId);
         void eventRouter.destroy();
         connections.delete(connectionId);
       });

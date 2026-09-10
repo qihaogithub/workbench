@@ -1,17 +1,17 @@
 {
   "workspaceId": "live-1786593034976-57mvvc71z",
   "projectId": "proj_1786593034898_oubm00",
-  "revision": 15,
-  "rootHash": "a84212d356428d7dafce988126438fde678f8d29d42f63df9a4958cee5d4ea2f",
+  "revision": 16,
+  "rootHash": "3db119c746e7b73f261e14b18d35512f076f228b19f353d4a60cb705088ddaef",
   "resourceHashes": {
-    "demos/c37202_v8uf/config.schema.json": "e76467bacafd52960a3d8830f4af125c07a5fbc62c91a9ae91891de75bc08830",
+    "demos/c37202_v8uf/config.schema.json": "436c2e013d1d23be0703d2e9b5ff70c738fd94d5c38948a8dee200fc3725d676",
     "demos/c37202_v8uf/index.tsx": "ccae4c5a2f734e120a5c30b0730bed313a20d7a8271531e0d7f5ba6f4d968b14",
     "demos/c37202_v8uf/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/c37202_v8uf/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
-    "demos/page_oe78/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_oe78/config.schema.json": "e60e8ef12ce527b4b4d0bbea8cfe06d51ab000e478bb13fb5576b216a8e0a209",
     "demos/page_oe78/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_oe78/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
-    "demos/page_zcvc/config.schema.json": "e76467bacafd52960a3d8830f4af125c07a5fbc62c91a9ae91891de75bc08830",
+    "demos/page_zcvc/config.schema.json": "436c2e013d1d23be0703d2e9b5ff70c738fd94d5c38948a8dee200fc3725d676",
     "demos/page_zcvc/index.tsx": "ccae4c5a2f734e120a5c30b0730bed313a20d7a8271531e0d7f5ba6f4d968b14",
     "demos/page_zcvc/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_zcvc/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
@@ -36,5 +36,5 @@
     "128d83b4-ac1f-4a82-a850-dc19e8a6483f": "7553a1ad54aea455b0eca778aaeb3accffbb857926acf2340a33f7b9e3c3f78f",
     "22c45e2f-9378-4fb7-b10a-b909471dd31c": "115e25a62c2cff228f31f6dbd697dfa5abb62210f70f695916635f9a661e60e8"
   },
-  "updatedAt": 1786593102601
+  "updatedAt": 1789005932634
 }

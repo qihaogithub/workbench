@@ -15,6 +15,25 @@ export type DocumentSaveStatus =
   | "permission-denied"
   | "validation-failed";
 
+/**
+ * Only these states need a persistent, user-actionable message. The normal
+ * autosave cycle (dirty → saving → saved) is intentionally silent in the UI.
+ */
+export function isDocumentSaveAttentionStatus(
+  status: DocumentSaveStatus,
+): boolean {
+  switch (status) {
+    case "offline":
+    case "authority-degraded":
+    case "conflict":
+    case "permission-denied":
+    case "validation-failed":
+      return true;
+    default:
+      return false;
+  }
+}
+
 export type DocumentSaveErrorCode =
   | "NETWORK_UNAVAILABLE"
   | "AUTHORITY_BACKUP_MISSING"

@@ -1,14 +1,14 @@
 {
   "workspaceId": "live-1786593778872-bcbtygri1",
   "projectId": "proj_1786593778858_fsz0gx",
-  "revision": 4,
-  "rootHash": "1ae3be816ba0fdeba81eadd12e49224f99435e1bccd50a3fcc39b1022c6542fb",
+  "revision": 5,
+  "rootHash": "5162f7cbb32d055d053df9722a016597ee3df8613868f250033da91a1584a78f",
   "resourceHashes": {
     ".canvas-layout.json": "adaddab59ea4333e5b0445f0ba1f749559fcfc99220c976ea158893dc4eb7200",
-    "demos/page_mx2x/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_mx2x/config.schema.json": "e60e8ef12ce527b4b4d0bbea8cfe06d51ab000e478bb13fb5576b216a8e0a209",
     "demos/page_mx2x/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_mx2x/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
-    "demos/page_z9my/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_z9my/config.schema.json": "e60e8ef12ce527b4b4d0bbea8cfe06d51ab000e478bb13fb5576b216a8e0a209",
     "demos/page_z9my/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_z9my/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
     "knowledge/manifest.json": "a16c8d90d68c47856912b4cab9ce2872bdd8bffc6f7c8f14d070a7ee0b4b82c8",
@@ -20,5 +20,5 @@
     "7d3ae85e-c6e0-4a77-8d88-2cd9a1e8ab99": "ffff0d195c25882821917fde1a26cb816837fc73821bb03a041b7c406f2a6789",
     "f3bb21d5-625c-4f73-8ebe-7c56fc42bf68": "57d588eb9b6a100b8ed6d673691b7be4d8f16d82265ed93ff24e2000e4cf6cfb"
   },
-  "updatedAt": 1786593786248
+  "updatedAt": 1789005935251
 }

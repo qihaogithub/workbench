@@ -381,8 +381,9 @@ async function deleteOnePage(
       projectId: liveWorkspace.projectId,
       workspaceId: liveWorkspace.workspaceId,
       sessionId: config.sessionId,
+      ...(config.runId ? { runId: config.runId } : {}),
       baseRevision: 0,
-      actor: "ai",
+      actor: config.mutationActor ?? "ai",
       reason: "agent_delete_page",
       operations: [
         ...managedPageFiles(workingDir, pageId).map((file) => ({
@@ -501,8 +502,9 @@ async function deletePageBatch(
       projectId: liveWorkspace.projectId,
       workspaceId: liveWorkspace.workspaceId,
       sessionId: config.sessionId,
+      ...(config.runId ? { runId: config.runId } : {}),
       baseRevision: 0,
-      actor: "ai",
+      actor: config.mutationActor ?? "ai",
       reason: "agent_delete_pages",
       operations: [
         ...pageIds.flatMap((pageId) =>

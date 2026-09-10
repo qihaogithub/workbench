@@ -126,8 +126,9 @@ export function createDeleteFileTool(
                 projectId: liveWorkspace.projectId,
                 workspaceId: liveWorkspace.workspaceId,
                 sessionId: config.sessionId,
+                ...(config.runId ? { runId: config.runId } : {}),
                 baseRevision: snapshot!.state.revision,
-                actor: "ai",
+                actor: config.mutationActor ?? "ai",
                 reason: "agent_delete_file",
                 operations: [
                   {

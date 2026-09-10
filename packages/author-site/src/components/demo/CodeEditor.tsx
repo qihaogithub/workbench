@@ -62,7 +62,7 @@ export function CodeEditor({
     );
 
     return ext;
-  }, [language, readOnly]);
+  }, [collab?.awareness, collab?.ytext, language, readOnly]);
 
   return (
     <CodeMirror

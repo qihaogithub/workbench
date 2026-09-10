@@ -4,6 +4,7 @@ import type { IframePreviewFrameProps } from "./IframePreviewFrame";
 import type { PrototypePagePreviewProps } from "./PrototypePagePreview";
 import type { SketchPagePreviewProps } from "./SketchPagePreview";
 import type { SandboxedHtmlFrameProps } from "./SandboxedHtmlFrame";
+import type { PreviewObservationRegistry } from "./preview-observation-registry";
 import type {
   CanvasNavigationHotspot,
   CanvasNavigationConnection,
@@ -40,10 +41,7 @@ export interface SinglePageRendererProps {
     PrototypePagePreviewProps,
     "html" | "css" | "previewSize" | "configData"
   >;
-  sketch?: Omit<
-    SketchPagePreviewProps,
-    "scene" | "previewSize" | "configData"
-  >;
+  sketch?: Omit<SketchPagePreviewProps, "scene" | "previewSize" | "configData">;
   highFidelity?: Omit<
     PreviewPanelProps,
     "code" | "compiledJsUrl" | "previewSize" | "configData"
@@ -56,6 +54,14 @@ export interface SinglePageRendererProps {
 
 export interface SinglePagePreviewProps {
   page?: PreviewStagePage;
+  /** Optional connection-local registry for runtimes without a DOM adapter. */
+  previewObservationRegistry?: PreviewObservationRegistry;
+  previewObservationContext?: {
+    projectId: string;
+    workspaceId: string;
+    rootHash?: string;
+  };
+  previewRevision?: number;
   rendererProps?: SinglePageRendererProps;
   emptyState?: ReactNode;
   className?: string;

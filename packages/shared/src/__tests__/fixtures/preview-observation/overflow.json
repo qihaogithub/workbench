@@ -1,0 +1,42 @@
+{
+  "facts": {
+    "identity": {
+      "schemaVersion": 1,
+      "projectId": "fixture-project",
+      "workspaceId": "fixture-workspace",
+      "pageId": "overflow-page",
+      "runtimeType": "prototype-html-css",
+      "surface": "active-single-page",
+      "previewInstanceId": "preview-overflow",
+      "renderGeneration": 2,
+      "revision": 19
+    },
+    "capabilities": ["page-summary", "layout", "runtime", "assertions"],
+    "viewport": {
+      "width": 800,
+      "height": 600,
+      "devicePixelRatio": 1,
+      "scrollX": 0,
+      "scrollY": 0
+    },
+    "document": {
+      "clientWidth": 800,
+      "clientHeight": 600,
+      "scrollWidth": 960,
+      "scrollHeight": 600,
+      "horizontalOverflow": true,
+      "verticalOverflow": false
+    },
+    "runtime": {
+      "readyState": "complete",
+      "fontsReady": true,
+      "runtimeErrorCount": 0,
+      "consoleErrorCount": 0
+    }
+  },
+  "assertions": [
+    {"id": "no-horizontal-overflow", "type": "no-horizontal-overflow"}
+  ],
+  "expectedStatuses": ["failed"],
+  "expectedAssertionStatus": "failed"
+}

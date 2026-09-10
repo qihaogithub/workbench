@@ -17,6 +17,7 @@ import { createBashTool } from "./bash-tool";
 import { createSchemaValidateTool } from "./schema-tool";
 import { createSaveImageTool } from "./save-image-tool";
 import { createGetConsoleLogsTool } from "./console-tool";
+import { createObservePreviewTool } from "./preview-observation-tool";
 import { createCaptureScreenshotTool } from "./screenshot-tool";
 import { createListImagesTool } from "./list-images-tool";
 import { createReadUserImageTool } from "./read-user-image-tool";
@@ -87,7 +88,7 @@ import {
 } from "./visibility-tools";
 import type { ConfigVisibilityApprovalHandler } from "./visibility-tools";
 
-export const WORKBENCH_TOOL_VERSION = 34;
+export const WORKBENCH_TOOL_VERSION = 35;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
@@ -122,24 +123,82 @@ const CONTROL_TOOL_NAMES = new Set([
   "submitFeedback",
 ]);
 
-const CAPABILITY_TOOL_NAMES: Record<Exclude<CapabilityName, "all">, ReadonlySet<string>> = {
-  workspace: new Set(["readFile", "readUploadedFile", "listFiles", "editFile", "writeFile", "deleteFile", "bash", "schemaValidate", "inspectConfigVisibility", "validateConfigVisibility", "explainConfigVisibility", "repairConfigVisibility", "migrateConfigVisibility", "prepareConfigVisibilityDraft", "commitConfigVisibilityDraft", "knowledgeReport", "readKnowledgeSource", "getConsoleLogs", "captureScreenshot", "readWhiteboardContext", "applyWhiteboardActions", "serializeWhiteboardCode", "importWhiteboardCode", "planWhiteboardComposition", "undoWhiteboardEdit"]),
-  pages: new Set(["createPage", "listPages", "arrangeCanvasPages", "previewDeletePages", "executeDeletePagePlan", "deletePage", "deletePages"]),
-  comments: new Set(["readComments", "inspectElement", "replyComment", "resolveComment", "submitFeedback"]),
-  image: new Set(["saveImage", "listImages", "readUserImage", "captureScreenshot", "delegateTask", "generateWhiteboardAsset", "generateReferenceImage"]),
+const CAPABILITY_TOOL_NAMES: Record<
+  Exclude<CapabilityName, "all">,
+  ReadonlySet<string>
+> = {
+  workspace: new Set([
+    "readFile",
+    "readUploadedFile",
+    "listFiles",
+    "editFile",
+    "writeFile",
+    "deleteFile",
+    "bash",
+    "schemaValidate",
+    "inspectConfigVisibility",
+    "validateConfigVisibility",
+    "explainConfigVisibility",
+    "repairConfigVisibility",
+    "migrateConfigVisibility",
+    "prepareConfigVisibilityDraft",
+    "commitConfigVisibilityDraft",
+    "knowledgeReport",
+    "readKnowledgeSource",
+    "getConsoleLogs",
+    "observePreview",
+    "captureScreenshot",
+    "readWhiteboardContext",
+    "applyWhiteboardActions",
+    "serializeWhiteboardCode",
+    "importWhiteboardCode",
+    "planWhiteboardComposition",
+    "undoWhiteboardEdit",
+  ]),
+  pages: new Set([
+    "createPage",
+    "listPages",
+    "arrangeCanvasPages",
+    "previewDeletePages",
+    "executeDeletePagePlan",
+    "deletePage",
+    "deletePages",
+  ]),
+  comments: new Set([
+    "readComments",
+    "inspectElement",
+    "replyComment",
+    "resolveComment",
+    "submitFeedback",
+  ]),
+  image: new Set([
+    "saveImage",
+    "listImages",
+    "readUserImage",
+    "captureScreenshot",
+    "delegateTask",
+    "generateWhiteboardAsset",
+    "generateReferenceImage",
+  ]),
   web: new Set(["webRead", "webSearch"]),
   external: new Set(["figmaMcp", "dingtalk"]),
 };
 
 const INITIAL_TOOL_NAMES = new Set([
   "readProjectReference",
-  "readFile", "readUploadedFile", "listFiles", "readPreinstalledSkill",
-  "activateCapabilities", "requestPlanApproval", "requestUserChoice", "updatePlan",
+  "readFile",
+  "readUploadedFile",
+  "listFiles",
+  "readPreinstalledSkill",
+  "activateCapabilities",
+  "requestPlanApproval",
+  "requestUserChoice",
+  "updatePlan",
 ]);
 
 export function formatCapabilityDirectory(): string {
   const entries = [
-    "- `workspace`：文件编辑、命令、校验、配置联动上下文/规则草稿、知识、诊断，以及（启用时）白板 document/代码/语义 action、只读 composition plan 与可确认撤销。",
+    "- `workspace`：文件编辑、命令、校验、配置联动上下文/规则草稿、知识、诊断、活动预览运行时观察，以及（启用时）白板 document/代码/语义 action、只读 composition plan 与可确认撤销。",
     "- `pages`：原子创建页面、页面列表、画布整理和受确认的页面删除。",
     "- `comments`：评论读取、定位、回复和解决。",
     "- `image`：图片素材、截图、白板候选资产与图像子 Agent。",
@@ -156,7 +215,9 @@ export function formatCapabilityDirectory(): string {
 }
 
 export function getInitialActiveToolNames(tools: AgentTool[]): string[] {
-  return tools.filter((tool) => INITIAL_TOOL_NAMES.has(tool.name)).map((tool) => tool.name);
+  return tools
+    .filter((tool) => INITIAL_TOOL_NAMES.has(tool.name))
+    .map((tool) => tool.name);
 }
 
 export function resolveCapabilityToolNames(
@@ -167,12 +228,17 @@ export function resolveCapabilityToolNames(
     ? new Set(tools.map((tool) => tool.name))
     : new Set(
         capabilities
-          .filter((capability): capability is Exclude<CapabilityName, "all"> => capability !== "all")
+          .filter(
+            (capability): capability is Exclude<CapabilityName, "all"> =>
+              capability !== "all",
+          )
           .flatMap((capability) => [...CAPABILITY_TOOL_NAMES[capability]]),
       );
   for (const name of CONTROL_TOOL_NAMES) requested.add(name);
   requested.add("activateCapabilities");
-  return tools.filter((tool) => requested.has(tool.name)).map((tool) => tool.name);
+  return tools
+    .filter((tool) => requested.has(tool.name))
+    .map((tool) => tool.name);
 }
 
 export function createWorkbenchTools(
@@ -206,7 +272,9 @@ export function createWorkbenchTools(
   const deletionPlanStore = createDeletionPlanStore();
   const tools: AgentTool[] = [
     createReadProjectReferenceTool(config),
-    ...(getImageGenConfig().enabled ? [createGenerateReferenceImageTool(config)] : []),
+    ...(getImageGenConfig().enabled
+      ? [createGenerateReferenceImageTool(config)]
+      : []),
     createReadFileTool(config),
     createReadUploadedFileTool(config),
     createEditFileTool(config),
@@ -217,7 +285,10 @@ export function createWorkbenchTools(
     createSchemaValidateTool(config),
     createSaveImageTool(config),
     createGetConsoleLogsTool(config),
-    ...(options.includeScreenshot === false ? [] : [createCaptureScreenshotTool(config)]),
+    createObservePreviewTool(config),
+    ...(options.includeScreenshot === false
+      ? []
+      : [createCaptureScreenshotTool(config)]),
     createListImagesTool(config),
     createReadUserImageTool(),
     createKnowledgeReportTool(config),
@@ -229,7 +300,10 @@ export function createWorkbenchTools(
     createRepairConfigVisibilityTool(config),
     createMigrateConfigVisibilityTool(config),
     createPrepareConfigVisibilityDraftTool(config),
-    createCommitConfigVisibilityDraftTool(config, options.configVisibilityApprovalHandler),
+    createCommitConfigVisibilityDraftTool(
+      config,
+      options.configVisibilityApprovalHandler,
+    ),
     createActivateCapabilitiesTool(options.capabilityActivationHandler),
     createArrangeCanvasPagesTool(config),
     ...(WHITEBOARD_TOOLS_ENABLED

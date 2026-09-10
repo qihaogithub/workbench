@@ -12,7 +12,15 @@
       "ui:options": {
         "minWidth": 750,
         "maxWidth": 750,
-        "maxHeight": 700
+        "maxHeight": 700,
+        "widthRule": {
+          "operator": "=",
+          "value": 750
+        },
+        "heightRule": {
+          "operator": "≤",
+          "value": 350
+        }
       }
     },
     "mainButtonText": {

@@ -1,11 +1,11 @@
 {
   "workspaceId": "live-1786594518890-c2e1b41nl",
   "projectId": "proj_1786594518341_bx5win",
-  "revision": 6,
-  "rootHash": "b47acca361318be06761c555d08a7f4db45b8d7d95590ddd34accccfb2744cf7",
+  "revision": 7,
+  "rootHash": "01b92a4038b3ffdbc6aa271f5dfc4de8d3ffafc524ca737795b2341b0a3e10a1",
   "resourceHashes": {
     ".canvas-layout.json": "80620097e0a307b7a85a4bd7d6524880b85f74f565faa514f7d9005b23663949",
-    "demos/page_f2qb/config.schema.json": "385d149a239df1df3d6a81c92a029a761e897b581f71957823577ad92c98d9aa",
+    "demos/page_f2qb/config.schema.json": "5b2137051e2ec10714dc9b6e154c2fd2089ca048f15392482e049f7944abb756",
     "demos/page_f2qb/index.tsx": "36952e02748f88dbe6155123e4aef4c2a0b64173a9216ecf60988a875cacf3da",
     "demos/page_f2qb/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_f2qb/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
@@ -20,5 +20,5 @@
     "e708f9a6-1838-4ff8-b134-32ea7d99c504": "bc997ab1e16623cf30d0a0944ba3f90999bafcd12f11c97c29adbdb13743ce66",
     "1bd26605-1fad-418f-8339-537c67c98c19": "cb9d39d0dcbf87c7c9d629cf15bb67abf589266445d5dc27467ce691d187c15a"
   },
-  "updatedAt": 1786599651654
+  "updatedAt": 1789005941471
 }

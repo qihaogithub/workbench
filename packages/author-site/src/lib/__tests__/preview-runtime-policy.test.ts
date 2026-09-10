@@ -44,7 +44,9 @@ describe("AI 页面预览运行时策略", () => {
 
     expect(result.dependencies).toContain("@preview/sdk");
     expect(result.compiledCode).not.toContain("from '@preview/sdk'");
-    expect(result.compiledCode).toContain('from "/preview-runtime/vendor/preview-sdk.js"');
+    expect(result.compiledCode).toContain(
+      'from "/preview-runtime/vendor/preview-sdk.js"',
+    );
     expect(result.moduleHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -57,7 +59,9 @@ describe("AI 页面预览运行时策略", () => {
       }
     `);
 
-    expect(result.compiledCode).toContain("/preview-runtime/vendor/lucide-react.js");
+    expect(result.compiledCode).toContain(
+      "/preview-runtime/vendor/lucide-react.js",
+    );
     expect(result.compiledCode).not.toContain("lucide-react?deps=");
   });
 
@@ -71,7 +75,9 @@ describe("AI 页面预览运行时策略", () => {
     `);
 
     expect(result.dependencies).toContain("@preview/sdk");
-    expect(result.compiledCode).toContain("/preview-runtime/vendor/preview-sdk.js");
+    expect(result.compiledCode).toContain(
+      "/preview-runtime/vendor/preview-sdk.js",
+    );
   });
 
   it("本地 JSX runtime vendor 暴露 React 自动 JSX 转换需要的 named exports", () => {
@@ -130,7 +136,9 @@ describe("AI 页面预览运行时策略", () => {
     expect(html).toContain(
       "document.addEventListener('scroll', scheduleVisualOverlayRedraw, true)",
     );
-    expect(html).toContain("window.addEventListener('resize', scheduleVisualOverlayRedraw)");
+    expect(html).toContain(
+      "window.addEventListener('resize', scheduleVisualOverlayRedraw)",
+    );
     expect(() => new Function(visualEditScript)).not.toThrow();
   });
 
@@ -140,9 +148,7 @@ describe("AI 页面预览运行时策略", () => {
     expect(html).toContain(
       '<script async src="/preview-runtime/vendor/tailwindcss.js"></script>',
     );
-    expect(html).not.toContain(
-      "cdn.jsdelivr.net/npm/tailwindcss-cdn",
-    );
+    expect(html).not.toContain("cdn.jsdelivr.net/npm/tailwindcss-cdn");
   });
 
   it("支持紧急 CDN 回退", () => {
@@ -214,7 +220,9 @@ describe("AI 页面预览运行时策略", () => {
     expect(result.compiledCode).toContain(
       'from "/data/proj-runtime/preview-runtime/vendor/lucide-react.js"',
     );
-    expect(result.compiledCode).not.toContain("/preview-runtime/preview-runtime/");
+    expect(result.compiledCode).not.toContain(
+      "/preview-runtime/preview-runtime/",
+    );
     expect(html).toContain(
       '"react": "/data/proj-runtime/preview-runtime/vendor/react.js"',
     );
@@ -247,30 +255,55 @@ describe("AI 页面预览运行时策略", () => {
   it("CDN 回退模式包含 lottie 和 rive 映射，不包含 spine", () => {
     const cdnHtml = generateIframeHtml({ useCdnRuntime: true });
 
-    expect(cdnHtml).toContain('"lottie-web": "https://esm.sh/lottie-web@5.13.0"');
-    expect(cdnHtml).toContain('"@rive-app/canvas": "https://esm.sh/@rive-app/canvas@2.38.1"');
-    expect(cdnHtml).not.toContain('"@esotericsoftware/spine-webgl": "https://esm.sh/');
+    expect(cdnHtml).toContain(
+      '"lottie-web": "https://esm.sh/lottie-web@5.13.0"',
+    );
+    expect(cdnHtml).toContain(
+      '"@rive-app/canvas": "https://esm.sh/@rive-app/canvas@2.38.1"',
+    );
+    expect(cdnHtml).not.toContain(
+      '"@esotericsoftware/spine-webgl": "https://esm.sh/',
+    );
   });
 
   it("SDK 源码包含三个动画播放器组件", () => {
-    const runtimeDir = path.join(process.cwd(), "public", "preview-runtime", "vendor");
-    const previewSdk = fs.readFileSync(path.join(runtimeDir, "preview-sdk.js"), "utf8");
+    const runtimeDir = path.join(
+      process.cwd(),
+      "public",
+      "preview-runtime",
+      "vendor",
+    );
+    const previewSdk = fs.readFileSync(
+      path.join(runtimeDir, "preview-sdk.js"),
+      "utf8",
+    );
 
     expect(previewSdk).toContain("LottiePlayer");
     expect(previewSdk).toContain("RivePlayer");
     expect(previewSdk).toContain("SpinePlayer");
-    expect(previewSdk).toContain("import('lottie-web')");
-    expect(previewSdk).toContain("import('@rive-app/canvas')");
-    expect(previewSdk).toContain("import('@esotericsoftware/spine-webgl')");
-    expect(previewSdk).toContain("import('@esotericsoftware/spine-webgl-42')");
-    expect(previewSdk).toContain("const { src, animation, loop = true, audioEnabled = true, fit = 'contain', alignment = 'center'");
+    expect(previewSdk).toMatch(/import\((['"])lottie-web\1\)/);
+    expect(previewSdk).toMatch(/import\((['"])@rive-app\/canvas\1\)/);
+    expect(previewSdk).toMatch(
+      /import\((['"])@esotericsoftware\/spine-webgl\1\)/,
+    );
+    expect(previewSdk).toMatch(
+      /import\((['"])@esotericsoftware\/spine-webgl-42\1\)/,
+    );
+    expect(previewSdk).toContain(
+      "const { src, animation, loop = true, audioEnabled = true, fit = 'contain', alignment = 'center'",
+    );
     expect(previewSdk).toContain("skeletonObj.getBounds(offset, size)");
     expect(previewSdk).toContain("camera.position.x");
     expect(previewSdk).toContain("normalizeSpineFit(spineFit) === 'none'");
-    expect(previewSdk).toContain("sceneRenderer.camera.setViewport(w, h); frameSpineCamera()");
+    expect(previewSdk).toContain(
+      "sceneRenderer.camera.setViewport(w, h); frameSpineCamera()",
+    );
     expect(previewSdk).toContain("state.apply(skeletonObj);");
     expect(previewSdk).toContain("window.__WORKBENCH_SPINE_ASSET_BASE__");
     expect(previewSdk).toContain("SpinePlayer src 必须是 SpineAssetRefV1");
+    expect(previewSdk).toContain("__workbenchPreviewProbe__");
+    expect(previewSdk).toContain("paintedBounds");
+    expect(previewSdk).toContain("viewportWidth");
     expect(previewSdk).not.toContain("var skeleton = props.skeleton");
     expect(previewSdk).not.toContain("skeleton && atlas && texture");
   });
@@ -301,7 +334,9 @@ describe("AI 页面预览运行时策略", () => {
       `),
     ).toThrow(PreviewRuntimeContractError);
 
-    const validation = validatePreviewRuntimeContract('import uniq from "lodash/uniq";');
+    const validation = validatePreviewRuntimeContract(
+      'import uniq from "lodash/uniq";',
+    );
     expect(validation.issues[0]).toMatchObject({
       code: "UNKNOWN_NPM_IMPORT",
       moduleName: "lodash/uniq",
@@ -384,8 +419,12 @@ describe("AI 页面预览运行时策略", () => {
     window.parent.postMessage = jest.fn();
     button.click();
 
-    const selectedBox = document.querySelector('[data-visual-overlay="selected"]') as HTMLElement | null;
-    const label = document.querySelector('[data-visual-overlay="label"]') as HTMLElement | null;
+    const selectedBox = document.querySelector(
+      '[data-visual-overlay="selected"]',
+    ) as HTMLElement | null;
+    const label = document.querySelector(
+      '[data-visual-overlay="label"]',
+    ) as HTMLElement | null;
     expect(selectedBox?.style.display).toBe("block");
     expect(label?.style.display).toBe("block");
     expect(label?.textContent).toContain("button");
@@ -403,10 +442,22 @@ describe("AI 页面预览运行时策略", () => {
     const postMessageMock = jest.fn();
     window.parent.postMessage = postMessageMock;
     button.click();
-    expect((document.querySelector('[data-visual-overlay="selected"]') as HTMLElement | null)?.style.display).toBe("block");
+    expect(
+      (
+        document.querySelector(
+          '[data-visual-overlay="selected"]',
+        ) as HTMLElement | null
+      )?.style.display,
+    ).toBe("block");
 
     document.body.click();
-    expect((document.querySelector('[data-visual-overlay="selected"]') as HTMLElement | null)?.style.display).toBe("none");
+    expect(
+      (
+        document.querySelector(
+          '[data-visual-overlay="selected"]',
+        ) as HTMLElement | null
+      )?.style.display,
+    ).toBe("none");
     expect(postMessageMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ type: "VISUAL_SELECT", node: null }),
       "*",

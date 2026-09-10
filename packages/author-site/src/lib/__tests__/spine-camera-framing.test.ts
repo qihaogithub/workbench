@@ -1,5 +1,7 @@
 import {
   calculateSpineCameraFrame,
+  copySafeSpineProbeBounds,
+  isSafeSpineProbeBounds,
   normalizeSpineAlignment,
   normalizeSpineFit,
 } from "../spine-camera-framing";
@@ -58,5 +60,24 @@ describe("Spine camera framing", () => {
   it("normalizes unknown public values to the safe defaults", () => {
     expect(normalizeSpineFit("unexpected")).toBe("contain");
     expect(normalizeSpineAlignment("unexpected")).toBe("center");
+  });
+
+  it("accepts finite, bounded probe rectangles and returns a defensive copy", () => {
+    const source = { x: -10, y: 20, width: 100, height: 50 };
+    expect(isSafeSpineProbeBounds(source)).toBe(true);
+    const copy = copySafeSpineProbeBounds(source);
+    expect(copy).toEqual(source);
+    expect(copy).not.toBe(source);
+  });
+
+  it.each([
+    { x: Number.NaN, y: 0, width: 10, height: 10 },
+    { x: 0, y: Number.POSITIVE_INFINITY, width: 10, height: 10 },
+    { x: 0, y: 0, width: -1, height: 10 },
+    { x: 0, y: 0, width: 10_001, height: 10 },
+    { x: 100_001, y: 0, width: 10, height: 10 },
+  ])("rejects unsafe probe bounds %#", (value) => {
+    expect(isSafeSpineProbeBounds(value)).toBe(false);
+    expect(copySafeSpineProbeBounds(value)).toBeUndefined();
   });
 });

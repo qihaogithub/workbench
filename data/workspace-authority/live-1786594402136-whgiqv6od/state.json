@@ -1,10 +1,10 @@
 {
   "workspaceId": "live-1786594402136-whgiqv6od",
   "projectId": "proj_1786594402117_7h98rf",
-  "revision": 3,
-  "rootHash": "17f17e1ea4e2d21108c7e634243e841ffdd9db7daf899dd6ea5b131abeaf3568",
+  "revision": 4,
+  "rootHash": "5fdb27cfcd9cf2f35a0875e3113f0d88f576d861a3b0813a78a96374ef7838cf",
   "resourceHashes": {
-    "demos/page_msvm/config.schema.json": "a0d29e038c5cfc38267e6ecfd72e62fa6e0533aa4d50b6b6bb1946bffe037dcf",
+    "demos/page_msvm/config.schema.json": "2ee4aa7aaccec8458cc6251ecc0acc8ef4a12d4ff79cc90229dad2f74a5d87c5",
     "demos/page_msvm/index.tsx": "03e0f95e4daca3264a7924d8bf79da5d693442950e777aa20f68a06520fdd714",
     "demos/page_msvm/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_msvm/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
@@ -16,5 +16,5 @@
     "7b83a180-b3bb-4fa6-bd13-98a15953bbeb": "a3b1d2cab58dc3c1b591fe2c95284e1ceb62f92e25c5e8ad6f66dbf6036dd3df",
     "0a329b32-a01d-4bfa-b56f-eefe872a8540": "ccdc9c04a0325a08c2edce56b7b7ec2e662dbe19a99e725a33a0a6ab422591c4"
   },
-  "updatedAt": 1786594402775
+  "updatedAt": 1789005939513
 }

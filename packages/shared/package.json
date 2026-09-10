@@ -17,6 +17,7 @@
     "./demo/config-schema-definition": "./src/demo/config-schema-definition.ts",
     "./demo/config-schema-fields": "./src/demo/config-schema-fields.ts",
     "./demo/visibility-rules": "./src/demo/visibility-rules.ts",
+    "./demo/preview-observation": "./src/demo/preview-observation.ts",
     "./markdown-reference": "./src/markdown-reference/index.ts",
     "./document": "./src/document/contracts.ts",
     "./workspace-path": "./src/workspace-path.ts"

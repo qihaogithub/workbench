@@ -265,13 +265,11 @@
     }
   ],
   "createdAt": 1782718596693,
-  "updatedAt": 1786067441465,
+  "updatedAt": 1789027772376,
   "activeWorkspaceId": "live-1785634371427-sc7gvpidi",
   "activeWorkspaceUpdatedAt": 1785922541962,
   "canonicalSyncedWorkspaceId": "live-1785634371427-sc7gvpidi",
-  "canonicalSyncedRevision": 26,
-  "canonicalSyncedRootHash": "05484ad00f2aac100c68483ec8f1b46cc61c45bde95ec35258119a9f1d096bd6",
-  "canonicalSyncedAt": 1786067441465,
-  "publishedVersion": "v23",
-  "publishedAt": 1785922541980
+  "canonicalSyncedRevision": 31,
+  "canonicalSyncedRootHash": "8bb2d6c53323a7d28c2c7060f8d93418e74397ec822bed791c920e725eea749d",
+  "canonicalSyncedAt": 1789027772376
 }

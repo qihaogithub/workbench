@@ -5,5 +5,8 @@ export type {
   StreamEvent,
   AgentClientConfig,
   ToolCapabilities,
+  PreviewRegistration,
+  PreviewObservationHandler,
 } from "./client";
 export { ConversationHttpError } from "./client";
+export type * from "./preview-observation-types";

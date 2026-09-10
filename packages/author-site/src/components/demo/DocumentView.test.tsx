@@ -160,7 +160,81 @@ describe("DocumentView knowledge creation", () => {
         }),
       );
     });
+    const listRequestsAfterSave = (global.fetch as jest.Mock).mock.calls.filter(
+      ([input, request]) =>
+        String(input).startsWith("/api/knowledge?") && !request?.method,
+    );
+    expect(listRequestsAfterSave).toHaveLength(1);
+    expect(screen.getByText("项目说明")).toBeInTheDocument();
     expect(screen.getByTestId("document-editor-value")).toHaveTextContent("# 原文!");
+  });
+
+  it("目录后台刷新时保留已加载的文档条目", async () => {
+    let listRequestCount = 0;
+    let resolveRefresh!: (value: unknown) => void;
+    const pendingRefresh = new Promise((resolve) => {
+      resolveRefresh = resolve;
+    });
+    global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/knowledge?") && !init?.method) {
+        listRequestCount += 1;
+        if (listRequestCount > 1) return pendingRefresh;
+        return jsonResponse({
+          success: true,
+          data: [{
+            id: "kb-existing",
+            title: "项目说明",
+            source: "user",
+            description: "项目说明",
+            fileName: "项目说明.md",
+            addedAt: "2026-08-12T00:00:00.000Z",
+            updatedAt: "2026-08-12T00:00:00.000Z",
+            sizeBytes: 0,
+          }],
+        });
+      }
+      if (url.startsWith("/api/knowledge/content")) {
+        return jsonResponse({ success: true, data: { content: "# 原文" } });
+      }
+      if (url.startsWith("/api/design-specs") || url.includes("workspace/files?include=conventions")) {
+        return jsonResponse({ success: true, data: [] });
+      }
+      return jsonResponse({ success: false }, false);
+    }) as jest.Mock;
+
+    const { container, unmount } = render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("项目说明")).toBeInTheDocument();
+      expect(screen.getByTestId("document-editor-value")).toHaveTextContent("# 原文");
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event("knowledge-updated"));
+    });
+    await waitFor(() => expect(listRequestCount).toBe(2));
+
+    expect(screen.getByText("项目说明")).toBeInTheDocument();
+    expect(container.querySelector(".animate-spin")).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveRefresh({
+        ok: true,
+        json: async () => ({ success: true, data: [] }),
+      });
+      await pendingRefresh;
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getByText("暂无文档，点击 + 添加")).toBeInTheDocument());
+    unmount();
   });
 
   it("does not show or load chat attachments in the document view", async () => {

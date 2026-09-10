@@ -1,8 +1,8 @@
 {
   "workspaceId": "live-1784698539757-9i6jc2l2h",
   "projectId": "proj_1783585261167_7h7prw",
-  "revision": 1,
-  "rootHash": "9c61618ea8a81cce164a8aad65d02cad09852392db43d9d356b4cbdf149b1208",
+  "revision": 2,
+  "rootHash": "549861ef2fd276c002e784ca3d6035b3eeb1dad31babe482da006424e0bbfdb4",
   "resourceHashes": {
     ".canvas-layout.json": "2244b5fac1ce49f838b2d4d6f5d2ff879906f0d49d322e57a4a146adafd275b5",
     "assets/images/0f90283a5e4b-kingkong-04.png": "0f90283a5e4b95e7d7de0340801bd4634111b2c5d2e6591a47d9bdd53adb268b",
@@ -20,11 +20,11 @@
     "assets/images/be63de2fde89-kingkong-07.png": "be63de2fde89a4db5fb56b810029d5d03eb5b71cca842a3cb9a0297c9bda44b2",
     "assets/images/e3d84d41a35b-kingkong-01.png": "e3d84d41a35b639fc61e2c25900c00da586604208b66c92e44e718a6747a4c85",
     "assets/images/f88701df91cd-kingkong-03.png": "f88701df91cdc146a175dd31640f5d4b793979c87e8a947ad3e7c4a492c1a6fd",
-    "demos/figma_s4v2/config.schema.json": "94a614f1dd49f202aa3093c086abc9e949066d189eec3b60155fe8569fb12d1e",
+    "demos/figma_s4v2/config.schema.json": "c5f191ae3b8807e9f7f13eb9fc33184a2a8a516a34e5b11859f1eaa748b3f7ce",
     "demos/figma_s4v2/index.tsx": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/figma_s4v2/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/figma_s4v2/prototype.html": "3a914fc2ad36059e9b11d187da380333567cd41eec2bd78daf58d70c7414abfc",
-    "demos/growth-bean-mall_x8k2/config.schema.json": "552a68ebc1f5dcfd8998f0934dd0c7132f26a78a7686ba46c25c09987b24c7a6",
+    "demos/growth-bean-mall_x8k2/config.schema.json": "6fe9c7209320f8f50d42ba3505ab097ff2fcf5ab417a49a51ef7deb94c497c2f",
     "demos/growth-bean-mall_x8k2/index.tsx": "0ca257d0c956ccf3de5bed9e89a8b337658b7636d59b3af658a176fe618f80e9",
     "demos/growth-bean-mall_x8k2/prototype.css": "c784f940d0fbf9d83cbbaee732c5b28fce451aa17e1063c0e058659fcf5f6b7a",
     "demos/growth-bean-mall_x8k2/prototype.html": "8c2c18522a83de24947b0c557bd0af5570291f03bf3b37db9ba48c4ff3227fe7",
@@ -34,5 +34,5 @@
     "workspace-tree.json": "70e2d25905258ba3fb3dc28e0b7d90ee0ea05ec38117c8c82bbe1a1266091422"
   },
   "mutationPayloads": {},
-  "updatedAt": 1785913433955
+  "updatedAt": 1789005893522
 }

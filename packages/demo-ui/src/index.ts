@@ -193,6 +193,11 @@ export type {
   CascadeOption,
 } from "./schema-parser";
 export { PreviewPanel } from "./PreviewPanel";
+export {
+  PreviewObservationRegistry,
+  collectPreviewObservation,
+} from "./preview-observation-registry";
+export type { PreviewObservationRegistration } from "./preview-observation-registry";
 export { SinglePagePreview } from "./SinglePagePreview";
 export { SandboxedHtmlFrame } from "./SandboxedHtmlFrame";
 export {

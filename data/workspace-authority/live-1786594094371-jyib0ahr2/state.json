@@ -1,11 +1,11 @@
 {
   "workspaceId": "live-1786594094371-jyib0ahr2",
   "projectId": "proj_1786594094351_cad1j5",
-  "revision": 9,
-  "rootHash": "361309f7372c37e966e8f66b6a5c40717df4b22fff502e0b4fb14b5a6ad0902e",
+  "revision": 10,
+  "rootHash": "1aa1f2f9cba44450ffff6b841dfccb8274a642984e4388f9a34693c802d1819e",
   "resourceHashes": {
     ".canvas-layout.json": "e464854f0cd339609957bda1e9f583aef44d0a9bd760103360887b481669eeb7",
-    "demos/page_phtz/config.schema.json": "ed036dec10597b07d4846d232c8c760ddb9a9de9d14d594affeb8911a672b355",
+    "demos/page_phtz/config.schema.json": "e60e8ef12ce527b4b4d0bbea8cfe06d51ab000e478bb13fb5576b216a8e0a209",
     "demos/page_phtz/index.tsx": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_phtz/prototype.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "demos/page_phtz/prototype.html": "4cff6d6aa4040c3d97d4ad5de83c3b9e78d400768a069871ebaf95d3ee52ce1f",
@@ -23,5 +23,5 @@
     "d8d59655-1c88-446e-ab73-9a737621145b": "f984395b52de126177534157eb11a5cb864abb931261266f141f0abc75cd4df7",
     "9b439e18-cd90-488c-beff-294dfb6ad833": "99955d62cd66340044ffd957a23cb2f54d93d14331d70b4c132e9a7edc1f05e4"
   },
-  "updatedAt": 1786594107192
+  "updatedAt": 1789005936769
 }

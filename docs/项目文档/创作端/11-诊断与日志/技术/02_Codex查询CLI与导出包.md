@@ -13,7 +13,7 @@ covers:
 
 # Codex 查询 CLI 与导出包
 
-> 更新日期：2026-09-09
+> 更新日期：2026-09-10
 
 本文描述创作端诊断事件的命令行查询入口、JSON 输出契约和导出包组成。事件采集和写入链路见 [创作端诊断事件系统](./01_创作端诊断事件系统.md)。
 
@@ -95,6 +95,15 @@ JSON 输出必须包含查询元信息、诊断完整性状态、事件列表、
     "unit": "ms",
     "metrics": {}
   },
+  "previewObservations": {
+    "runCount": 0,
+    "observationCount": 0,
+    "availability": {},
+    "assertionStatus": {},
+    "latencyMs": {},
+    "payloadBytes": {},
+    "technicalRepair": { "successRate": null }
+  },
   "agentRunLogs": []
 }
 ```
@@ -117,6 +126,10 @@ JSON 输出必须包含查询元信息、诊断完整性状态、事件列表、
 
 `performance.metrics` 固定输出以下八项，单位均为毫秒：autosave debounce wait、queue wait、commit latency、remote update latency、draft preview latency、projection latency、reconnect convergence 和 canonical lag。每项包含 `count`、`min`、`p50`、`p95`、`p99`、`max` 和 `average`；无样本时 `count=0`，其余数值为 `null`。canonical lag 在事件未显式携带时，由同 Workspace、同 revision 的 mutation committed 到 canonical materialization succeeded 时间差派生。未产生某类埋点时必须保留空样本，不能用其他耗时伪装。
 
+`previewObservations` 只读扫描 `agent-run-logs/<sessionId>/*.jsonl` 中已脱敏的 `observePreview` 终态摘要，聚合调用量、`observed/stale/unavailable/unsupported` 状态、断言状态与结果、E1/E2/E3 evidence kind/precision、runtime 类型、延迟和 payload 字节数分位（含 P50/P90/P95/P99）以及 timeout/stale 计数。工具失败、超时、断连或已发起但缺失终态的调用按 `unavailable` 计入；不会从原始错误文本恢复 observation 内容。`technicalRepair.successRate` 只按显式定义计算：mutation committed、存在显式断言、finish 成功、projection applied 且至少一条断言通过；没有可判定项目 ID 的记录在按项目查询时 fail-closed。Agent `run_start` 若带有显式 `projectId` 优先使用，否则从受限 `workingDir` 的 `projects/<projectId>` 段恢复项目归属，历史 `demoId` 仅作最后兜底，避免无 identity 的 unavailable observation 因页面 ID/项目 ID 混淆而被过滤。聚合输出不包含节点、文本、URL、凭证或工具原文。
+
+共享包的 `src/__tests__/fixtures/preview-observation/` 保存无用户正文的脱敏 facts fixtures，固定覆盖居中、溢出、图片失败、Spine 和旧 revision；`preview-observation-replay.test.ts` 逐个回放并断言统一 evaluator 的结果，同时验证旧 revision 只作为 stale replay 输入保留。该回放集只用于契约回归，不会被诊断 CLI 当作运行样本，也不会进入导出包的 observation 原文。
+
 `workspace-authority-status` 是只读 Workspace Authority 观测入口。命令通过 agent-service 的 health 接口读取 `ready`、`condition`、`recommendedAction`、revision/rootHash、实际 rootHash、external drift、queue depth、active lease、prepared/recovery pending 事务数、recovery state、持久 mutation 冲突数、当前 committed-event 订阅者数、staging 数、committed backup 数、路径维度的 `missingBackupCount`、去重 blob 维度的 `missingBackupHashCount`、receipt 数、journal 条数和 projection ack 条数。`condition` 只取 `healthy | backup_repairable | drift_requires_decision | unrecoverable`。它需要有效 Session 做访问校验，不触发 bootstrap、不获取写 lease，也不修改业务文件。JSON 输出会额外给出 `warnings` 数组，供 Codex 或自动任务判断是否需要先处理漂移、遗留 lease、未恢复事务或备份缺口。
 
 `workspace-authority-preflight` 是只读 Workspace Authority 机器判定入口。命令同样只读取 health，不写业务文件；JSON 输出包含 `passed`、`issues`、`status` 和 `warnings`。默认阻断 Workspace 缺失、Authority state 缺失、external drift、active/stale write lease、prepared 事务和 committed backup 不完整；`--fail-on-queue` 与 `--fail-on-staging` 可把 mutation queue 积压和 staging 文件残留纳入失败条件。发布、导出、模板创建、canonical 物化和部署前检查应优先消费 `passed/issues`，而不是解析文本 warnings。
@@ -135,6 +148,8 @@ JSON 输出必须包含查询元信息、诊断完整性状态、事件列表、
 - 对应 JSONL fallback/spool 原始诊断片段。
 - 按 Workspace/revision 关联的 `workspaceFlows`。
 - 八项延迟指标的样本数与 p50/p95/p99 摘要。
+- `previewObservations` 的脱敏跨运行状态、断言、延迟/载荷分位和技术修复成功率摘要。
+- 共享 preview observation facts replay fixtures 的版本/测试结果索引（不携带 fixture 原文）。
 - AI run log 索引和工具调用摘要。
 - 当前 Workspace 元数据。
 - 关键资源的 hash、长度和 mtime。

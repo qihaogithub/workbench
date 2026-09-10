@@ -4,6 +4,7 @@ import * as path from "path";
 import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { AgentConfig } from "../../core/types";
+import type { WorkspaceMutationOperation } from "@workbench/shared/contracts";
 import { logger } from "../../utils/logger";
 import { isPathAllowed, DEFAULT_WORKSPACE_PERMISSIONS } from "./permissions";
 import { resolveVirtualKnowledgeFile } from "./virtual-knowledge";
@@ -16,8 +17,6 @@ import {
   resolveLiveWorkspaceMutationContext,
   WorkspaceMutationAuthorityError,
 } from "../../workspace/workspace-mutation-authority";
-import { getHocuspocusCollabServer } from "../../collab/hocuspocus-server";
-import { resolveCollabResourceKind } from "../../collab/workspace-file-persistence";
 import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-policy";
 import { createManagedDocumentProposalResult } from "./document-proposal-tool";
 import { formatAuthorityCommitSummary } from "./authority-result-summary";
@@ -34,16 +33,14 @@ const MANIFEST_PATH = "knowledge/manifest.json";
  * 当 writeFile 创建新的 knowledge/*.md 文件时，透明同步 manifest.json。
  * 这是 writeFile 的副作用，AI 无需感知 manifest 更新。
  *
- * 返回 true 表示 manifest 同步成功，false 表示跳过（非知识库路径或非新建文件）。
+ * 返回一个与正文写入同一事务提交的 manifest operation。
  */
-async function syncKnowledgeManifest(
-  liveWorkspace: NonNullable<ReturnType<typeof resolveLiveWorkspaceMutationContext>>,
+function buildKnowledgeManifestOperation(
   snapshot: { resources: Record<string, string> },
-  receiptRevision: number,
   docPath: string,
   docContent: string,
-  sessionId?: string,
-): Promise<boolean> {
+): WorkspaceMutationOperation | null {
+  if (!KNOWLEDGE_DOC_PATTERN.test(docPath)) return null;
   // 读取当前 manifest
   const manifestRaw = snapshot.resources[MANIFEST_PATH];
   let manifest: { version: number; items: Array<Record<string, unknown>> };
@@ -72,24 +69,14 @@ async function syncKnowledgeManifest(
 
   manifest.items.push(newItem);
 
-  await liveWorkspace.authority.mutate({
-    mutationId: crypto.randomUUID(),
-    projectId: liveWorkspace.projectId,
-    workspaceId: liveWorkspace.workspaceId,
-    sessionId,
-    baseRevision: receiptRevision,
-    actor: "ai",
-    reason: "knowledge_document_manifest_sync",
-    operations: [
-      {
-        type: "put_text",
-        path: MANIFEST_PATH,
-        content: JSON.stringify(manifest, null, 2),
-      },
-    ],
-  });
-
-  return true;
+  return {
+    type: "put_text",
+    path: MANIFEST_PATH,
+    content: JSON.stringify(manifest, null, 2),
+    ...(manifestRaw === undefined
+      ? { expectedAbsent: true }
+      : { expectedHash: crypto.createHash("sha256").update(manifestRaw).digest("hex") }),
+  };
 }
 
 const ReadFileParams = Type.Object({
@@ -196,36 +183,26 @@ export function createReadFileTool(
         let authorityRevision: number | undefined;
         let authorityHash: string | undefined;
         if (snapshot) {
-          content = snapshot.resources[args.path];
+          const snapshotPath = args.path.replace(/^(?:\.\/)+/, "");
+          content = snapshot.resources[snapshotPath];
           if (content !== undefined) {
             fromAuthority = true;
             authorityRevision = snapshot.state.revision;
-            authorityHash = snapshot.state.resourceHashes[args.path];
+            authorityHash = snapshot.state.resourceHashes[snapshotPath];
           }
         }
         if (content === undefined && !snapshot) {
           content = await fs.promises.readFile(filePath, "utf-8");
         }
+        if (content === undefined && snapshot) {
+          return {
+            content: [{ type: "text", text: `Error reading file: ${args.path} is not found` }],
+            details: { path: args.path, error: "WORKSPACE_RESOURCE_NOT_FOUND", revision: snapshot.state.revision },
+            isError: true,
+          };
+        }
         if (content === undefined) {
-          // File not found in Authority snapshot; try filesystem as fallback
-          try {
-            content = await fs.promises.readFile(filePath, "utf-8");
-            logger.debug(
-              { path: args.path },
-              "readFile: file not in Authority snapshot, read from filesystem",
-            );
-          } catch (fsError) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `Error reading file: ${args.path} is not found`,
-                },
-              ],
-              details: { path: args.path, error: "WORKSPACE_RESOURCE_NOT_FOUND" },
-              isError: true,
-            };
-          }
+          content = await fs.promises.readFile(filePath, "utf-8");
         }
 
         // Apply offset/limit pagination
@@ -386,62 +363,35 @@ export function createWriteFileTool(
           if (proposalResult) return proposalResult;
         }
 
+        const manifestOperation = liveWorkspace && snapshot && existing === null
+          ? buildKnowledgeManifestOperation(snapshot, args.path, args.content)
+          : null;
         let receipt;
         if (liveWorkspace) {
-          const resourceKind = resolveCollabResourceKind(args.path);
-          let collabWriteSucceeded = false;
-          if (resourceKind && config.sessionId) {
-            // Yjs-First: route text writes through collab room for CRDT merging
-            try {
-              const writeResult = await getHocuspocusCollabServer().writeToResource(
-                {
-                  projectId: liveWorkspace.projectId,
-                  workspaceId: liveWorkspace.workspaceId,
-                  sessionId: config.sessionId,
-                  resourcePath: args.path,
-                  kind: resourceKind,
-                },
-                args.content,
-                existing === null
+          // Agent writes always go through Authority. A failed collaboration
+          // fan-out must be surfaced rather than silently taking a second
+          // write path with a different concurrency contract.
+          receipt = await liveWorkspace.authority.mutate({
+            mutationId: crypto.randomUUID(),
+            projectId: liveWorkspace.projectId,
+            workspaceId: liveWorkspace.workspaceId,
+            sessionId: config.sessionId,
+            ...(config.runId ? { runId: config.runId } : {}),
+            baseRevision: snapshot!.state.revision,
+            actor: config.mutationActor ?? "ai",
+            reason: "agent_write_file",
+            operations: [
+              {
+                type: "put_text",
+                path: args.path,
+                content: args.content,
+                ...(existing === null
                   ? { expectedAbsent: true }
-                  : { expectedHash: crypto.createHash("sha256").update(existing).digest("hex") },
-              );
-              receipt = writeResult.receipt;
-              collabWriteSucceeded = Boolean(receipt);
-            } catch (collabErr) {
-              logger.warn(
-                { path: args.path, err: String(collabErr) },
-                "writeFile: collab room write failed, falling back to Authority",
-              );
-            }
-          }
-          if (!collabWriteSucceeded) {
-            // Authority path (non-collab resource or collab room unavailable)
-            receipt = await liveWorkspace.authority.mutate({
-                  mutationId: crypto.randomUUID(),
-                  projectId: liveWorkspace.projectId,
-                  workspaceId: liveWorkspace.workspaceId,
-                  sessionId: config.sessionId,
-                  baseRevision: snapshot!.state.revision,
-                  actor: "ai",
-                  reason: "agent_write_file",
-                  operations: [
-                    {
-                      type: "put_text",
-                      path: args.path,
-                      content: args.content,
-                      ...(existing === null
-                        ? { expectedAbsent: true }
-                        : {
-                            expectedHash: crypto
-                              .createHash("sha256")
-                              .update(existing)
-                              .digest("hex"),
-                          }),
-                    },
-                  ],
-                });
-          }
+                  : { expectedHash: crypto.createHash("sha256").update(existing).digest("hex") }),
+              },
+              ...(manifestOperation ? [manifestOperation] : []),
+            ],
+          });
         } else {
           await fs.promises.mkdir(dir, { recursive: true });
           await fs.promises.writeFile(filePath, args.content, "utf-8");
@@ -449,34 +399,12 @@ export function createWriteFileTool(
         }
 
         // 透明 manifest 同步：新建 knowledge/*.md 时自动更新 manifest.json
-        let knowledgeDocumentCreated = false;
-        if (
-          liveWorkspace &&
-          receipt &&
-          existing === null &&
-          KNOWLEDGE_DOC_PATTERN.test(args.path)
-        ) {
-          try {
-            knowledgeDocumentCreated = await syncKnowledgeManifest(
-              liveWorkspace,
-              snapshot!,
-              (receipt as { revision: number }).revision,
-              args.path,
-              args.content,
-              config.sessionId,
-            );
-            if (knowledgeDocumentCreated) {
-              logger.info(
-                { path: args.path, manifestPath: MANIFEST_PATH },
-                "writeFile: knowledge manifest synced",
-              );
-            }
-          } catch (manifestErr) {
-            logger.warn(
-              { path: args.path, err: String(manifestErr) },
-              "writeFile: knowledge manifest sync failed (non-fatal)",
-            );
-          }
+        const knowledgeDocumentCreated = Boolean(manifestOperation && receipt);
+        if (knowledgeDocumentCreated) {
+          logger.info(
+            { path: args.path, manifestPath: MANIFEST_PATH },
+            "writeFile: knowledge manifest committed atomically",
+          );
         }
 
         const runtimeValidation = validatePreviewFileWrite(
@@ -592,7 +520,8 @@ export function createListFilesTool(
           : null;
 
         if (snapshot) {
-          const prefix = args.path ? `${args.path.replace(/\/+$/, "")}/` : "";
+          const normalizedDirectory = (args.path || "").replace(/^(?:\.\/)+/, "").replace(/\/+$/, "");
+          const prefix = normalizedDirectory ? `${normalizedDirectory}/` : "";
           const seen = new Set<string>();
           for (const resourcePath of Object.keys(snapshot.resources)) {
             if (prefix && !resourcePath.startsWith(prefix)) continue;
@@ -630,10 +559,10 @@ export function createListFilesTool(
               },
             };
           }
-          logger.debug(
-            { path: args.path || "." },
-            "Authority snapshot has no resources for this path, falling back to filesystem",
-          );
+          return {
+            content: [{ type: "text", text: "Directory is empty" }],
+            details: { path: args.path || ".", entries: 0, revision: snapshot.state.revision },
+          };
         }
 
         logger.info(

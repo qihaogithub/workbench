@@ -1,8 +1,9 @@
 import type { Extension } from "@hocuspocus/server";
 import * as Y from "yjs";
+import crypto from "node:crypto";
 
 import type { CollabConnectionContext } from "./session-auth";
-import type { CollabDocumentName } from "../document-name";
+import { decodeDocumentName, type CollabDocumentName } from "../document-name";
 import type { WorkspaceFilePersistence } from "../workspace-file-persistence";
 import type { CollabStateStore } from "../collab-state-store";
 import { logger } from "../../utils/logger";
@@ -22,13 +23,18 @@ import type { WorkspaceMutationReceipt } from "@workbench/shared/contracts";
  *   `persistence.commitResource()` (actor: "collab", reason: "collab_autosave"),
  *   then persists the Yjs state so the room can safely recreate on next start.
  *
- * The Yjs room is the single content authority (Yjs-First architecture),
- * so non-collab writes must route through the Yjs doc via
- * `Hocuspocus.openDirectConnection().transact()` instead of bypassing it.
+ * Human edits remain authoritative inside a Yjs room. Agent/HTTP mutations
+ * commit through Workspace Authority and are projected back into an active
+ * room only when its content still matches the receipt's before hash. A room
+ * with unsaved local edits is marked conflicted and cannot flush stale text
+ * over the newer Authority revision; its persisted Yjs snapshot is removed so
+ * a reconnect starts from canonical content.
  */
 export class AuthorityPersistenceExtension implements Extension {
   priority = 100;
   private readonly lastReceipts = new Map<string, WorkspaceMutationReceipt>();
+  private readonly conflictedRooms = new Set<string>();
+  private readonly roomBaselines = new Map<string, string>();
 
   constructor(
     private readonly persistence: WorkspaceFilePersistence,
@@ -49,8 +55,15 @@ export class AuthorityPersistenceExtension implements Extension {
     const ctx = data.context;
     if (!ctx?.ok) return;
 
+    // A newly loaded room always re-seeds from persisted canonical content;
+    // clear an in-memory conflict marker left by a previous connection.
+    this.conflictedRooms.delete(this.roomKey(ctx));
+
     const text = data.document.getText("content");
-    if (text.length > 0) return;
+    if (text.length > 0) {
+      this.roomBaselines.set(this.roomKey(ctx), this.hashContent(text.toString()));
+      return;
+    }
 
     const descriptor: CollabDocumentName = {
       projectId: ctx.projectId,
@@ -72,7 +85,7 @@ export class AuthorityPersistenceExtension implements Extension {
           ctx.kind as never,
         );
 
-        if (state.content && text.toString() !== state.content) {
+        if (text.toString() !== state.content) {
           logger.warn(
             {
               workspaceId: ctx.workspaceId,
@@ -88,6 +101,7 @@ export class AuthorityPersistenceExtension implements Extension {
             Y.encodeStateAsUpdate(data.document),
           );
         }
+        this.roomBaselines.set(this.roomKey(ctx), this.hashContent(text.toString()));
         return;
       } catch (error) {
         logger.error(
@@ -112,6 +126,7 @@ export class AuthorityPersistenceExtension implements Extension {
         Y.encodeStateAsUpdate(data.document),
       );
     }
+    this.roomBaselines.set(this.roomKey(ctx), this.hashContent(text.toString()));
   }
 
   /**
@@ -119,10 +134,10 @@ export class AuthorityPersistenceExtension implements Extension {
    *
    * Called by Hocuspocus after the configured debounce window. Skips
    * no-op writes (file content unchanged) to avoid unnecessary mutation
-   * events. Uses `baseRevision: 0` because the Yjs room is the single
-   * content authority and the Authority auto-adopts drift. The resulting
-   * durable receipt is retained for the direct writer; callers must never
-   * construct a revision-0/empty-root success receipt themselves.
+   * events. Human Yjs writes use the collab actor and may merge in the room;
+   * Agent writes never reach this path without an explicit Authority receipt.
+   * The resulting durable receipt is retained for the direct writer; callers
+   * must never construct a revision-0/empty-root success receipt themselves.
    */
   async onStoreDocument(data: {
     document: Y.Doc;
@@ -130,6 +145,11 @@ export class AuthorityPersistenceExtension implements Extension {
   }): Promise<void> {
     const ctx = data.lastContext;
     if (!ctx?.ok) return;
+
+    const roomKey = this.roomKey(ctx);
+    if (this.conflictedRooms.has(roomKey)) {
+      throw new Error("WORKSPACE_RESOURCE_CONFLICT");
+    }
 
     this.lastReceipts.delete(`${ctx.workspaceId}:${ctx.resourcePath}`);
 
@@ -157,6 +177,19 @@ export class AuthorityPersistenceExtension implements Extension {
       ctx.kind as never,
     );
 
+    const baselineHash = this.roomBaselines.get(roomKey) ?? this.hashContent(currentState.content);
+    if (currentState.hash !== baselineHash) {
+      this.conflictedRooms.add(roomKey);
+      this.roomBaselines.delete(roomKey);
+      this.stateStore?.delete(ctx.workspaceId, {
+        projectId: ctx.projectId,
+        workspaceId: ctx.workspaceId,
+        resourcePath: ctx.resourcePath,
+        kind: ctx.kind as never,
+      });
+      throw new Error("WORKSPACE_RESOURCE_CONFLICT");
+    }
+
     if (currentState.content === roomContent) {
       if (this.stateStore) {
         this.persistState(data.document, ctx);
@@ -179,8 +212,10 @@ export class AuthorityPersistenceExtension implements Extension {
         kind: ctx.kind as never,
         content: roomContent,
         baseRevision: 0,
+        expectedHash: baselineHash,
       });
       this.lastReceipts.set(`${ctx.workspaceId}:${ctx.resourcePath}`, result.receipt);
+      this.roomBaselines.set(roomKey, this.hashContent(roomContent));
 
       if (this.stateStore) {
         this.persistState(data.document, ctx);
@@ -199,8 +234,76 @@ export class AuthorityPersistenceExtension implements Extension {
     }
   }
 
+  async afterUnloadDocument(data: { documentName: string }): Promise<void> {
+    const descriptor = decodeDocumentName(data.documentName);
+    if (!descriptor) return;
+    const key = this.roomKey(descriptor);
+    this.roomBaselines.delete(key);
+    this.conflictedRooms.delete(key);
+  }
+
+  /**
+   * Apply a committed non-collab mutation to an active room without allowing
+   * an unsaved human edit to be overwritten. The caller supplies the room's
+   * current Y.Doc and the canonical content read after the Authority commit.
+   */
+  applyCommittedResource(input: {
+    documentName: string;
+    document: Y.Doc;
+    descriptor: CollabDocumentName;
+    beforeHash: string | null;
+    afterHash: string | null;
+    canonicalContent: string;
+  }): "applied" | "conflicted" | "ignored" {
+    const currentContent = input.document.getText("content").toString();
+    const currentHash = this.hashContent(currentContent);
+    const expectedBefore = input.beforeHash ?? this.hashContent("");
+    if (currentHash !== expectedBefore) {
+      this.conflictedRooms.add(this.roomKey(input.descriptor));
+      this.roomBaselines.delete(this.roomKey(input.descriptor));
+      this.stateStore?.delete(input.descriptor.workspaceId, input.descriptor);
+      logger.warn(
+        {
+          documentName: input.documentName,
+          projectId: input.descriptor.projectId,
+          workspaceId: input.descriptor.workspaceId,
+          resourcePath: input.descriptor.resourcePath,
+          expectedBefore,
+          currentHash,
+        },
+        "Authority commit raced with unsaved Yjs edits; room requires reconnect",
+      );
+      return "conflicted";
+    }
+
+    if (this.hashContent(input.canonicalContent) !== (input.afterHash ?? this.hashContent(""))) {
+      logger.error(
+        { documentName: input.documentName, resourcePath: input.descriptor.resourcePath },
+        "Authority commit content hash did not match receipt",
+      );
+      return "ignored";
+    }
+
+    const text = input.document.getText("content");
+    input.document.transact(() => {
+      if (text.length > 0) text.delete(0, text.length);
+      if (input.canonicalContent) text.insert(0, input.canonicalContent);
+    });
+    this.conflictedRooms.delete(this.roomKey(input.descriptor));
+    this.roomBaselines.set(this.roomKey(input.descriptor), this.hashContent(input.canonicalContent));
+    return "applied";
+  }
+
   getLastReceipt(workspaceId: string, resourcePath: string): WorkspaceMutationReceipt | undefined {
     return this.lastReceipts.get(`${workspaceId}:${resourcePath}`);
+  }
+
+  private roomKey(input: Pick<CollabConnectionContext, "projectId" | "workspaceId" | "resourcePath">): string {
+    return `${input.projectId}:${input.workspaceId}:${input.resourcePath}`;
+  }
+
+  private hashContent(content: string): string {
+    return crypto.createHash("sha256").update(content).digest("hex");
   }
 
   private persistState(

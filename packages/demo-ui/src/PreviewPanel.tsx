@@ -43,7 +43,10 @@ function readConfigPathValue(
   path: string,
 ): unknown {
   if (!config || !path) return undefined;
-  const keys = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+  const keys = path
+    .replace(/\[(\d+)\]/g, ".$1")
+    .split(".")
+    .filter(Boolean);
   let current: unknown = config;
   for (const key of keys) {
     if (current === null || typeof current !== "object") return undefined;
@@ -188,9 +191,10 @@ function sanitizeStaticPrototypeElement(root: HTMLElement) {
   });
 }
 
-function extractStaticPrototypeCss(
-  doc: Document,
-): { css: string; hasCrossOriginFailures: boolean } {
+function extractStaticPrototypeCss(doc: Document): {
+  css: string;
+  hasCrossOriginFailures: boolean;
+} {
   const chunks: string[] = [];
   let hasCrossOriginFailures = false;
   doc.querySelectorAll("style").forEach((style) => {
@@ -311,6 +315,13 @@ function setNullableStringStateIfChanged(
   setter((current) => (current === value ? current : value));
 }
 
+function createPreviewInstanceId(): string {
+  return typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `preview-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function PreviewPanelInternal({
   code,
   sessionId,
@@ -318,6 +329,7 @@ function PreviewPanelInternal({
   compiledJsUrl,
   cssImports: externalCssImports,
   configData,
+  previewRevision,
   appState,
   routeParams,
   sdkFiles: _sdkFiles,
@@ -356,6 +368,8 @@ function PreviewPanelInternal({
   onPositionChange,
   onPositionDrag,
   onPositionEditExit,
+  previewObservationRegistry,
+  previewObservationContext,
 }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -369,6 +383,15 @@ function PreviewPanelInternal({
   const iframeReadyRef = useRef(false);
   const activePreviewRequestIdRef = useRef(0);
   const nextPreviewRequestIdRef = useRef(0);
+  const nextRenderGenerationRef = useRef(0);
+  const activeRenderGenerationRef = useRef(0);
+  const lastLoadedIdentityRef = useRef<string | null>(null);
+  const previewInstanceIdRef = useRef<string>("");
+  if (!previewInstanceIdRef.current) {
+    previewInstanceIdRef.current = createPreviewInstanceId();
+  }
+  const activePreviewRevisionRef = useRef<number | undefined>(previewRevision);
+  activePreviewRevisionRef.current = previewRevision;
   const [pendingCompileResult, setPendingCompileResult] = useState<{
     result: CompileResult;
     requestId: number;
@@ -447,6 +470,17 @@ function PreviewPanelInternal({
 
   const isSleeping = activityState === "sleeping";
   const resolvedCdnBaseUrl = getPreviewCdnBaseUrl(cdnBaseUrl);
+
+  // Canvas runtime pooling keeps sleeping iframes mounted for a cheap visual
+  // fallback, but they are not an authoritative observation surface. Keep the
+  // connection-local registry in sync so observePreview fails closed while a
+  // runtime is sleeping and becomes observable again on wake.
+  useEffect(() => {
+    previewObservationRegistry?.updateActivityState(
+      previewInstanceIdRef.current,
+      activityState,
+    );
+  }, [activityState, previewObservationRegistry]);
 
   const reportTiming = useCallback(
     (stage: string, details: Record<string, unknown> = {}) => {
@@ -546,14 +580,17 @@ function PreviewPanelInternal({
         sessionId,
         demoId,
       });
-      const spineAssetBaseUrl = sessionId && typeof window !== "undefined"
-        ? `${window.location.origin}/api/sessions/${encodeURIComponent(sessionId)}/workspace/assets/animations`
-        : undefined;
+      const spineAssetBaseUrl =
+        sessionId && typeof window !== "undefined"
+          ? `${window.location.origin}/api/sessions/${encodeURIComponent(sessionId)}/workspace/assets/animations`
+          : undefined;
       updateCodeSentAtRef.current =
         typeof performance !== "undefined" ? performance.now() : null;
       reportTiming("parent_update_code_url_sent", {
         cssImports: cssList.length,
       });
+      const renderGeneration = ++nextRenderGenerationRef.current;
+      activeRenderGenerationRef.current = renderGeneration;
 
       iframe.contentWindow.postMessage(
         {
@@ -567,6 +604,9 @@ function PreviewPanelInternal({
           spineAssetBaseUrl,
           cssImports: cssList,
           requestId,
+          previewInstanceId: previewInstanceIdRef.current,
+          renderGeneration,
+          revision: activePreviewRevisionRef.current,
         },
         "*",
       );
@@ -605,15 +645,18 @@ function PreviewPanelInternal({
         sessionId,
         demoId,
       });
-      const spineAssetBaseUrl = sessionId && typeof window !== "undefined"
-        ? `${window.location.origin}/api/sessions/${encodeURIComponent(sessionId)}/workspace/assets/animations`
-        : undefined;
+      const spineAssetBaseUrl =
+        sessionId && typeof window !== "undefined"
+          ? `${window.location.origin}/api/sessions/${encodeURIComponent(sessionId)}/workspace/assets/animations`
+          : undefined;
       updateCodeSentAtRef.current =
         typeof performance !== "undefined" ? performance.now() : null;
       reportTiming("parent_update_code_sent", {
         cssImports: result.cssImports.length,
         codeBytes: result.compiledCode.length,
       });
+      const renderGeneration = ++nextRenderGenerationRef.current;
+      activeRenderGenerationRef.current = renderGeneration;
 
       iframe.contentWindow.postMessage(
         {
@@ -625,6 +668,9 @@ function PreviewPanelInternal({
           spineAssetBaseUrl,
           cssImports: result.cssImports,
           requestId,
+          previewInstanceId: previewInstanceIdRef.current,
+          renderGeneration,
+          revision: activePreviewRevisionRef.current,
         },
         "*",
       );
@@ -647,10 +693,13 @@ function PreviewPanelInternal({
         sessionId,
         demoId,
       });
-      const spineAssetBaseUrl = sessionId && typeof window !== "undefined"
-        ? `${window.location.origin}/api/sessions/${encodeURIComponent(sessionId)}/workspace/assets/animations`
-        : undefined;
+      const spineAssetBaseUrl =
+        sessionId && typeof window !== "undefined"
+          ? `${window.location.origin}/api/sessions/${encodeURIComponent(sessionId)}/workspace/assets/animations`
+          : undefined;
       const requestId = activePreviewRequestIdRef.current;
+      const renderGeneration = ++nextRenderGenerationRef.current;
+      activeRenderGenerationRef.current = renderGeneration;
 
       iframe.contentWindow.postMessage(
         {
@@ -660,6 +709,9 @@ function PreviewPanelInternal({
           routeParams: routeParamsRef.current || {},
           spineAssetBaseUrl,
           requestId,
+          previewInstanceId: previewInstanceIdRef.current,
+          renderGeneration,
+          revision: activePreviewRevisionRef.current,
         },
         "*",
       );
@@ -775,13 +827,19 @@ function PreviewPanelInternal({
 
     if (isUrlMode) {
       if (!compiledJsUrl) {
+        previewObservationRegistry?.invalidate(previewInstanceIdRef.current);
+        lastLoadedIdentityRef.current = null;
         activePreviewRequestIdRef.current = NO_ACTIVE_PREVIEW_REQUEST_ID;
+        activePreviewRevisionRef.current = undefined;
         return;
       }
 
       const requestId = nextPreviewRequestIdRef.current + 1;
       nextPreviewRequestIdRef.current = requestId;
       activePreviewRequestIdRef.current = requestId;
+      activePreviewRevisionRef.current = previewRevision;
+      previewObservationRegistry?.invalidate(previewInstanceIdRef.current);
+      lastLoadedIdentityRef.current = null;
       dispatchRequest({ type: "START", requestId, phase: "waiting-shell" });
 
       setNullableStringStateIfChanged(setCompileError, null);
@@ -802,7 +860,10 @@ function PreviewPanelInternal({
     }
 
     if (code !== undefined && !code) {
+      previewObservationRegistry?.invalidate(previewInstanceIdRef.current);
+      lastLoadedIdentityRef.current = null;
       activePreviewRequestIdRef.current = NO_ACTIVE_PREVIEW_REQUEST_ID;
+      activePreviewRevisionRef.current = undefined;
       dispatchRequest({ type: "RESET" });
       setBooleanStateIfChanged(setContentLoaded, false);
       setBooleanStateIfChanged(setIsCompiling, false);
@@ -814,7 +875,10 @@ function PreviewPanelInternal({
     }
 
     if (!sessionId && (!code || !validCode)) {
+      previewObservationRegistry?.invalidate(previewInstanceIdRef.current);
+      lastLoadedIdentityRef.current = null;
       activePreviewRequestIdRef.current = NO_ACTIVE_PREVIEW_REQUEST_ID;
+      activePreviewRevisionRef.current = undefined;
       dispatchRequest({ type: "RESET" });
       setBooleanStateIfChanged(setContentLoaded, false);
       setBooleanStateIfChanged(setIsCompiling, false);
@@ -827,6 +891,9 @@ function PreviewPanelInternal({
     const requestId = nextPreviewRequestIdRef.current + 1;
     nextPreviewRequestIdRef.current = requestId;
     activePreviewRequestIdRef.current = requestId;
+    activePreviewRevisionRef.current = previewRevision;
+    previewObservationRegistry?.invalidate(previewInstanceIdRef.current);
+    lastLoadedIdentityRef.current = null;
     dispatchRequest({ type: "START", requestId });
 
     let cancelled = false;
@@ -919,6 +986,7 @@ function PreviewPanelInternal({
             requestId,
           };
           setNullableStringStateIfChanged(setCompileError, message);
+          previewObservationRegistry?.invalidate(previewInstanceIdRef.current);
           dispatchRequest({ type: "FAIL", requestId, error: message });
           onErrorRef.current?.(
             createPreviewDiagnosticError(message, diagnostic),
@@ -975,6 +1043,7 @@ function PreviewPanelInternal({
             "请修复 TSX/JSX 语法错误，保留一个完整的 React 组件模块后重新生成。",
         };
         setNullableStringStateIfChanged(setCompileError, message);
+        previewObservationRegistry?.invalidate(previewInstanceIdRef.current);
         dispatchRequest({ type: "FAIL", requestId, error: message });
         onErrorRef.current?.(createPreviewDiagnosticError(message, diagnostic));
         setPendingCompileResult(null);
@@ -1003,6 +1072,7 @@ function PreviewPanelInternal({
     externalCssImports,
     isUrlMode,
     validCode,
+    previewRevision,
     sendUpdateCode,
     sendUpdateCodeUrl,
     reportTiming,
@@ -1042,13 +1112,17 @@ function PreviewPanelInternal({
       reportTiming(`${stage}_timeout`, { deadlineMs: deadline });
       onErrorRef.current?.(
         createPreviewDiagnosticError(message, {
-          source: stage === "compile" ? "post_generation_validation" : "preview_runtime",
+          source:
+            stage === "compile"
+              ? "post_generation_validation"
+              : "preview_runtime",
           stage: `${stage}_timeout`,
           pageId: demoId,
           file: demoId ? `demos/${demoId}/index.tsx` : undefined,
           message,
           requestId: requestState.requestId,
-          instruction: "请重试预览；若持续失败，请查看诊断以确认编译服务、预览容器或模块加载状态。",
+          instruction:
+            "请重试预览；若持续失败，请查看诊断以确认编译服务、预览容器或模块加载状态。",
         }),
       );
     }, deadline);
@@ -1115,10 +1189,16 @@ function PreviewPanelInternal({
         justEnteredPositionEditRef.current = false;
         return;
       }
-      const activePosition = getActivePosition(positionEditMode.target, configData);
-      const positions = positionEditMode.target && activePosition
-        ? { [positionEditMode.target.id]: activePosition }
-        : (configData?.__positions as Record<string, { x: number; y: number }> | undefined);
+      const activePosition = getActivePosition(
+        positionEditMode.target,
+        configData,
+      );
+      const positions =
+        positionEditMode.target && activePosition
+          ? { [positionEditMode.target.id]: activePosition }
+          : (configData?.__positions as
+              | Record<string, { x: number; y: number }>
+              | undefined);
       if (positions) {
         const iframe = iframeRef.current;
         if (iframe && iframe.contentWindow) {
@@ -1225,6 +1305,11 @@ function PreviewPanelInternal({
       const isCurrentPreviewRequest =
         typeof requestId === "number" &&
         requestId === activePreviewRequestIdRef.current;
+      const isCurrentPreviewIdentity =
+        (typeof event.data?.previewInstanceId !== "string" ||
+          event.data.previewInstanceId === previewInstanceIdRef.current) &&
+        (typeof event.data?.renderGeneration !== "number" ||
+          event.data.renderGeneration === activeRenderGenerationRef.current);
 
       switch (type) {
         case "READY":
@@ -1251,7 +1336,7 @@ function PreviewPanelInternal({
           break;
 
         case "LOADED":
-          if (!isCurrentPreviewRequest) return;
+          if (!isCurrentPreviewRequest || !isCurrentPreviewIdentity) return;
           reportTiming("iframe_loaded", {
             updateToLoadedMs:
               updateCodeSentAtRef.current != null &&
@@ -1262,8 +1347,65 @@ function PreviewPanelInternal({
           setNullableStringStateIfChanged(setRuntimeError, null);
           setBooleanStateIfChanged(setContentLoaded, true);
           dispatchRequest({ type: "READY", requestId });
-          if (!contentLoaded) {
-            onContentLoaded?.({ requestId });
+          if (
+            previewObservationRegistry &&
+            previewObservationContext &&
+            demoId
+          ) {
+            const previewDocument = iframe.contentDocument;
+            const previewRoot =
+              previewDocument?.getElementById("root") || previewDocument?.body;
+            if (previewRoot) {
+              previewObservationRegistry.register({
+                identity: {
+                  schemaVersion: 1,
+                  projectId: previewObservationContext.projectId,
+                  workspaceId: previewObservationContext.workspaceId,
+                  pageId: demoId,
+                  runtimeType: "high-fidelity-react",
+                  surface: "active-single-page",
+                  previewInstanceId: previewInstanceIdRef.current,
+                  renderGeneration:
+                    typeof event.data?.renderGeneration === "number"
+                      ? event.data.renderGeneration
+                      : activeRenderGenerationRef.current,
+                  revision:
+                    typeof event.data?.revision === "number"
+                      ? event.data.revision
+                      : (activePreviewRevisionRef.current ?? 0),
+                  rootHash: previewObservationContext.rootHash,
+                },
+                root: previewRoot,
+                selectedElement: null,
+                runtime: {
+                  runtimeErrorCount: 0,
+                  consoleErrorCount: 0,
+                },
+                activityState: activityStateRef.current,
+              });
+            }
+          }
+          const loadedPreviewInstanceId =
+            typeof event.data?.previewInstanceId === "string"
+              ? event.data.previewInstanceId
+              : previewInstanceIdRef.current;
+          const loadedRenderGeneration =
+            typeof event.data?.renderGeneration === "number"
+              ? event.data.renderGeneration
+              : activeRenderGenerationRef.current;
+          const loadedRevision =
+            typeof event.data?.revision === "number"
+              ? event.data.revision
+              : activePreviewRevisionRef.current;
+          const loadedIdentityKey = `${loadedPreviewInstanceId}:${loadedRenderGeneration}:${loadedRevision ?? ""}`;
+          if (lastLoadedIdentityRef.current !== loadedIdentityKey) {
+            lastLoadedIdentityRef.current = loadedIdentityKey;
+            onContentLoaded?.({
+              requestId,
+              previewInstanceId: loadedPreviewInstanceId,
+              renderGeneration: loadedRenderGeneration,
+              revision: loadedRevision,
+            });
           }
           sendCollectPositionableSizes();
           // 固定 iframe 外壳在页面切换期间保持 READY；此前图层树请求会落在
@@ -1273,15 +1415,79 @@ function PreviewPanelInternal({
           break;
 
         case "COMPONENT_READY":
-          if (!isCurrentPreviewRequest) return;
+          if (!isCurrentPreviewRequest || !isCurrentPreviewIdentity) return;
           sendCollectPositionableSizes();
           break;
 
         case "RUNTIME_ERROR":
-          if (!isCurrentPreviewRequest) return;
+          if (!isCurrentPreviewRequest || !isCurrentPreviewIdentity) return;
           {
             const message = error || "组件运行时发生错误";
+            // A render error is reported before RenderCommitReporter can emit
+            // LOADED, so the normal registration path may not have run yet.
+            // Keep the iframe's error fallback observable with the same frozen
+            // render identity instead of turning a known runtime failure into
+            // the less useful `no-active-preview` result. If the successful
+            // registration already exists, preserve its accumulated counters.
+            const observationIdentity = {
+              schemaVersion: 1 as const,
+              projectId: previewObservationContext?.projectId,
+              workspaceId: previewObservationContext?.workspaceId,
+              pageId: demoId,
+              runtimeType: "high-fidelity-react" as const,
+              surface: "active-single-page" as const,
+              previewInstanceId: previewInstanceIdRef.current,
+              renderGeneration:
+                typeof event.data?.renderGeneration === "number"
+                  ? event.data.renderGeneration
+                  : activeRenderGenerationRef.current,
+              revision:
+                typeof event.data?.revision === "number"
+                  ? event.data.revision
+                  : (activePreviewRevisionRef.current ?? 0),
+              rootHash: previewObservationContext?.rootHash,
+            };
+            const currentIdentity = previewObservationRegistry?.identity;
+            const hasCurrentRegistration =
+              currentIdentity?.previewInstanceId ===
+                observationIdentity.previewInstanceId &&
+              currentIdentity.renderGeneration ===
+                observationIdentity.renderGeneration &&
+              currentIdentity.revision === observationIdentity.revision;
+            if (
+              !hasCurrentRegistration &&
+              previewObservationRegistry &&
+              observationIdentity.projectId &&
+              observationIdentity.workspaceId &&
+              demoId
+            ) {
+              const previewDocument = iframe.contentDocument;
+              const previewRoot =
+                previewDocument?.getElementById("root") ||
+                previewDocument?.body;
+              if (previewRoot) {
+                previewObservationRegistry.register({
+                  identity: {
+                    ...observationIdentity,
+                    projectId: observationIdentity.projectId,
+                    workspaceId: observationIdentity.workspaceId,
+                    pageId: demoId,
+                  },
+                  root: previewRoot,
+                  selectedElement: null,
+                  runtime: {
+                    runtimeErrorCount: 0,
+                    consoleErrorCount: 0,
+                  },
+                  activityState: activityStateRef.current,
+                });
+              }
+            }
             setNullableStringStateIfChanged(setRuntimeError, message);
+            previewObservationRegistry?.recordRuntimeError(
+              previewInstanceIdRef.current,
+              "runtime",
+            );
             dispatchRequest({ type: "FAIL", requestId, error: message });
             onErrorRef.current?.(
               createPreviewDiagnosticError(message, {
@@ -1299,7 +1505,7 @@ function PreviewPanelInternal({
           break;
 
         case "RESIZE":
-          if (!isCurrentPreviewRequest) return;
+          if (!isCurrentPreviewRequest || !isCurrentPreviewIdentity) return;
           if (typeof event.data?.height === "number") {
             onContentHeightChange?.(event.data.height);
           }
@@ -1307,9 +1513,14 @@ function PreviewPanelInternal({
 
         case "CONSOLE_LOG":
           if (event.data?.payload) {
-            onConsoleEntryRef.current?.(
-              event.data.payload as ConsoleLogPayload,
-            );
+            const payload = event.data.payload as ConsoleLogPayload;
+            if (payload.level === "error") {
+              previewObservationRegistry?.recordRuntimeError(
+                previewInstanceIdRef.current,
+                "console",
+              );
+            }
+            onConsoleEntryRef.current?.(payload);
           }
           break;
 
@@ -1591,6 +1802,11 @@ function PreviewPanelInternal({
   }, [visualEditMode]);
 
   useEffect(() => {
+    previewObservationRegistry?.invalidate(previewInstanceIdRef.current);
+    previewInstanceIdRef.current = createPreviewInstanceId();
+    lastLoadedIdentityRef.current = null;
+    nextRenderGenerationRef.current = 0;
+    activeRenderGenerationRef.current = 0;
     reportTiming("iframe_html_create_start", {
       cdnBase: resolvedCdnBaseUrl,
       urlMode: isUrlMode,
@@ -1605,7 +1821,7 @@ function PreviewPanelInternal({
       typeof window !== "undefined" &&
       !!window.location?.origin;
     const url = canUseFixedShell
-      ? `${window.location.origin}/api/preview-runtime/shell?runtimeSource=${runtimeSource}`
+      ? `${window.location.origin}/api/preview-runtime/shell?runtimeSource=${runtimeSource}&previewInstanceId=${encodeURIComponent(previewInstanceIdRef.current)}`
       : `data:text/html;charset=utf-8,${encodeURIComponent(
           generateIframeHtml({
             supportUrlMode: true,
@@ -1613,6 +1829,7 @@ function PreviewPanelInternal({
             runtimeBaseUrl: window.location.origin,
             useCdnRuntime: runtimeSource === "cdn",
             configData: configDataRef.current || {},
+            previewInstanceId: previewInstanceIdRef.current,
           }),
         )}`;
     setIframeSrcUrl((current) => (current === url ? current : url));
@@ -1622,7 +1839,7 @@ function PreviewPanelInternal({
       runtimeSource,
       shellMode,
     });
-  }, [isUrlMode, resolvedCdnBaseUrl]);
+  }, [isUrlMode, previewObservationRegistry, reportTiming, resolvedCdnBaseUrl]);
 
   useEffect(() => {
     setBooleanStateIfChanged(setContentLoaded, false);
@@ -1631,6 +1848,13 @@ function PreviewPanelInternal({
   useEffect(() => {
     setBooleanStateIfChanged(setPlaceholderFailed, false);
   }, [placeholderScreenshotUrl]);
+
+  useEffect(
+    () => () => {
+      previewObservationRegistry?.invalidate(previewInstanceIdRef.current);
+    },
+    [previewObservationRegistry],
+  );
 
   return (
     <>
@@ -1676,7 +1900,9 @@ function PreviewPanelInternal({
         <div className="absolute inset-0 z-30 m-2 flex items-center justify-center rounded-lg border border-destructive/30 bg-background/95 p-4 text-center">
           <div className="max-w-sm space-y-3">
             <p className="text-sm font-semibold text-foreground">
-              {requestState.phase === "timed-out" ? "预览加载超时" : "预览加载失败"}
+              {requestState.phase === "timed-out"
+                ? "预览加载超时"
+                : "预览加载失败"}
             </p>
             <p className="text-xs text-muted-foreground">{terminalError}</p>
             <button
@@ -1806,6 +2032,9 @@ export function arePreviewPanelPropsEqual(
     prev.compiledJsUrl === next.compiledJsUrl &&
     prev.previewSize === next.previewSize &&
     prev.configData === next.configData &&
+    prev.previewRevision === next.previewRevision &&
+    prev.previewObservationRegistry === next.previewObservationRegistry &&
+    prev.previewObservationContext === next.previewObservationContext &&
     prev.demoId === next.demoId &&
     prev.sessionId === next.sessionId &&
     prev.placeholderScreenshotUrl === next.placeholderScreenshotUrl &&

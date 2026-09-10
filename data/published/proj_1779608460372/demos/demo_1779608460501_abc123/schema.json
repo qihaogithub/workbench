@@ -1,9 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$demo": {
-    "previewSize": {
-      "width": 375,
-      "height": 812
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
     }
   },
   "title": "底部弹窗 - 手机版配置",

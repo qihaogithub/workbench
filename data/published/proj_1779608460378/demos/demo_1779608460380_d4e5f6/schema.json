@@ -1,9 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$demo": {
-    "previewSize": {
-      "width": 1024,
-      "height": 768
+    "presentation": {
+      "version": 1,
+      "mode": "responsive-page",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "heightBehavior": "content",
+      "preset": "custom",
+      "source": "user"
     }
   },
   "title": "广场页面 - 平板版配置",

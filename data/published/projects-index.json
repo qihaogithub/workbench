@@ -1,24 +1,24 @@
 {
   "projects": [
     {
-      "id": "proj_1785984571939_9uj8av",
-      "name": "伴读首页",
-      "publishedAt": 1787191739760,
-      "publishedVersion": "v10",
-      "demoCount": 2
-    },
-    {
       "id": "proj_1779608460372",
       "name": "底部弹窗",
-      "publishedAt": 1786699513985,
-      "publishedVersion": "v36",
+      "publishedAt": 1789027442048,
+      "publishedVersion": "v38",
       "demoCount": 2
     },
     {
       "id": "proj_1779608460378",
       "name": "广场页面",
-      "publishedAt": 1786010306277,
-      "publishedVersion": "v76",
+      "publishedAt": 1789026445364,
+      "publishedVersion": "v77",
+      "demoCount": 2
+    },
+    {
+      "id": "proj_1785984571939_9uj8av",
+      "name": "伴读首页",
+      "publishedAt": 1787191739760,
+      "publishedVersion": "v10",
       "demoCount": 2
     },
     {
@@ -27,14 +27,6 @@
       "publishedAt": 1786007287360,
       "publishedVersion": "v30",
       "demoCount": 11
-    },
-    {
-      "id": "proj_1782718596686_wmv9yu",
-      "name": "App通用广告弹窗",
-      "description": "叫叫App的通用广告弹窗，用于在启动App时弹一个广告弹窗。",
-      "publishedAt": 1785922541966,
-      "publishedVersion": "v23",
-      "demoCount": 2
     },
     {
       "id": "proj_1784874964275_p0k4ho",
@@ -73,5 +65,5 @@
       "demoCount": 2
     }
   ],
-  "generatedAt": 1788416436470
+  "generatedAt": 1789027442141
 }

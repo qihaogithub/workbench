@@ -135,6 +135,7 @@ function readConfigSchemaUpdate(event: Event): ConfigSchemaUpdate | null {
 type DesignSpecTitleUpdate = {
   docId: string;
   title: string;
+  reason?: string;
 };
 
 function readDesignSpecTitleUpdate(event: Event): DesignSpecTitleUpdate | null {
@@ -149,7 +150,11 @@ function readDesignSpecTitleUpdate(event: Event): DesignSpecTitleUpdate | null {
   ) {
     return null;
   }
-  return { docId: candidate.docId, title: candidate.title.trim() };
+  return {
+    docId: candidate.docId,
+    title: candidate.title.trim(),
+    reason: typeof candidate.reason === "string" ? candidate.reason : undefined,
+  };
 }
 
 /**
@@ -352,7 +357,15 @@ export function DesignSpecWorkspaceProvider({
           docRef.current = value;
           setDoc(value);
           setDirty(false);
-          window.dispatchEvent(new Event("design-spec-updated"));
+          window.dispatchEvent(
+            new CustomEvent("design-spec-updated", {
+              detail: {
+                docId: activeDocId,
+                title: value.title,
+                reason: "content-save",
+              },
+            }),
+          );
         },
         onError: () => {
           setDirty(true);
@@ -521,6 +534,7 @@ export function DesignSpecWorkspaceProvider({
     const handleTitleUpdate = (event: Event) => {
       const update = readDesignSpecTitleUpdate(event);
       if (!update || update.docId !== activeDocId) return;
+      if (update.reason === "content-save") return;
       const current = docRef.current;
       if (!current) return;
       const next = { ...current, title: update.title };

@@ -103,6 +103,11 @@ export class WorkspaceFilePersistence {
     });
   }
 
+  /** Resolve a registered live Workspace for server-side projection only. */
+  getWorkspacePath(workspaceId: string): string | null {
+    return this.findWorkspacePath(workspaceId);
+  }
+
   validateSession(input: {
     projectId: string;
     workspaceId: string;
@@ -252,7 +257,7 @@ export class WorkspaceFilePersistence {
     resourcePath: string;
     kind: CollabResourceKind;
     content: string;
-    /** @deprecated Yjs-First: expectedHash is no longer used by Authority. */
+    /** Optional CAS precondition for internal projection writes. */
     expectedHash?: string;
     baseRevision?: number;
     sessionId?: string;
@@ -273,6 +278,7 @@ export class WorkspaceFilePersistence {
         type: "put_text",
         path: input.resourcePath,
         content: input.content,
+        ...(input.expectedHash ? { expectedHash: input.expectedHash } : {}),
       }],
     });
     return { state: this.readResourceState(workspacePath, input.resourcePath, input.kind), receipt };

@@ -73,4 +73,40 @@ describe('AgentManager tool version handling', () => {
     expect(second.getConfig().toolVersion).toBe(1);
   });
 
+  it('keeps the originating connection while a turn is processing', () => {
+    const { agents, factory } = createFactory('processing');
+    const manager = new AgentManager(factory as any);
+
+    const first = manager.getOrCreate('s1', {
+      sessionId: 's1',
+      connectionId: 'connection-a',
+    });
+    const second = manager.getOrCreate('s1', {
+      sessionId: 's1',
+      connectionId: 'connection-b',
+    });
+
+    expect(second).toBe(first);
+    expect(agents).toHaveLength(1);
+    expect(second.getConfig().connectionId).toBe('connection-a');
+  });
+
+  it('keeps the first connection during agent initialization', () => {
+    const { agents, factory } = createFactory('initializing');
+    const manager = new AgentManager(factory as any);
+
+    const first = manager.getOrCreate('s1', {
+      sessionId: 's1',
+      connectionId: 'connection-a',
+    });
+    const second = manager.getOrCreate('s1', {
+      sessionId: 's1',
+      connectionId: 'connection-b',
+    });
+
+    expect(second).toBe(first);
+    expect(agents).toHaveLength(1);
+    expect(second.getConfig().connectionId).toBe('connection-a');
+  });
+
 });

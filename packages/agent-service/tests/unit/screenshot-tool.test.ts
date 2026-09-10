@@ -70,7 +70,12 @@ describe('createCaptureScreenshotTool', () => {
       demoId: 'demo_test',
     });
 
-    const result = await tool.execute('tool_call_1', { width: 400, height: 800, fullPage: true });
+    const result = await tool.execute('tool_call_1', {
+      width: 400,
+      height: 800,
+      fullPage: true,
+      renderMode: 'fast',
+    });
 
     expect(result.isError).toBeFalsy();
     expect(result.content[0].text).toContain('Screenshot captured');
@@ -86,8 +91,12 @@ describe('createCaptureScreenshotTool', () => {
      'http://shot.local/api/screenshots/generate',
       expect.objectContaining({
         method: 'POST',
-        body: expect.stringContaining('"fullPage":true'),
+        body: expect.stringContaining('"renderMode":"fast"'),
       }),
+   );
+   expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('/api/screenshots/file/proj_test/demo_test?variant=fast&'),
    );
  });
 

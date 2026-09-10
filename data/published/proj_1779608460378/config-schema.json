@@ -15,7 +15,15 @@
         "minWidth": 1248,
         "maxWidth": 1248,
         "minHeight": 384,
-        "maxHeight": 384
+        "maxHeight": 384,
+        "widthRule": {
+          "operator": "=",
+          "value": 1248
+        },
+        "heightRule": {
+          "operator": "=",
+          "value": 384
+        }
       }
     },
     "bigBannerBackground": {
@@ -30,7 +38,15 @@
         "minWidth": 1248,
         "maxWidth": 1248,
         "minHeight": 344,
-        "maxHeight": 344
+        "maxHeight": 344,
+        "widthRule": {
+          "operator": "=",
+          "value": 1248
+        },
+        "heightRule": {
+          "operator": "=",
+          "value": 344
+        }
       }
     },
     "miniBanners": {
@@ -43,7 +59,15 @@
         "minWidth": 480,
         "maxWidth": 480,
         "minHeight": 270,
-        "maxHeight": 270
+        "maxHeight": 270,
+        "widthRule": {
+          "operator": "=",
+          "value": 480
+        },
+        "heightRule": {
+          "operator": "=",
+          "value": 270
+        }
       },
       "items": {
         "type": "string",

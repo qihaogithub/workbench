@@ -13,6 +13,10 @@ import {
 } from "../session/run-log-store";
 import { logger } from "../utils/logger";
 import type { LedgerTerminalInput } from "../services/conversation-ledger-client";
+import type {
+  ObservePreviewInput,
+  PreviewObservationResult,
+} from "@workbench/shared/demo/preview-observation";
 
 const AGENT_EVENT_TYPES = [
   "stream",
@@ -44,7 +48,8 @@ export interface ServerMessage {
     | "pong"
     | "permission_request"
     | "user_choice_request"
-    | "models";
+    | "models"
+    | "preview_observe_request";
   id?: string;
   sessionId?: string;
   conversationId?: string;
@@ -125,6 +130,9 @@ export interface ServerMessage {
   }>;
   currentModelId?: string;
   canSwitch?: boolean;
+  previewRequestId?: string;
+  previewObservation?: ObservePreviewInput;
+  previewResult?: PreviewObservationResult;
 }
 
 export type SendMessageFn = (message: ServerMessage) => void;
@@ -146,9 +154,15 @@ export class WebSocketEventRouter {
   private boundHandler: (event: AgentEvent) => void;
   private onActivity?: (event: AgentEvent) => void;
   private ledgerDisplayParts: Array<Record<string, unknown>> = [];
-  private latestContextSummary: NonNullable<LedgerTerminalInput["contextSummary"]> | null = null;
+  private latestContextSummary: NonNullable<
+    LedgerTerminalInput["contextSummary"]
+  > | null = null;
 
-  constructor(sessionId: string, sendMessage: SendMessageFn, onActivity?: (event: AgentEvent) => void) {
+  constructor(
+    sessionId: string,
+    sendMessage: SendMessageFn,
+    onActivity?: (event: AgentEvent) => void,
+  ) {
     this.sessionId = sessionId;
     this.sendMessage = sendMessage;
     this.onActivity = onActivity;
@@ -214,7 +228,9 @@ export class WebSocketEventRouter {
     this.runLog?.recordFinish(result);
   }
 
-  recordError(error: AgentError | { code?: string; message?: string; details?: unknown }): void {
+  recordError(
+    error: AgentError | { code?: string; message?: string; details?: unknown },
+  ): void {
     this.runLog?.recordError(error);
   }
 
@@ -226,7 +242,10 @@ export class WebSocketEventRouter {
     return this.activeMessage?.isCancelled ?? false;
   }
 
-  getActiveRunIds(): Pick<ActiveMessage, "conversationId" | "runId" | "assistantMessageId"> | null {
+  getActiveRunIds(): Pick<
+    ActiveMessage,
+    "conversationId" | "runId" | "assistantMessageId"
+  > | null {
     if (!this.activeMessage) return null;
     const { conversationId, runId, assistantMessageId } = this.activeMessage;
     return { conversationId, runId, assistantMessageId };
@@ -236,11 +255,15 @@ export class WebSocketEventRouter {
     return this.ledgerDisplayParts.map((part) => ({ ...part }));
   }
 
-  getContextSummary(): NonNullable<LedgerTerminalInput["contextSummary"]> | undefined {
+  getContextSummary():
+    | NonNullable<LedgerTerminalInput["contextSummary"]>
+    | undefined {
     return this.latestContextSummary
       ? {
           ...this.latestContextSummary,
-          tailMessages: this.latestContextSummary.tailMessages.map((message) => ({ ...message })),
+          tailMessages: this.latestContextSummary.tailMessages.map(
+            (message) => ({ ...message }),
+          ),
         }
       : undefined;
   }
@@ -271,7 +294,9 @@ export class WebSocketEventRouter {
         schemaVersion: 1,
         reason: event.reason,
         summaryText: event.contextSummary.summaryText,
-        tailMessages: event.contextSummary.tailMessages.map((message) => ({ ...message })),
+        tailMessages: event.contextSummary.tailMessages.map((message) => ({
+          ...message,
+        })),
         sourceRevision: 0,
         coveredThroughSequence: 0,
       };
@@ -287,9 +312,10 @@ export class WebSocketEventRouter {
 
     const messageId = this.activeMessage?.id;
     const runIds = this.getActiveRunIds();
-    const observedEvent: AgentEvent = event.type === "context_compacted"
-      ? { ...event, contextSummary: undefined }
-      : event;
+    const observedEvent: AgentEvent =
+      event.type === "context_compacted"
+        ? { ...event, contextSummary: undefined }
+        : event;
     this.onActivity?.(observedEvent);
     this.runLog?.recordAgentEvent(observedEvent);
 
@@ -364,7 +390,10 @@ export class WebSocketEventRouter {
         break;
 
       case "plan":
-        this.ledgerDisplayParts.push({ type: "plan", content: event.content.slice(0, 8_000) });
+        this.ledgerDisplayParts.push({
+          type: "plan",
+          content: event.content.slice(0, 8_000),
+        });
         this.sendMessage({
           type: "plan",
           id: messageId,
@@ -452,7 +481,6 @@ export class WebSocketEventRouter {
           userChoiceRequest: event.userChoiceRequest,
         });
         break;
-
     }
   }
 }

@@ -1,9 +1,12 @@
+// @vitest-environment jsdom
+
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SinglePagePreview } from "./SinglePagePreview";
 import type { PreviewStagePage } from "./preview-stage-types";
+import { PreviewObservationRegistry } from "./preview-observation-registry";
 
 vi.mock("./IframePreviewFrame", () => ({
   IframePreviewFrame: ({
@@ -85,8 +88,21 @@ vi.mock("./PreviewPanel", () => ({
 }));
 
 vi.mock("./SandboxedHtmlFrame", () => ({
-  SandboxedHtmlFrame: ({ executionUrl, title, heightBehavior }: { executionUrl: string; title: string; heightBehavior?: string }) => (
-    <div data-testid="sandbox-renderer" data-url={executionUrl} data-title={title} data-height-behavior={heightBehavior} />
+  SandboxedHtmlFrame: ({
+    executionUrl,
+    title,
+    heightBehavior,
+  }: {
+    executionUrl: string;
+    title: string;
+    heightBehavior?: string;
+  }) => (
+    <div
+      data-testid="sandbox-renderer"
+      data-url={executionUrl}
+      data-title={title}
+      data-height-behavior={heightBehavior}
+    />
   ),
 }));
 
@@ -158,7 +174,57 @@ describe("SinglePagePreview", () => {
       "/sandbox/execution/opaque-id",
     );
     expect(screen.queryByTestId("iframe-renderer")).not.toBeInTheDocument();
-    expect(screen.getByTestId("sandbox-renderer")).toHaveAttribute("data-height-behavior", "fixed");
+    expect(screen.getByTestId("sandbox-renderer")).toHaveAttribute(
+      "data-height-behavior",
+      "fixed",
+    );
+  });
+  it("为 sandbox/sketch 页面注册显式受限的 observation runtime", async () => {
+    const registry = new PreviewObservationRegistry();
+    const context = { projectId: "project-1", workspaceId: "workspace-1" };
+    const { rerender } = render(
+      <SinglePagePreview
+        page={createPage({
+          runtimeType: "sandboxed-html",
+          sandboxExecutionUrl: "/sandbox/execution/opaque-id",
+          sandboxChannelId: "channel-1",
+        })}
+        previewObservationRegistry={registry}
+        previewObservationContext={context}
+        previewRevision={2}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(registry.identity).toMatchObject({
+        pageId: "page-1",
+        runtimeType: "sandboxed-html",
+        revision: 2,
+      }),
+    );
+    expect(registry.observe()).toMatchObject({
+      availability: "unsupported",
+      capabilities: ["limited-host-facts"],
+    });
+
+    rerender(
+      <SinglePagePreview
+        page={createPage({
+          runtimeType: "sketch-scene",
+          sketchScene: '{"nodes":[]}',
+        })}
+        previewObservationRegistry={registry}
+        previewObservationContext={context}
+        previewRevision={3}
+      />,
+    );
+    await waitFor(() =>
+      expect(registry.identity).toMatchObject({
+        runtimeType: "sketch-scene",
+        revision: 3,
+      }),
+    );
+    expect(registry.observe().availability).toBe("unsupported");
   });
   it("优先分发发布 iframe 并透传页面公共属性", () => {
     render(
@@ -271,9 +337,7 @@ describe("SinglePagePreview", () => {
       />,
     );
 
-    expect(
-      screen.queryByLabelText("绘制页面跳转热区"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("绘制页面跳转热区")).not.toBeInTheDocument();
 
     rerender(
       <SinglePagePreview

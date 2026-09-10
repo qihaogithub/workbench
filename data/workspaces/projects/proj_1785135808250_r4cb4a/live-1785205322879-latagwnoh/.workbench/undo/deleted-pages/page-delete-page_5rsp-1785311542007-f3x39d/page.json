@@ -1,8 +1,0 @@
-{
-  "id": "page_5rsp",
-  "name": "闯关活动",
-  "routeKey": "page-6",
-  "order": 0,
-  "parentId": null,
-  "runtimeType": "high-fidelity-react"
-}
