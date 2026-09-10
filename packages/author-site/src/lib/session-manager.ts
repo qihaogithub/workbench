@@ -7,6 +7,7 @@ import {
   getSnapshotPath,
   projectExists,
   deleteSession,
+  deleteSessionAtPath,
   getLatestVersion,
   readProjectMeta,
   writeProjectMeta,
@@ -18,8 +19,8 @@ import {
   getWorkspaceMultiDemoFiles,
   syncProjectDemoPagesFromWorkspace,
   listDemoPages,
-  registerSessionPath,
 } from "./fs-utils";
+import { registerSessionPath } from "./paths";
 import {
   getOrCreateProjectActiveWorkspace,
   isLiveWorkspace,
@@ -88,8 +89,8 @@ function getLastActivityAt(meta: { lastActivityAt?: unknown; createdAt?: unknown
     typeof meta.lastActivityAt === "number" && Number.isFinite(meta.lastActivityAt)
       ? meta.lastActivityAt
       : 0;
+  if (activityAt > 0) return activityAt;
   return Math.max(
-    activityAt,
     lastMessageAt ?? 0,
     typeof meta.createdAt === "number" && Number.isFinite(meta.createdAt)
       ? meta.createdAt
@@ -910,8 +911,11 @@ export function cleanupExpiredSessions(userId: string, projectId?: string): stri
         const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
         const lastActivityAt = getLastActivityAt(meta, sessionPath);
         if (!lastActivityAt || now - lastActivityAt <= SESSION_HISTORY_RETENTION_MS) continue;
-        if (deleteSession(meta.sessionId || sessionDir.name)) {
-          cleaned.push(meta.sessionId || sessionDir.name);
+        const sessionId = meta.sessionId || sessionDir.name;
+        // Cleanup discovers nested sessions directly from disk, including after
+        // a cold start where the in-memory path index has not been populated.
+        if (deleteSessionAtPath(sessionId, sessionPath)) {
+          cleaned.push(sessionId);
         }
       } catch {
         continue;

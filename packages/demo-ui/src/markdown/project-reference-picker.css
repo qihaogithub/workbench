@@ -111,6 +111,63 @@
   padding: 8px 10px;
   text-align: left;
 }
+.project-reference-project-name {
+  min-width: 0;
+  flex: 1;
+  padding: 8px 0 8px 10px !important;
+  text-align: left;
+}
+.project-reference-project-name > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-reference-project-insert {
+  display: grid;
+  place-items: center;
+  flex: none;
+  min-width: 48px;
+  padding: 0 8px !important;
+  height: 30px;
+  margin-right: 2px;
+  color: var(--crepe-color-on-surface) !important;
+  border: 1px solid var(--crepe-color-outline) !important;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.project-reference-project-insert:hover:not(:disabled) {
+  background: var(--crepe-color-hover);
+}
+.project-reference-project-insert:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+.project-reference-project-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 20px);
+  min-height: 36px;
+  margin: 0 10px 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--crepe-color-outline) !important;
+  border-radius: 6px;
+  text-align: left;
+}
+.project-reference-project-entry:hover {
+  background: var(--crepe-color-hover);
+}
+.project-reference-project-entry-label {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--crepe-color-on-surface-variant);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .project-reference-project-option:hover,
 .project-reference-project-option[aria-selected="true"] {
   background: var(--crepe-color-hover);

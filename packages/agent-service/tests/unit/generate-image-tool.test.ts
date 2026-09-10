@@ -6,10 +6,16 @@ import type { AgentConfig } from "../../src/core/types";
 const storeMocks = vi.hoisted(() => ({
   uploadToGlobalImageStore: vi.fn(),
 }));
+const referenceMocks = vi.hoisted(() => ({
+  requestProjectReference: vi.fn(),
+}));
 
 vi.mock("../../src/backends/pi-tools/global-image-store", () => storeMocks);
 vi.mock("../../src/backends/pi-tools/image-store-register", () => ({
   registerGlobalImageToProject: vi.fn(),
+}));
+vi.mock("../../src/backends/pi-tools/markdown-reference-tool", () => ({
+  requestProjectReference: referenceMocks.requestProjectReference,
 }));
 vi.mock("../../src/utils/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -159,6 +165,113 @@ describe("createGenerateImageTool", () => {
     expect(result.details.results[0].imageId).toBe("img_generated123");
     expect(uploadToGlobalImageStore).toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith("https://api.test/v1/images/generations", expect.objectContaining({ method: "POST" }));
+    fetchMock.mockRestore();
+  });
+
+  it("按顺序受控读取图片参考，并只在 details 中保留引用元数据", async () => {
+    mockUpload();
+    referenceMocks.requestProjectReference
+      .mockResolvedValueOnce({
+        uri: "wb://project/p1/page/a",
+        assetId: "asset-a",
+        mimeType: "image/png",
+        dataBase64: "eA==",
+      })
+      .mockResolvedValueOnce({
+        uri: "wb://project/p1/page/b",
+        assetId: "asset-b",
+        mimeType: "image/jpeg",
+        dataBase64: "eA==",
+      });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      await fakeFetchResponse(200, {
+        data: [{ b64_json: Buffer.from("fakePng").toString("base64") }],
+      }),
+    );
+
+    const result = await createTool().execute("id", {
+      prompt: "use the references",
+      filename: "out.png",
+      references: [
+        { uri: "wb://project/p1/page/a", assetId: "asset-a" },
+        { uri: "wb://project/p1/page/b", assetId: "asset-b" },
+      ],
+    } as any);
+
+    expect(referenceMocks.requestProjectReference).toHaveBeenNthCalledWith(
+      1,
+      baseConfig,
+      { uri: "wb://project/p1/page/a", mode: "image", assetId: "asset-a" },
+      undefined,
+    );
+    expect(referenceMocks.requestProjectReference).toHaveBeenNthCalledWith(
+      2,
+      baseConfig,
+      { uri: "wb://project/p1/page/b", mode: "image", assetId: "asset-b" },
+      undefined,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.test/v1/images/edits",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(result.details.references).toEqual([
+      { uri: "wb://project/p1/page/a", assetId: "asset-a" },
+      { uri: "wb://project/p1/page/b", assetId: "asset-b" },
+    ]);
+    expect(JSON.stringify(result.details)).not.toContain("dataBase64");
+    fetchMock.mockRestore();
+  });
+
+  it("参考读取失败时不调用 provider", async () => {
+    referenceMocks.requestProjectReference.mockRejectedValue(
+      new Error("REFERENCE_UNAVAILABLE"),
+    );
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    const result = await createTool().execute("id", {
+      prompt: "use the reference",
+      filename: "out.png",
+      references: [{ uri: "wb://project/p1/page/a", assetId: "asset-a" }],
+    } as any);
+
+    expect(result.isError).toBe(true);
+    expect(result.details.error).toBe("reference_read_failed");
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRestore();
+  });
+
+  it("不支持参考图的档案明确拒绝且不读取、不降级", async () => {
+    process.env.IMAGE_GEN_MODEL = "dall-e-3";
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const result = await createTool().execute("id", {
+      prompt: "use the reference",
+      filename: "out.png",
+      references: [{ uri: "wb://project/p1/page/a", assetId: "asset-a" }],
+    } as any);
+
+    expect(result.isError).toBe(true);
+    expect(result.details.error).toBe("references_not_supported");
+    expect(referenceMocks.requestProjectReference).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRestore();
+  });
+
+  it("直接 execute 传入超过 4 个参考时拒绝且不读取", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const references = Array.from({ length: 5 }, (_, index) => ({
+      uri: `wb://project/p1/page/${index}`,
+      assetId: `asset-${index}`,
+    }));
+    const result = await createTool().execute("id", {
+      prompt: "too many references",
+      filename: "out.png",
+      references,
+    } as any);
+
+    expect(result.isError).toBe(true);
+    expect(result.details.error).toBe("too_many_references");
+    expect(referenceMocks.requestProjectReference).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
     fetchMock.mockRestore();
   });
 

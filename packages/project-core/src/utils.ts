@@ -5,7 +5,6 @@ import {
   createDefaultSketchScene,
   type SketchSceneDocument,
 } from "@workbench/sketch-core";
-import { validateWorkspacePathSegment } from "@workbench/shared/workspace-path";
 import type {
   DemoPageMeta,
   DemoPageRuntimeType,
@@ -13,6 +12,7 @@ import type {
 } from "@workbench/shared/contracts";
 
 import { DEFAULT_PROJECT_CATEGORY } from "./constants.js";
+import { validateWorkspacePathSegment } from "./shared-runtime.js";
 import type { ProjectAdminResult } from "./types.js";
 
 export function normalizeProjectCategory(category?: string): string {

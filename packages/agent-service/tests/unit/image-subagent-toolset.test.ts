@@ -21,6 +21,7 @@ describe("createWorkbenchTools imageSubagent 定向工具集", () => {
       "listFiles",
       "listImages",
       "readFile",
+      "readProjectReference",
       "readUserImage",
       "saveImage",
       "writeFile",

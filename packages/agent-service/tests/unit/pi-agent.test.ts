@@ -997,61 +997,38 @@ describe('PiAgentBackend', () => {
     },
   };
 
-  describe('图片预描述', () => {
+  describe('图片直传', () => {
     const textOnlyConfig = textOnlyImageConfig;
     const multimodalConfig = multimodalImageConfig;
 
-    it('非多模态模型收到图片且未配置预描述时应报错', async () => {
+    it('未标记多模态的自定义模型收到图片时仍应直传原始像素', async () => {
+      const prompt = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
       const backend = new PiAgentBackend(textOnlyConfig);
       Object.defineProperty(backend, 'harness', {
-        value: { prompt: vi.fn() },
+        value: { prompt },
       });
-      Object.defineProperty(backend, 'imageDescriber', {
-        value: {
-          isAvailable: () => false,
-        },
-      });
+
+      const image = {
+        data: Buffer.from('image').toString('base64'),
+        mimeType: 'image/png',
+        name: 'screen.png',
+      };
 
       await expect(
         backend.sendMessage('请看图', {
-          images: [
-            {
-              data: Buffer.from('image').toString('base64'),
-              mimeType: 'image/png',
-              name: 'screen.png',
-            },
-          ],
-        }),
-      ).rejects.toThrow('当前模型不支持图片处理');
-    });
-
-    it('非多模态模型收到图片且已配置预描述时应注入描述文本', async () => {
-      const prompt = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
-      const backend = new PiAgentBackend(textOnlyConfig);
-      Object.defineProperty(backend, 'harness', { value: { prompt } });
-      Object.defineProperty(backend, 'imageDescriber', {
-        value: {
-          isAvailable: () => true,
-          describe: vi.fn().mockResolvedValue('图片里有一个红色提交按钮'),
-        },
-      });
-
-      await expect(
-        backend.sendMessage('这个按钮有什么问题？', {
-          images: [
-            {
-              data: Buffer.from('image').toString('base64'),
-              mimeType: 'image/png',
-              name: 'screen.png',
-            },
-          ],
+          images: [image],
         }),
       ).resolves.toBe('ok');
 
-      expect(prompt).toHaveBeenCalledWith(
-        '【图片内容】图片里有一个红色提交按钮\n\n【用户问题】这个按钮有什么问题？\n\n[图片 screen.png 未能自动入库]\n\n',
-        { images: undefined },
-      );
+      expect(prompt).toHaveBeenCalledWith('请看图\n[图片 screen.png 未能自动入库]\n\n', {
+        images: [
+          {
+            type: 'image',
+            data: image.data,
+            mimeType: 'image/png',
+          },
+        ],
+      });
     });
 
     it('管理后台标记为多模态的自定义模型收到图片时应直传图片', async () => {
@@ -1132,45 +1109,6 @@ describe('PiAgentBackend', () => {
       expect(prompt).not.toHaveBeenCalled();
     });
 
-    it('通过环境变量启用预描述后应走真实 ImageDescriber 缓存路径', async () => {
-      process.env.IMAGE_DESCRIPTION_ENABLED = 'true';
-      process.env.IMAGE_DESCRIPTION_MODEL = 'custom/vision-model';
-
-      const prompt = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
-      const backend = new PiAgentBackend(textOnlyConfig);
-      Object.defineProperty(backend, 'harness', { value: { prompt } });
-
-      const describeSpy = vi
-        .spyOn(backend as any, 'describeImageWithVisionModel')
-        .mockResolvedValue('图片展示了一个设置面板');
-
-      const image = {
-        data: Buffer.from('same-image').toString('base64'),
-        mimeType: 'image/png',
-        name: 'settings.png',
-      };
-
-      await backend.sendMessage('说明这个界面', { images: [image] });
-      await backend.sendMessage('再次说明这个界面', { images: [image] });
-
-      expect(describeSpy).toHaveBeenCalledTimes(1);
-      expect(describeSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          image,
-          modelId: 'custom/vision-model',
-        }),
-      );
-      expect(prompt).toHaveBeenNthCalledWith(
-        1,
-        '【图片内容】图片展示了一个设置面板\n\n【用户问题】说明这个界面\n\n[图片 settings.png 未能自动入库]\n\n',
-        { images: undefined },
-      );
-      expect(prompt).toHaveBeenNthCalledWith(
-        2,
-        '【图片内容】图片展示了一个设置面板\n\n【用户问题】再次说明这个界面\n\n[图片 settings.png 未能自动入库]\n\n',
-        { images: undefined },
-      );
-    });
   });
 
   describe('图片自动入库 URL 文本注入', () => {
@@ -1218,7 +1156,7 @@ describe('PiAgentBackend', () => {
       });
     });
 
-    it('非 vision 模型发送图片时应同时包含描述和 URL 文本', async () => {
+    it('未标记多模态的模型发送图片时应同时包含原始像素和 URL 文本', async () => {
       vi.mocked(uploadToGlobalImageStore).mockReturnValue({
         success: true,
         imageId: 'img_def456',
@@ -1235,12 +1173,6 @@ describe('PiAgentBackend', () => {
       const prompt = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
       const backend = new PiAgentBackend(textOnlyImageConfig);
       Object.defineProperty(backend, 'harness', { value: { prompt } });
-      Object.defineProperty(backend, 'imageDescriber', {
-        value: {
-          isAvailable: () => true,
-          describe: vi.fn().mockResolvedValue('图片里有一个红色按钮'),
-        },
-      });
 
       await backend.sendMessage('这个按钮有什么问题？', {
         images: [
@@ -1253,15 +1185,17 @@ describe('PiAgentBackend', () => {
       });
 
       expect(prompt).toHaveBeenCalledTimes(1);
-      const [promptText] = prompt.mock.calls[0];
-      expect(promptText).toContain('【图片内容】');
-      expect(promptText).toContain('图片里有一个红色按钮');
+      const [promptText, opts] = prompt.mock.calls[0];
       expect(promptText).toContain('[图片已自动入库]');
       expect(promptText).toContain('img_def456');
       expect(promptText).toContain('/api/images/img_def456');
-      expect(promptText).toContain('【用户问题】');
       expect(promptText).toContain('这个按钮有什么问题？');
       expect(promptText).toContain('无需调用 `readUserImage` 或 `listImages`');
+      expect(opts.images).toHaveLength(1);
+      expect(opts.images[0]).toMatchObject({
+        type: 'image',
+        mimeType: 'image/png',
+      });
     });
   });
 });
@@ -1358,7 +1292,7 @@ describe('PiAgent 工具', () => {
         }),
       });
       
-      expect(tools).toHaveLength(43);
+      expect(tools).toHaveLength(44);
 
       const toolNames = tools.map(tool => tool.name);
       expect(toolNames).toContain('readFile');
@@ -1412,7 +1346,7 @@ describe('PiAgent 工具', () => {
       const { createWorkbenchTools } = await import('../../src/backends/pi-tools');
       const tools = createWorkbenchTools(mockConfig, undefined, { includeDelegateTask: false });
 
-      expect(tools).toHaveLength(42);
+      expect(tools).toHaveLength(43);
       expect(tools.map(tool => tool.name)).not.toContain('delegateTask');
       expect(tools.map(tool => tool.name)).toContain('activateCapabilities');
       expect(tools.map(tool => tool.name)).toContain('readUploadedFile');

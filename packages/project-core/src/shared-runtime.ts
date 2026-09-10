@@ -7,6 +7,7 @@
 import * as sharedModule from "@workbench/shared";
 import * as pageRequirementsModule from "@workbench/shared/demo/page-requirements";
 import * as configRuntimeModule from "@workbench/shared/demo/config-runtime-compatibility";
+import * as workspacePathModule from "@workbench/shared/workspace-path";
 
 function unwrap<T extends object>(module: T): T {
   const defaultExport = (module as T & { default?: unknown }).default;
@@ -22,6 +23,9 @@ const pageRequirements = unwrap(
 const configRuntime = unwrap(
   configRuntimeModule,
 ) as typeof import("@workbench/shared/demo/config-runtime-compatibility");
+const workspacePath = unwrap(
+  workspacePathModule,
+) as typeof import("@workbench/shared/workspace-path");
 
 export const {
   WHITEBOARD_DOCUMENT_MAX_BYTES,
@@ -33,3 +37,4 @@ export const {
 
 export const { parsePageRequirementsRefs } = pageRequirements;
 export const { checkConfigSchemaAgainstPrototype } = configRuntime;
+export const { validateWorkspacePathSegment } = workspacePath;

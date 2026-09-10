@@ -44,6 +44,27 @@ export interface OfflineDraftStore {
   hasDrafts(workspaceId: string): Promise<boolean>;
 }
 
+/**
+ * 生成浏览器端可复现的内容指纹。
+ *
+ * 该指纹只用于判断本地草稿的基线是否仍等于当前服务端正文，不能替代
+ * Workspace Authority 的 SHA-256、revision 或 rootHash。
+ */
+export function contentFingerprint(value: string): string {
+  let first = 0x811c9dc5;
+  let second = 0x01000193;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    first ^= code;
+    first = Math.imul(first, 0x01000193);
+    second ^= code + index;
+    second = Math.imul(second, 0x85ebca6b);
+  }
+  return `${(first >>> 0).toString(16).padStart(8, "0")}${(second >>> 0)
+    .toString(16)
+    .padStart(8, "0")}`;
+}
+
 /** 生成 IndexedDB key: `${workspaceId}:${path}` */
 function makeKey(workspaceId: string, path: string): string {
   return `${workspaceId}:${path}`;

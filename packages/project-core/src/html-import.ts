@@ -16,10 +16,10 @@ import {
   type HtmlResourceReference,
   type HtmlUnsupportedCapability,
 } from "./html-import-contract.js";
-import { validateWorkspacePathSegment } from "@workbench/shared/workspace-path";
 import {
   applyPagePresentationToSchema,
   recommendHtmlImportPresentation,
+  validateWorkspacePathSegment,
 } from "./shared-runtime.js";
 import { MAX_PROTOTYPE_CSS_LENGTH } from "./constants.js";
 

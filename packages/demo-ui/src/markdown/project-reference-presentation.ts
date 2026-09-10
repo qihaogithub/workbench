@@ -1,7 +1,12 @@
 import type { Editor } from "@milkdown/kit/core";
 import { linkPreviewTooltip } from "@milkdown/kit/component/link-tooltip";
-import { DOMSerializer, type Mark, type Node } from "@milkdown/kit/prose/model";
-import { Plugin, PluginKey, type PluginView } from "@milkdown/kit/prose/state";
+import { DOMSerializer, Mark, type Node } from "@milkdown/kit/prose/model";
+import {
+  Plugin,
+  PluginKey,
+  TextSelection,
+  type PluginView,
+} from "@milkdown/kit/prose/state";
 import { computePosition, flip, shift, offset } from "@floating-ui/dom";
 import {
   Decoration,
@@ -170,6 +175,35 @@ export function createProjectReferencePresentationPlugin(
         tr.docChanged || tr.getMeta(projectReferenceDirectoryMeta)
           ? build(tr.doc)
           : previous,
+    },
+    appendTransaction: (_transactions, _oldState, newState) => {
+      const { selection } = newState;
+      if (!(selection instanceof TextSelection) || !selection.empty) return null;
+
+      const { $from } = selection;
+      const before = $from.nodeBefore;
+      if (!before?.isText) return null;
+
+      const referenceMark = before.marks.find(
+        (mark) =>
+          mark.type.name === "link" &&
+          typeof mark.attrs.href === "string" &&
+          Boolean(decodeMarkdownReferenceUri(mark.attrs.href)),
+      );
+      if (!referenceMark) return null;
+
+      // Keep the mark while the caret is inside the reference. At its end,
+      // remove only the reference mark so the next input becomes plain text.
+      const after = $from.nodeAfter;
+      if (after?.marks.some((mark) => mark.eq(referenceMark))) return null;
+
+      const currentMarks = newState.storedMarks ?? $from.marks();
+      const nextMarks = currentMarks.filter((mark) => !mark.eq(referenceMark));
+      if (Mark.sameSet(currentMarks, nextMarks)) return null;
+
+      return newState.tr
+        .setStoredMarks(nextMarks)
+        .setMeta("project-reference-boundary", true);
     },
     props: {
       decorations: (state) => projectReferencePresentationKey.getState(state),

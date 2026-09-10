@@ -22,6 +22,8 @@ import { createListImagesTool } from "./list-images-tool";
 import { createReadUserImageTool } from "./read-user-image-tool";
 import { createKnowledgeReportTool } from "./knowledge-report-tool";
 import { createReadKnowledgeSourceTool } from "./read-knowledge-source-tool";
+import { createReadProjectReferenceTool } from "./markdown-reference-tool";
+import { createGenerateReferenceImageTool } from "./generate-reference-image-tool";
 import { createReadPreinstalledSkillTool } from "./read-preinstalled-skill-tool";
 import { createArrangeCanvasPagesTool } from "./canvas-layout-tool";
 import { createDingtalkTool } from "./dingtalk-tool";
@@ -112,6 +114,7 @@ export interface WorkbenchToolsOptions {
 }
 
 const CONTROL_TOOL_NAMES = new Set([
+  "readProjectReference",
   "readPreinstalledSkill",
   "requestPlanApproval",
   "requestUserChoice",
@@ -123,12 +126,13 @@ const CAPABILITY_TOOL_NAMES: Record<Exclude<CapabilityName, "all">, ReadonlySet<
   workspace: new Set(["readFile", "readUploadedFile", "listFiles", "editFile", "writeFile", "deleteFile", "bash", "schemaValidate", "inspectConfigVisibility", "validateConfigVisibility", "explainConfigVisibility", "repairConfigVisibility", "migrateConfigVisibility", "prepareConfigVisibilityDraft", "commitConfigVisibilityDraft", "knowledgeReport", "readKnowledgeSource", "getConsoleLogs", "captureScreenshot", "readWhiteboardContext", "applyWhiteboardActions", "serializeWhiteboardCode", "importWhiteboardCode", "planWhiteboardComposition", "undoWhiteboardEdit"]),
   pages: new Set(["createPage", "listPages", "arrangeCanvasPages", "previewDeletePages", "executeDeletePagePlan", "deletePage", "deletePages"]),
   comments: new Set(["readComments", "inspectElement", "replyComment", "resolveComment", "submitFeedback"]),
-  image: new Set(["saveImage", "listImages", "readUserImage", "captureScreenshot", "delegateTask", "generateWhiteboardAsset"]),
+  image: new Set(["saveImage", "listImages", "readUserImage", "captureScreenshot", "delegateTask", "generateWhiteboardAsset", "generateReferenceImage"]),
   web: new Set(["webRead", "webSearch"]),
   external: new Set(["figmaMcp", "dingtalk"]),
 };
 
 const INITIAL_TOOL_NAMES = new Set([
+  "readProjectReference",
   "readFile", "readUploadedFile", "listFiles", "readPreinstalledSkill",
   "activateCapabilities", "requestPlanApproval", "requestUserChoice", "updatePlan",
 ]);
@@ -178,7 +182,7 @@ export function createWorkbenchTools(
 ): AgentTool[] {
   if (options.mode === "viewer-readonly") {
     return [
-      createReadFileTool(config),
+      createReadFileTool({ ...config, toolMode: "viewer-readonly" }),
       createListFilesTool(config),
       createKnowledgeReportTool(config, { mode: "viewer-readonly" }),
       createSubmitFeedbackTool(config, "viewer-readonly"),
@@ -187,6 +191,7 @@ export function createWorkbenchTools(
 
   if (options.imageSubagent) {
     return [
+      createReadProjectReferenceTool(config),
       createReadFileTool(config),
       createWriteFileTool(config),
       createListFilesTool(config),
@@ -200,6 +205,8 @@ export function createWorkbenchTools(
 
   const deletionPlanStore = createDeletionPlanStore();
   const tools: AgentTool[] = [
+    createReadProjectReferenceTool(config),
+    ...(getImageGenConfig().enabled ? [createGenerateReferenceImageTool(config)] : []),
     createReadFileTool(config),
     createReadUploadedFileTool(config),
     createEditFileTool(config),

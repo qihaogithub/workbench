@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { editorViewCtx } from "@milkdown/kit/core";
 import { AllSelection, TextSelection } from "@milkdown/kit/prose/state";
 import { undo, undoDepth } from "@milkdown/kit/prose/history";
@@ -78,6 +78,89 @@ function open() {
 }
 
 describe("shared editor block menu transactions", () => {
+  it("directly inserts a foreign whole-project reference after target revalidation", async () => {
+    const projectReference = {
+      target: { kind: "project" as const, projectId: "b" },
+      label: "品牌官网",
+      displayPath: "品牌官网",
+    };
+    const provider = Object.assign(
+      vi.fn(async ({ projectId }: { projectId?: string }) =>
+        projectId === "b"
+          ? [projectReference]
+          : [{ target: { kind: "page" as const, projectId: "a", pageId: "home" }, label: "首页", displayPath: "当前活动 / 首页" }]),
+      { listProjects: vi.fn(async () => [{ id: "a", name: "当前活动" }, { id: "b", name: "品牌官网" }]) },
+    );
+    render(
+      <DocumentEditor
+        value="说明"
+        onChange={vi.fn()}
+        referenceContext={{ source: { kind: "knowledge-document", projectId: "a", workspaceId: "w", docId: "d" }, policy: { sameProjectOnly: false, allowedTargetKinds: ["project", "page", "config", "document"] } }}
+        referenceProvider={provider}
+      />,
+    );
+    const view = await ready();
+    open();
+    fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    fireEvent.click(await screen.findByRole("button", { name: "当前活动" }));
+    const option = await screen.findByRole("option", { name: /品牌官网/ });
+    fireEvent.click(within(option).getByRole("button", { name: "插入项目引用：品牌官网" }));
+    await waitFor(() => expect(document.querySelector('[data-reference-uri="wb://project/b"]')).toBeTruthy());
+    expect(provider).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: "b", query: "", context: expect.objectContaining({ source: expect.objectContaining({ projectId: "a" }) }) }));
+    expect(view.state.doc.textContent).toContain("品牌官网");
+  });
+
+  it("cancels a delayed whole-project request when the menu closes and reopens", async () => {
+    let resolveOld!: (value: any[]) => void;
+    let oldSignal: AbortSignal | undefined;
+    const projectReference = { target: { kind: "project" as const, projectId: "b" }, label: "品牌官网", displayPath: "品牌官网" };
+    const provider = Object.assign(
+      vi.fn(({ projectId, signal }: { projectId?: string; signal?: AbortSignal }) => {
+        if (projectId === "b") {
+          oldSignal = signal;
+          return new Promise<any[]>((resolve) => { resolveOld = resolve; });
+        }
+        return [{ target: { kind: "page" as const, projectId: "a", pageId: "home" }, label: "首页", displayPath: "当前活动 / 首页" }];
+      }),
+      { listProjects: vi.fn(async () => [{ id: "a", name: "当前活动" }, { id: "b", name: "品牌官网" }]) },
+    );
+    render(<DocumentEditor value="说明" onChange={vi.fn()}
+      referenceContext={{ source: { kind: "knowledge-document", projectId: "a", workspaceId: "w", docId: "d" }, policy: { sameProjectOnly: false, allowedTargetKinds: ["project", "page", "config", "document"] } }}
+      referenceProvider={provider} />);
+    const view = await ready();
+    open();
+    fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    fireEvent.click(await screen.findByRole("button", { name: "当前活动" }));
+    const option = await screen.findByRole("option", { name: /品牌官网/ });
+    fireEvent.click(within(option).getByRole("button", { name: "插入项目引用：品牌官网" }));
+    await waitFor(() => expect(provider).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: "b", signal: expect.any(AbortSignal) })));
+    fireEvent.click(screen.getByRole("button", { name: "关闭项目引用" }));
+    open();
+    fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    resolveOld([projectReference]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(oldSignal?.aborted).toBe(true);
+    expect(view.state.doc.textContent).toBe("说明");
+    expect(document.querySelector('[data-reference-uri="wb://project/b"]')).toBeNull();
+  });
+
+  it("hides whole-project shortcuts when policy disallows project targets", async () => {
+    const provider = Object.assign(
+      vi.fn(async () => [{ target: { kind: "page" as const, projectId: "a", pageId: "home" }, label: "首页", displayPath: "当前活动 / 首页" }]),
+      { listProjects: vi.fn(async () => [{ id: "a", name: "当前活动" }, { id: "b", name: "品牌官网" }]) },
+    );
+    render(<DocumentEditor value="说明" onChange={vi.fn()}
+      referenceContext={{ source: { kind: "knowledge-document", projectId: "a", workspaceId: "w", docId: "d" }, policy: { sameProjectOnly: false, allowedTargetKinds: ["page"] } }}
+      referenceProvider={provider} />);
+    await ready();
+    open();
+    fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    fireEvent.click(await screen.findByRole("button", { name: "当前活动" }));
+    await screen.findByRole("option", { name: /品牌官网/ });
+    expect(screen.queryByRole("button", { name: /插入项目引用：品牌官网/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /引用整个项目/ })).toBeNull();
+  });
+
   it("switches reference projects without editing and inserts the foreign identity in one undo", async () => {
     const foreign = { target: { kind: "page" as const, projectId: "b", pageId: "home" }, label: "外部首页", displayPath: "品牌官网 / 外部首页" };
     const provider = Object.assign(vi.fn(async ({ projectId }: { projectId?: string }) => projectId === "b" ? [foreign] : []), {
@@ -91,7 +174,8 @@ describe("shared editor block menu transactions", () => {
     const depth = undoDepth(view.state);
     open(); fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
     fireEvent.click(await screen.findByRole("button", { name: "当前活动" }));
-    fireEvent.click(await screen.findByRole("option", { name: /品牌官网/ }));
+    const option = await screen.findByRole("option", { name: /品牌官网/ });
+    fireEvent.click(within(option).getByRole("button", { name: "品牌官网" }));
     const row = await screen.findByRole("treeitem", { name: "外部首页" });
     expect(view.state.doc.eq(before)).toBe(true);
     expect(undoDepth(view.state)).toBe(depth);
@@ -144,6 +228,70 @@ describe("shared editor block menu transactions", () => {
       fireEvent.mouseMove(view.dom, { clientX: 20, clientY: 20 });
       await waitFor(() => expect(document.querySelector('.milkdown-link-preview')?.getAttribute('data-show')).toBe('false'));
     } finally { coords.mockRestore(); focus.mockRestore(); }
+  });
+
+  it("keeps typing after a project reference outside the reference link", async () => {
+    render(
+      <DocumentEditor
+        value="[首页](wb://page/p/home)"
+        onChange={vi.fn()}
+      />,
+    );
+    const view = await ready();
+    let referenceEnd = 0;
+    view.state.doc.descendants((node, pos) => {
+      if (
+        node.isText &&
+        node.text === "首页" &&
+        node.marks.some((mark) => mark.attrs.href === "wb://page/p/home")
+      ) {
+        referenceEnd = pos + node.nodeSize;
+      }
+    });
+    expect(referenceEnd).toBeGreaterThan(0);
+
+    view.focus();
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, referenceEnd)),
+    );
+    expect(view.state.storedMarks).toEqual([]);
+    const linkButton = document.querySelector<HTMLButtonElement>(
+      '.top-bar-inner [aria-label="链接"]',
+    );
+    expect(linkButton).toBeTruthy();
+    expect(linkButton).not.toHaveClass("active");
+
+    view.dispatch(view.state.tr.insertText("后续文字"));
+    const paragraph = view.state.doc.firstChild!;
+    expect(paragraph.textContent).toBe("首页后续文字");
+    expect(paragraph.child(0).marks.some((mark) => mark.attrs.href === "wb://page/p/home")).toBe(true);
+    expect(paragraph.child(1).marks.some((mark) => mark.type.name === "link")).toBe(false);
+  });
+
+  it("does not normalize the end of an ordinary external link", async () => {
+    render(<DocumentEditor value="[网站](https://example.com)" onChange={vi.fn()} />);
+    const view = await ready();
+    let linkEnd = 0;
+    view.state.doc.descendants((node, pos) => {
+      if (
+        node.isText &&
+        node.text === "网站" &&
+        node.marks.some((mark) => mark.attrs.href === "https://example.com")
+      ) {
+        linkEnd = pos + node.nodeSize;
+      }
+    });
+    expect(linkEnd).toBeGreaterThan(0);
+
+    view.focus();
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, linkEnd)),
+    );
+    view.dispatch(view.state.tr.insertText("继续"));
+
+    const paragraph = view.state.doc.firstChild!;
+    expect(paragraph.textContent).toBe("网站继续");
+    expect(paragraph.child(0).marks.some((mark) => mark.attrs.href === "https://example.com")).toBe(true);
   });
 
   it("project reference tab opens directly, cancellation is inert and insertion is one undo", async () => {

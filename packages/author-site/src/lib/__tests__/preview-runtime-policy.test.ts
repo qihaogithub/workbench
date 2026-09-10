@@ -259,10 +259,10 @@ describe("AI 页面预览运行时策略", () => {
     expect(previewSdk).toContain("LottiePlayer");
     expect(previewSdk).toContain("RivePlayer");
     expect(previewSdk).toContain("SpinePlayer");
-    expect(previewSdk).toContain('import("lottie-web")');
-    expect(previewSdk).toContain('import("@rive-app/canvas")');
-    expect(previewSdk).toContain('import("@esotericsoftware/spine-webgl")');
-    expect(previewSdk).toContain('import("@esotericsoftware/spine-webgl-42")');
+    expect(previewSdk).toContain("import('lottie-web')");
+    expect(previewSdk).toContain("import('@rive-app/canvas')");
+    expect(previewSdk).toContain("import('@esotericsoftware/spine-webgl')");
+    expect(previewSdk).toContain("import('@esotericsoftware/spine-webgl-42')");
     expect(previewSdk).toContain("const { src, animation, loop = true, audioEnabled = true, fit = 'contain', alignment = 'center'");
     expect(previewSdk).toContain("skeletonObj.getBounds(offset, size)");
     expect(previewSdk).toContain("camera.position.x");

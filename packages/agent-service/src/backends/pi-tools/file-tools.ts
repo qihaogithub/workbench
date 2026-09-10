@@ -22,6 +22,7 @@ import { aiMutationDeniedResult, assertAiMutationAllowed } from "./ai-mutation-p
 import { createManagedDocumentProposalResult } from "./document-proposal-tool";
 import { formatAuthorityCommitSummary } from "./authority-result-summary";
 import { validateConfigResourceMutation } from "./config-mutation-validation";
+import { describeMarkdownReferences } from "./markdown-reference-tool";
 
 /**
  * 知识库文档路径正则：匹配 knowledge/ 下的 .md/.markdown/.mdown 文件
@@ -259,7 +260,7 @@ export function createReadFileTool(
 
         logger.debug({ path: args.path }, "File read successfully");
         return {
-          content: [{ type: "text", text: outputText }],
+          content: [{ type: "text", text: outputText + (config.toolMode === "viewer-readonly" ? "" : describeMarkdownReferences(truncResult.content)) }],
           details: {
             path: args.path,
             size: content.length,

@@ -13,7 +13,7 @@ export function useAuthorReferenceDeepLink(options: {
   sessionId: string;
   workspaceId: string;
   navigate: (
-    target: Exclude<MarkdownReferenceTarget, { kind: "project" }>,
+    target: MarkdownReferenceTarget,
     signal: AbortSignal,
   ) => Promise<void>;
   onError: (error: unknown) => void;

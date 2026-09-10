@@ -182,13 +182,13 @@ export function listProjectTemplates(): ProjectTemplateMeta[] {
   return templates.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-function resolveProjectWorkspacePath(
+export function resolveProjectWorkspacePath(
   projectId: string,
   workspacePath?: string,
 ): string | null {
   const candidates = [
-    workspacePath,
     path.join(getProjectPath(projectId), "workspace"),
+    workspacePath,
     workspacePath ? findWorkspacePath(workspacePath) : null,
   ].filter((item): item is string => Boolean(item));
 
@@ -1108,6 +1108,18 @@ export function deleteSession(sessionId: string): boolean {
   // layout is sessions/{userId}/{projectId}/{sessionId}; resolving afterwards
   // would fall back to the legacy flat path and leave the history on disk.
   const sessionPath = getSessionPath(sessionId);
+  return deleteSessionAtPath(sessionId, sessionPath);
+}
+
+export function deleteSessionAtPath(
+  sessionId: string,
+  sessionPath: string,
+): boolean {
+  if (!fs.existsSync(sessionPath) || !fs.statSync(sessionPath).isDirectory()) {
+    unregisterSessionPath(sessionId);
+    return false;
+  }
+
   unregisterSessionPath(sessionId);
 
   try {

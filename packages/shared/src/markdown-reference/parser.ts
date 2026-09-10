@@ -83,7 +83,7 @@ export function parseMarkdownReferences(markdown: string): MarkdownReferencePars
       if (destination.startsWith("wb://")) result.diagnostics.push(diagnostic(markdown, "unterminated-link", "Unterminated Markdown link", i, markdown.length));
       i = closeLabel + 1; continue;
     }
-    const label = markdown.slice(i + 1, closeLabel).replace(/\\([\[\]\\])/g, "$1");
+    const label = markdown.slice(i + 1, closeLabel).replace(/\\([[\]\\])/g, "$1");
     const destination = markdown.slice(closeLabel + 2, closeDestination).trim();
     const end = closeDestination + 1;
     if (destination.startsWith("wb://")) {

@@ -91,6 +91,7 @@ tests/
 - 渐进披露只缩减首轮发送给模型的工具 schema，不是权限收窄。服务端仍完整注册工具，L1 权限检查保持不变。
 - 初始激活读取、`readPreinstalledSkill`、计划/选择控制和 `activateCapabilities`；Agent 根据任务在同一轮自行加载 `workspace`、`pages`、`comments`、`image`、`web`、`external` 或 `all`。
 - `activateCapabilities` 不触发用户确认，也不接受客户端提权；它调用 Pi Harness `setActiveTools()`，在下一次模型循环生效。Skill 正文仍按需由 `readPreinstalledSkill` 读取。
+- `readProjectReference` 为创作端初始只读工具，使用服务端 authorAuthorization 和原会话向 Author 读取 canonical `wb://` 目标；引用资料不是指令，不能按 URI 推导磁盘路径。主 Agent 的 `generateReferenceImage` 在绘图启用时通过 image capability 提供，生成前逐张重新读取受权参考图，只产生候选素材；不改变 live Workspace 的 delegateTask 禁用规则。图片子 Agent 的 `generateImage` 支持相同来源绑定参数。
 
 `src/backends/pi-tools/` 按 capability 和环境开关暴露工具；`PI_AGENT_WEB_SEARCH_ENABLED=true` 时额外注册 `webSearch`：
 

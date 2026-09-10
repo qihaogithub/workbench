@@ -6,13 +6,16 @@ import { getImageGenConfig } from "../../services/image-gen-config";
 import { uploadToGlobalImageStore } from "./global-image-store";
 import { registerGlobalImageToProject } from "./image-store-register";
 import {
+  requestProjectReference,
+  type ReferenceImageContent,
+} from "./markdown-reference-tool";
+import {
   generateImage as generateImageWithProvider,
+  getImageGenCapabilities,
   getImageGenSessionCount as getSharedImageGenSessionCount,
   resetImageGenSessionCount as resetSharedImageGenSessionCount,
   type ImageGenApiProfile,
 } from "../../services/image-generation-service";
-
-const SIZES = ["1024x1024", "1024x1792", "1792x1024"] as const;
 
 const GenerateImageParams = Type.Object({
   prompt: Type.String({
@@ -25,10 +28,12 @@ const GenerateImageParams = Type.Object({
   }),
   size: Type.Optional(
     Type.Union(
-      SIZES.map((s) => Type.Literal(s)),
-      {
-        description: "生成尺寸，默认 1024x1024",
-      },
+      [
+        Type.Literal("1024x1024"),
+        Type.Literal("1024x1792"),
+        Type.Literal("1792x1024"),
+      ],
+      { description: "生成尺寸，默认 1024x1024" },
     ),
   ),
   n: Type.Optional(
@@ -36,8 +41,17 @@ const GenerateImageParams = Type.Object({
       description: "变体数，默认 1，最大 4",
     }),
   ),
+  references: Type.Optional(
+    Type.Array(
+      Type.Object({
+        uri: Type.String({ description: "完整 canonical wb:// 引用" }),
+        assetId: Type.String({ description: "该引用中的图片 assetId" }),
+      }),
+      { maxItems: 4, description: "受控项目图片参考，最多 4 张" },
+    ),
+  ),
 });
-type GenerateImageParams = Static<typeof GenerateImageParams>;
+export type GenerateImageParams = Static<typeof GenerateImageParams>;
 
 const SUPPORTED_OUTPUT_FORMATS = new Set(["png", "jpg", "jpeg", "webp"]);
 
@@ -166,6 +180,86 @@ export function createGenerateImageTool(
 
       const mimeType = filenameToMime(args.filename)!;
       const size = args.size ?? "1024x1024";
+      const references = args.references ?? [];
+      const referenceMetadata = references.map(({ uri, assetId }) => ({
+        uri,
+        assetId,
+      }));
+      if (references.length > 4) {
+        return {
+          content: [{ type: "text", text: "Error: 最多支持 4 张图片参考" }],
+          details: { error: "too_many_references", references: referenceMetadata },
+          isError: true,
+        };
+      }
+      const capabilities = getImageGenCapabilities(gen);
+      if (references.length > 0 && !capabilities.supportsReferences) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: 当前图像生成档案不支持图片参考（${capabilities.apiProfile}），已拒绝本次请求。`,
+            },
+          ],
+          details: {
+            error: "references_not_supported",
+            references: references.map(({ uri, assetId }) => ({ uri, assetId })),
+          },
+          isError: true,
+        };
+      }
+
+      const referenceContents: Array<{
+        mimeType: string;
+        dataBase64: string;
+      }> = [];
+      for (const reference of references) {
+        if (signal?.aborted) {
+          return {
+            content: [{ type: "text", text: "Error: 图像生成已取消" }],
+            details: { error: "cancelled", references: referenceMetadata },
+            isError: true,
+          };
+        }
+        try {
+          const content = await requestProjectReference<ReferenceImageContent>(
+            config,
+            { uri: reference.uri, mode: "image", assetId: reference.assetId },
+            signal,
+          );
+          if (
+            content.uri !== reference.uri ||
+            content.assetId !== reference.assetId ||
+            !["image/png", "image/jpeg", "image/webp"].includes(
+              content.mimeType,
+            ) ||
+            typeof content.dataBase64 !== "string" ||
+            !content.dataBase64
+          ) {
+            throw new Error("REFERENCE_INVALID_IMAGE");
+          }
+          referenceContents.push({
+            mimeType: content.mimeType,
+            dataBase64: content.dataBase64,
+          });
+        } catch {
+          if (signal?.aborted) {
+            return {
+              content: [{ type: "text", text: "Error: 图像生成已取消" }],
+              details: { error: "cancelled", references: referenceMetadata },
+              isError: true,
+            };
+          }
+          return {
+            content: [{ type: "text", text: "Error: 图片参考读取失败，未调用图像生成服务" }],
+            details: {
+              error: "reference_read_failed",
+              references: referenceMetadata,
+            },
+            isError: true,
+          };
+        }
+      }
 
       // Provider retries, cancellation, quota and response parsing live in the
       // shared service used by both this tool and the whiteboard endpoint.
@@ -187,6 +281,7 @@ export function createGenerateImageTool(
             maxRetries: gen.maxRetries,
             maxPromptLen: gen.maxPromptLen,
             sessionId,
+            references: referenceContents,
             signal,
           });
 
@@ -247,6 +342,7 @@ export function createGenerateImageTool(
                   results,
                   mimeType,
                   size,
+                  references: referenceMetadata,
                 },
               };
             }
@@ -274,7 +370,7 @@ export function createGenerateImageTool(
             text: `Error: 图像生成失败：${lastError || "未知错误"}`,
           },
         ],
-        details: { error: "generation_failed" },
+        details: { error: "generation_failed", references: referenceMetadata },
         isError: true,
       };
     },
@@ -300,6 +396,7 @@ async function callImageGenerationApi(params: {
   maxRetries: number;
   maxPromptLen: number;
   sessionId: string;
+  references?: Array<{ mimeType: string; dataBase64: string }>;
   signal?: AbortSignal;
 }): Promise<{ buffers: Buffer[] }> {
   const generated = await generateImageWithProvider(
@@ -308,6 +405,7 @@ async function callImageGenerationApi(params: {
       prompt: params.prompt,
       size: params.size,
       count: params.n,
+      references: params.references,
       signal: params.signal,
     },
     {

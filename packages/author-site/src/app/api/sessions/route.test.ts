@@ -235,16 +235,20 @@ describe("sessions route external auth reuse", () => {
     );
     expect(agentProviders.pushSessionModelConfigToAgent).toHaveBeenCalledWith(
       "session-new",
-      {
-        ...globalBackendProvidersConfig,
-        multimodalModels: ["admin/vision-model"],
-      },
+      globalBackendProvidersConfig,
     );
   });
 
   it("复用活跃会话时也重新推送已保存授权配置", async () => {
     jest.doMock("@/lib/session-manager", () => ({
       archiveActiveSession: jest.fn(),
+      bindEditSessionRole: jest.fn((sessionId, userId, userRole) => ({
+        sessionId,
+        userId,
+        userRole,
+        projectId: "project-1",
+        expiresAt: Date.now() + 60_000,
+      })),
       createEditSession: jest.fn(),
       enforceSessionLimit: jest.fn(),
       ensureSessionUsesProjectActiveWorkspace: jest.fn(),
@@ -265,6 +269,13 @@ describe("sessions route external auth reuse", () => {
   it("复用活跃会话时也重新推送全局模型配置", async () => {
     jest.doMock("@/lib/session-manager", () => ({
       archiveActiveSession: jest.fn(),
+      bindEditSessionRole: jest.fn((sessionId, userId, userRole) => ({
+        sessionId,
+        userId,
+        userRole,
+        projectId: "project-1",
+        expiresAt: Date.now() + 60_000,
+      })),
       createEditSession: jest.fn(),
       enforceSessionLimit: jest.fn(),
       ensureSessionUsesProjectActiveWorkspace: jest.fn(),
@@ -278,10 +289,7 @@ describe("sessions route external auth reuse", () => {
     expect(response.status).toBe(200);
     expect(agentProviders.pushSessionModelConfigToAgent).toHaveBeenCalledWith(
       "session-existing",
-      {
-        ...globalBackendProvidersConfig,
-        multimodalModels: ["admin/vision-model"],
-      },
+      globalBackendProvidersConfig,
     );
   });
 
@@ -301,10 +309,21 @@ describe("sessions route external auth reuse", () => {
       jest.doMock("@/lib/agent-providers", () => ({
         pushSessionModelConfigToAgent,
         pushSessionExternalAuthToAgent,
+        pushSessionAuthorizationToAgent: jest.fn(async () => ({
+          ok: true,
+          message: "ok",
+        })),
       }));
       if (reuseSession) {
         jest.doMock("@/lib/session-manager", () => ({
           archiveActiveSession: jest.fn(),
+          bindEditSessionRole: jest.fn((sessionId, userId, userRole) => ({
+            sessionId,
+            userId,
+            userRole,
+            projectId: "project-1",
+            expiresAt: Date.now() + 60_000,
+          })),
           createEditSession: jest.fn(),
           enforceSessionLimit: jest.fn(),
           ensureSessionUsesProjectActiveWorkspace: jest.fn(),
@@ -340,6 +359,13 @@ describe("sessions route external auth reuse", () => {
   it("复用活跃会话前会确保绑定项目级共享 workspace", async () => {
     jest.doMock("@/lib/session-manager", () => ({
       archiveActiveSession: jest.fn(),
+      bindEditSessionRole: jest.fn((sessionId, userId, userRole) => ({
+        sessionId,
+        userId,
+        userRole,
+        projectId: "project-1",
+        expiresAt: Date.now() + 60_000,
+      })),
       createEditSession: jest.fn(),
       enforceSessionLimit: jest.fn(),
       ensureSessionUsesProjectActiveWorkspace: jest.fn(),
@@ -369,6 +395,7 @@ describe("sessions route external auth reuse", () => {
       "user-1",
       "project-1",
       undefined,
+      "editor",
     );
   });
 
@@ -422,6 +449,7 @@ describe("sessions route external auth reuse", () => {
       "user-1",
       "project-1",
       undefined,
+      "editor",
     );
   });
 });

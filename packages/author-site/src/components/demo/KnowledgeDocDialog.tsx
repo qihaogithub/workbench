@@ -32,6 +32,17 @@ import {
 import { createAuthorReferenceProvider, navigateToMarkdownMention } from "./markdown-reference-navigation";
 import { toKnowledgeItem } from "./document-api-adapter";
 import { localizeRemoteImageForSession } from "@workbench/demo-ui/markdown/remote-image-localizer";
+import {
+  DocumentSaveCoordinator,
+  DocumentSaveError,
+  type DocumentSaveSnapshot,
+  toDocumentSaveError,
+} from "@/lib/document-save-coordinator";
+import {
+  createOfflineDraftStore,
+  type OfflineDraftStore,
+} from "@/lib/workspace-offline-drafts";
+import { DocumentSaveStatusBar } from "./DocumentSaveStatusBar";
 
 export interface KnowledgeItem {
   id: string;
@@ -95,6 +106,10 @@ export function KnowledgeDocDialog({
   onSaved,
 }: KnowledgeDocDialogProps) {
   const { toast } = useToast();
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
+  const onSavedRef = useRef(onSaved);
+  onSavedRef.current = onSaved;
   // 内部模式状态，支持从阅读切换到编辑
   const [activeMode, setActiveMode] = useState<KnowledgeDocDialogMode>(initialMode);
   const [content, setContent] = useState("");
@@ -106,7 +121,22 @@ export function KnowledgeDocDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const activeItemId = item?.id;
+  const activeItemDescription = item?.description ?? "";
+  const [editSaveSnapshot, setEditSaveSnapshot] = useState<DocumentSaveSnapshot>({
+    status: "clean",
+    error: null,
+    localRevision: 0,
+    committedRevision: 0,
+    hasLocalDraft: false,
+  });
   const referenceEditorContainerRef = useRef<HTMLDivElement>(null);
+  const editValueRef = useRef({ content: "", description: "" });
+  editValueRef.current = { content: editContent, description: editDescription };
+  const activeModeRef = useRef(activeMode);
+  activeModeRef.current = activeMode;
+  const draftStoreRef = useRef<OfflineDraftStore | null>(null);
+  if (!draftStoreRef.current) draftStoreRef.current = createOfflineDraftStore();
   const collabDescriptor = useMemo<CollabRoomDescriptor | null>(() => {
     if (
       !open ||
@@ -147,7 +177,7 @@ export function KnowledgeDocDialog({
     return {
       source: { kind: "knowledge-document", projectId, workspaceId, docId: item.id },
       policy: {
-        allowedTargetKinds: ["page", "config", "document"],
+        allowedTargetKinds: ["project", "page", "config", "document"],
         sameProjectOnly: false,
         allowUnresolved: false,
       },
@@ -173,6 +203,126 @@ export function KnowledgeDocDialog({
     const current = activeMode === "edit" ? editContent : content;
     navigateToMarkdownMention(referenceEditorContainerRef.current, current, mention);
   }, [activeMode, content, editContent]);
+
+  const saveEdit = useCallback(
+    async (value: { content: string; description: string }): Promise<void> => {
+      if (!activeItemId || (!workingDir && !(documentApiMode === "project" && projectId))) {
+        throw new DocumentSaveError("文档尚未准备好保存。", { code: "UNKNOWN" });
+      }
+      const params = workingDir ? new URLSearchParams({ workingDir }) : new URLSearchParams();
+      if (projectId && documentApiMode === "legacy") params.set("projectId", projectId);
+      if (sessionId && documentApiMode === "legacy") params.set("sessionId", sessionId);
+      const response = await fetch(
+        documentApiMode === "project" && projectId
+          ? `/api/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(activeItemId)}${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`
+          : `/api/knowledge/${activeItemId}?${params.toString()}`,
+        {
+          method: documentApiMode === "project" ? "PATCH" : "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            description: value.description,
+            content: value.content,
+          }),
+        },
+      );
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        throw toDocumentSaveError(
+          data ? { ...data, status: response.status } : { status: response.status },
+          "保存失败",
+        );
+      }
+      const savedItem = documentApiMode === "project"
+        ? toKnowledgeItem(data.data.snapshot)
+        : data.data as KnowledgeItem;
+      onSavedRef.current(savedItem);
+    },
+    [activeItemId, documentApiMode, projectId, sessionId, workingDir],
+  );
+
+  const editSaveKey =
+    activeMode === "edit" && item && !collabDescriptor
+      ? `knowledge-dialog:${documentApiMode}:${projectId ?? workingDir ?? "local"}:${item.id}`
+      : null;
+  const editCoordinatorRef = useRef<
+    DocumentSaveCoordinator<{ content: string; description: string }> | null
+  >(null);
+  const editCoordinator = useMemo<
+    DocumentSaveCoordinator<{ content: string; description: string }> | null
+  >(() => {
+    if (!editSaveKey) return null;
+    const currentStore = draftStoreRef.current;
+    let instance: DocumentSaveCoordinator<{
+      content: string;
+      description: string;
+    }>;
+    instance = new DocumentSaveCoordinator({
+      save: saveEdit,
+      draft:
+        projectId && workspaceId && currentStore
+          ? {
+              store: currentStore,
+              workspaceId,
+              projectId,
+              path: editSaveKey,
+              serialize: (value) => JSON.stringify(value),
+              deserialize: (value) => JSON.parse(value) as {
+                content: string;
+                description: string;
+              },
+            }
+          : undefined,
+      onStateChange: (snapshot) => {
+        if (editCoordinatorRef.current !== instance) return;
+        setEditSaveSnapshot(snapshot);
+      },
+      onCommitted: ({ value, latest }) => {
+        if (editCoordinatorRef.current !== instance || !latest) return;
+        setContent(value.content);
+        setEditContent(value.content);
+        setEditDescription(value.description);
+        setHasChanges(false);
+      },
+      onError: (error) => {
+        if (editCoordinatorRef.current !== instance) return;
+        toastRef.current({ title: error.message, variant: "destructive" });
+      },
+    });
+    return instance;
+  }, [editSaveKey, projectId, saveEdit, workspaceId]);
+  editCoordinatorRef.current = editCoordinator;
+
+  const restoreEditDraft = useCallback(async () => {
+    const value = await editCoordinatorRef.current?.restoreDraft();
+    if (!value) return;
+    setContent(value.content);
+    setEditContent(value.content);
+    setEditDescription(value.description);
+    setHasChanges(true);
+  }, []);
+
+  const discardEditDraft = useCallback(async () => {
+    await editCoordinatorRef.current?.discardDraft();
+    setEditContent(content);
+    setEditDescription(item?.description ?? "");
+    setHasChanges(false);
+  }, [content, item?.description]);
+
+  useEffect(() => {
+    setEditSaveSnapshot(
+      editCoordinator?.getSnapshot() ?? {
+        status: "clean",
+        error: null,
+        localRevision: 0,
+        committedRevision: 0,
+        hasLocalDraft: false,
+      },
+    );
+    const current = editCoordinator;
+    return () => {
+      if (current) void current.dispose();
+    };
+  }, [editCoordinator]);
 
   // 打开弹窗时重置模式并加载数据
   useEffect(() => {
@@ -200,10 +350,24 @@ export function KnowledgeDocDialog({
           ? readFileContent(workingDir, item.fileName || "")
           : Promise.resolve("");
       contentPromise
-        .then((text) => {
-          setContent(text);
-          setEditContent(text);
-          setEditDescription(item.description);
+        .then(async (text) => {
+          if (!open) return;
+          let nextContent = text;
+          const base = { content: text, description: item.description };
+          const coordinator = editCoordinatorRef.current;
+          coordinator?.setBase(base);
+          const draft = coordinator
+            ? await coordinator.readDraft(base)
+            : { status: "none" as const };
+          if (draft.status === "match") {
+            nextContent = draft.value.content;
+            setEditDescription(draft.value.description);
+            if (activeModeRef.current === "edit") coordinator?.markDirty(draft.value);
+          } else {
+            setEditDescription(item.description);
+          }
+          setContent(nextContent);
+          setEditContent(nextContent);
         })
         .catch(() => {
           setContent("");
@@ -212,6 +376,28 @@ export function KnowledgeDocDialog({
         .finally(() => setLoading(false));
     }
   }, [documentApiMode, initialMode, item, open, projectId, sessionId, workingDir]);
+
+  // 从阅读模式切换到编辑模式时，当前正文已经在 state 中，仍需检查同一
+  // 文档是否存在可安全恢复的本地草稿。
+  useEffect(() => {
+    if (activeMode !== "edit" || !activeItemId || !editCoordinator) return;
+    let cancelled = false;
+    const base = {
+      content: editValueRef.current.content,
+      description: activeItemDescription,
+    };
+    editCoordinator.setBase(base);
+    void editCoordinator.readDraft(base).then((draft) => {
+      if (cancelled || draft.status !== "match") return;
+      setContent(draft.value.content);
+      setEditContent(draft.value.content);
+      setEditDescription(draft.value.description);
+      editCoordinator.markDirty(draft.value);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeItemDescription, activeItemId, activeMode, editCoordinator]);
 
   useEffect(() => {
     if (!collabDescriptor || activeMode !== "edit") return;
@@ -267,39 +453,40 @@ export function KnowledgeDocDialog({
       } else if (activeMode === "edit" && item) {
         if (collabDescriptor) {
           await collab.flush();
-        }
-        const contentToSave = collabDescriptor
-          ? collab.ytext?.toString() ?? editContent
-          : editContent;
-        const params = workingDir ? new URLSearchParams({ workingDir }) : new URLSearchParams();
-        if (projectId && documentApiMode === "legacy") params.set("projectId", projectId);
-        if (sessionId && documentApiMode === "legacy") params.set("sessionId", sessionId);
-        const res = await fetch(
-          documentApiMode === "project" && projectId
-            ? `/api/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(item.id)}${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`
-            : `/api/knowledge/${item.id}?${params.toString()}`,
-          {
-            method: documentApiMode === "project" ? "PATCH" : "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              description: editDescription,
-              content: contentToSave,
-            }),
+          const contentToSave = collab.ytext?.toString() ?? editContent;
+          const params = workingDir ? new URLSearchParams({ workingDir }) : new URLSearchParams();
+          if (projectId && documentApiMode === "legacy") params.set("projectId", projectId);
+          if (sessionId && documentApiMode === "legacy") params.set("sessionId", sessionId);
+          const res = await fetch(
+            `/api/knowledge/${item.id}?${params.toString()}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                description: editDescription,
+                content: contentToSave,
+              }),
+            },
+          );
+          const data = await res.json();
+          if (!data.success) {
+            toast({
+              title: "保存失败",
+              description: data.error?.message,
+              variant: "destructive",
+            });
+            return;
           }
-        );
-        const data = await res.json();
-        if (data.success) {
           setContent(contentToSave);
           setEditContent(contentToSave);
           toast({ title: "保存成功" });
-          onSaved(documentApiMode === "project" ? toKnowledgeItem(data.data.snapshot) : data.data as KnowledgeItem);
+          onSaved(data.data as KnowledgeItem);
           onOpenChange(false);
         } else {
-          toast({
-            title: "保存失败",
-            description: data.error?.message,
-            variant: "destructive",
-          });
+          const saved = await editCoordinatorRef.current?.flush();
+          if (!saved) return;
+          toast({ title: "保存成功" });
+          onOpenChange(false);
         }
       }
     } catch {
@@ -409,7 +596,16 @@ export function KnowledgeDocDialog({
             </label>
             <Input
               value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
+              onChange={(e) => {
+                const description = e.target.value;
+                setEditDescription(description);
+                if (!collabDescriptor) {
+                  editCoordinatorRef.current?.markDirty({
+                    content: editContent,
+                    description,
+                  });
+                }
+              }}
               className="mt-1 h-8 text-sm"
             />
           </div>
@@ -421,6 +617,11 @@ export function KnowledgeDocDialog({
                 setEditContent(nextValue);
                 if (collabDescriptor) {
                   replaceCollabText(collab.ytext, nextValue);
+                } else {
+                  editCoordinatorRef.current?.markDirty({
+                    content: nextValue,
+                    description: editDescription,
+                  });
                 }
               }}
               localizeRemoteImage={sessionId ? localizeRemoteImage : undefined}
@@ -429,6 +630,20 @@ export function KnowledgeDocDialog({
               onReferenceClick={onReferenceClick}
             />
           </div>
+          {!collabDescriptor && (
+            <DocumentSaveStatusBar
+              snapshot={editSaveSnapshot}
+              onRetry={() => {
+                void editCoordinatorRef.current?.retry();
+              }}
+              onRestoreDraft={() => {
+                void restoreEditDraft();
+              }}
+              onDiscardDraft={() => {
+                void discardEditDraft();
+              }}
+            />
+          )}
           {collabDescriptor && (
             <div className="text-[11px] text-muted-foreground">
               协同状态：{collab.status === "synced" ? "已同步" : collab.status === "saving" ? "保存中" : collab.status === "connecting" ? "连接中" : "离线"}
@@ -483,8 +698,11 @@ export function KnowledgeDocDialog({
           >
             {hasChanges ? "取消编辑（有未保存的更改）" : "返回阅读"}
           </Button>
-          <Button onClick={handleSave} disabled={saving || !hasChanges}>
-            {saving ? (
+          <Button
+            onClick={handleSave}
+            disabled={(saving || editSaveSnapshot.status === "saving") || !hasChanges}
+          >
+            {saving || editSaveSnapshot.status === "saving" ? (
               <>
                 <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                 保存中...
@@ -532,7 +750,14 @@ export function KnowledgeDocDialog({
                 const next = `${current.slice(0, mention.start)}${serializeMarkdownReference(mention.target, mention.label)}${current.slice(mention.end)}`;
                 if (activeMode === "edit") {
                   setEditContent(next);
-                  if (collabDescriptor) replaceCollabText(collab.ytext, next);
+                  if (collabDescriptor) {
+                    replaceCollabText(collab.ytext, next);
+                  } else {
+                    editCoordinatorRef.current?.markDirty({
+                      content: next,
+                      description: editDescription,
+                    });
+                  }
                 } else {
                   setContent(next);
                 }
