@@ -2,10 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 
-import {
-  encodeMarkdownReferenceUri,
-  MARKDOWN_REFERENCE_INDEX_VERSION,
-} from "../shared-runtime.js";
+import { encodeMarkdownReferenceUri, MARKDOWN_REFERENCE_INDEX_VERSION } from "@workbench/shared/markdown-reference";
 
 import { InMemoryMarkdownReferenceIndex, type MarkdownReferenceIndexScope, type RebuildMarkdownReferenceIndexInput } from "./link-index.js";
 import type {

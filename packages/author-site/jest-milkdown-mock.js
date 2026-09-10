@@ -5,6 +5,19 @@ const React = require('react');
 
 const command = () => ({ key: 'mock-command' });
 
+class PluginKey {
+  constructor(key) { this.key = key; }
+  getState() { return undefined; }
+}
+
+class Mark {
+  static sameSet(left, right) {
+    if (left === right) return true;
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((mark, index) => mark === right[index]);
+  }
+}
+
 module.exports = {
   // @milkdown/crepe
   Crepe: class {
@@ -104,5 +117,14 @@ module.exports = {
 
   // @milkdown/kit/prose/state
   EditorState: class {},
+  Plugin: class {
+    constructor(spec) { this.spec = spec; }
+  },
+  PluginKey,
   TextSelection: class {},
+
+  // @milkdown/kit/prose/model and @milkdown/kit/prose/view
+  Mark,
+  Decoration: { inline: (_from, _to, attrs) => ({ attrs }) },
+  DecorationSet: { create: (_doc, decorations) => ({ decorations }) },
 };
