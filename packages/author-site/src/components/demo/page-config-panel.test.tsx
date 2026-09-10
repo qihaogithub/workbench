@@ -155,7 +155,7 @@ describe("PageConfigPanel", () => {
     expect(screen.queryByText("没有匹配的配置项")).not.toBeInTheDocument();
   });
 
-  it("一级展示页面配置数量，二级展示共享配置和本页配置", () => {
+  it("一级展示页面配置数量，二级合并配置语义并标记共享来源", () => {
     render(
       <PageConfigPanel
         pages={[
@@ -189,21 +189,20 @@ describe("PageConfigPanel", () => {
     fireEvent.click(screen.getByText("页面 A"));
 
     expect(screen.queryByText(/项配置/)).not.toBeInTheDocument();
-    expect(screen.getByText("共享配置")).toBeInTheDocument();
+    expect(screen.queryByText("共享配置")).not.toBeInTheDocument();
+    expect(screen.queryByText("本页配置")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("项目共享配置：Logo")).toBeInTheDocument();
+    expect(screen.getByLabelText("项目共享配置：主题")).toBeInTheDocument();
     expect(screen.queryByText("影响多个页面")).not.toBeInTheDocument();
     expect(screen.queryByText("仅当前页面")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "2" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "2" }));
-    expect(screen.getByText("受影响页面")).toBeInTheDocument();
-    expect(screen.getAllByText("页面 A").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("页面 B").length).toBeGreaterThan(0);
-    expect(screen.getByText("本页配置")).toBeInTheDocument();
+    expect(screen.getByText("标题")).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("返回所有页面"));
     fireEvent.click(screen.getByText("页面 B"));
 
     expect(screen.queryByText(/项配置/)).not.toBeInTheDocument();
-    expect(screen.getByText("共享配置")).toBeInTheDocument();
+    expect(screen.getByLabelText("项目共享配置：Logo")).toBeInTheDocument();
+    expect(screen.getByLabelText("项目共享配置：主题")).toBeInTheDocument();
     expect(screen.queryByText("本页配置")).not.toBeInTheDocument();
   });
 
@@ -230,8 +229,10 @@ describe("PageConfigPanel", () => {
     expect(screen.queryByText("配置面板")).not.toBeInTheDocument();
     expect(screen.queryByText("页面 A")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("返回所有页面")).not.toBeInTheDocument();
-    expect(screen.getByText("共享配置")).toBeInTheDocument();
-    expect(screen.getByText("本页配置")).toBeInTheDocument();
+    expect(screen.queryByText("共享配置")).not.toBeInTheDocument();
+    expect(screen.queryByText("本页配置")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("项目共享配置：Logo")).toBeInTheDocument();
+    expect(screen.getByText("标题")).toBeInTheDocument();
   });
 
   it("项目级配置只在当前页面绑定对应字段时展示", () => {
@@ -268,11 +269,11 @@ describe("PageConfigPanel", () => {
 
     fireEvent.click(screen.getByText("页面 A"));
 
-    expect(screen.getByText("共享配置")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "1" })).toBeInTheDocument();
+    expect(screen.getByLabelText("项目共享配置：Logo")).toBeInTheDocument();
+    expect(screen.queryByLabelText("项目共享配置：主题")).not.toBeInTheDocument();
     expect(screen.getByText("Logo")).toBeInTheDocument();
     expect(screen.queryByText("主题")).not.toBeInTheDocument();
-    expect(screen.getByText("本页配置")).toBeInTheDocument();
+    expect(screen.getByText("标题")).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("返回所有页面"));
     fireEvent.click(screen.getByText("页面 B"));
@@ -391,7 +392,8 @@ describe("PageConfigPanel", () => {
     );
 
     expect(screen.queryByText("配置项")).not.toBeInTheDocument();
-    expect(screen.getByText("本页配置")).toBeInTheDocument();
+    expect(screen.queryByText("本页配置")).not.toBeInTheDocument();
+    expect(screen.getByText("标题")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "恢复默认" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
 
@@ -552,8 +554,10 @@ describe("PageConfigPanel", () => {
       />,
     );
 
-    expect(screen.getByText("共享配置")).toBeInTheDocument();
-    expect(screen.getByText("本页配置")).toBeInTheDocument();
+    expect(screen.queryByText("共享配置")).not.toBeInTheDocument();
+    expect(screen.queryByText("本页配置")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("项目共享配置：Logo")).toBeInTheDocument();
+    expect(screen.getByText("标题")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "更多配置操作" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
   });
@@ -733,7 +737,8 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
     );
 
     expect(screen.queryByText("配置项")).not.toBeInTheDocument();
-    expect(screen.getByText("本页配置")).toBeInTheDocument();
+    expect(screen.queryByText("本页配置")).not.toBeInTheDocument();
+    expect(screen.getByText("标题")).toBeInTheDocument();
     expect(screen.getByText("资源规范")).toBeInTheDocument();
     expect(screen.getByText("暂无资源规范")).toBeInTheDocument();
   });
@@ -925,8 +930,7 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
     expect(screen.getByText("交互要求", { exact: false })).toBeInTheDocument();
   });
 
-  it("共享配置受影响页面数徽标点击后弹出列表，点击页面名跳转", () => {
-    const onPageSelect = jest.fn();
+  it("共享配置在字段旁按需展示项目级来源提示", () => {
     render(
       <PageConfigPanel
         pages={[
@@ -950,14 +954,12 @@ describe("PageConfigPanel 配置项与资源规范折叠区", () => {
         hideDetailHeader
         projectConfigSchema={sharedSchema}
         readonly
-        onPageSelect={onPageSelect}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "2" }));
-    expect(screen.getByText("受影响页面")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("页面 B"));
-    expect(onPageSelect).toHaveBeenCalledWith("page_b");
+    expect(screen.getByLabelText("项目共享配置：Logo")).toBeInTheDocument();
+    expect(screen.getByLabelText("项目共享配置：主题")).toBeInTheDocument();
+    expect(screen.queryByText("受影响页面")).not.toBeInTheDocument();
   });
 
   it("extractCodeConfigBindingKeys 提取 props 解构的共享配置字段", () => {

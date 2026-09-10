@@ -249,6 +249,6 @@ describe('ConfigFormNew', () => {
 
     expect(handleChange).toHaveBeenCalledWith({
       position: { x: 35, y: 20 },
-    });
+    }, undefined);
   });
 });

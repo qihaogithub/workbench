@@ -1142,7 +1142,6 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "更多" }));
-    fireEvent.click(screen.getByRole("button", { name: "更多" }));
     fireEvent.click(await screen.findByRole("button", { name: "合并页面" }));
 
     await waitFor(() => {

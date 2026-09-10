@@ -1108,6 +1108,18 @@ export function deleteSession(sessionId: string): boolean {
   // layout is sessions/{userId}/{projectId}/{sessionId}; resolving afterwards
   // would fall back to the legacy flat path and leave the history on disk.
   const sessionPath = getSessionPath(sessionId);
+  return deleteSessionAtPath(sessionId, sessionPath);
+}
+
+export function deleteSessionAtPath(
+  sessionId: string,
+  sessionPath: string,
+): boolean {
+  if (!fs.existsSync(sessionPath) || !fs.statSync(sessionPath).isDirectory()) {
+    unregisterSessionPath(sessionId);
+    return false;
+  }
+
   unregisterSessionPath(sessionId);
 
   try {

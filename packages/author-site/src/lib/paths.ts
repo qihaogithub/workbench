@@ -117,6 +117,9 @@ const sessionPathIndex = new Map<string, string>();
 
 export function registerSessionPath(sessionId: string, sessionPath: string): void {
   sessionPathIndex.set(sessionId, sessionPath);
+  // A previous lookup may have cached a miss. Registration is authoritative
+  // and must make the newly discovered path visible immediately.
+  sessionPathCache.delete(sessionId);
 }
 
 export function unregisterSessionPath(sessionId: string): void {
