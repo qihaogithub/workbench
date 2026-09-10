@@ -2,7 +2,7 @@
 
 整项目引用双入口见[Markdown 能力需求](./共享能力/Markdown文档/Markdown编辑器_需求文档.md)；Agent 引用读取与参考图输入见[Agent 核心模块](./独立Agent服务层/03-核心模块设计.md#markdown-引用读取与图片输入)。
 
-创作端 Markdown 文档的统一保存协调器、失败暂停、本地草稿恢复和 Authority 重试边界见[Markdown 宿主保存设计](./共享能力/Markdown文档/技术/04_宿主接入、保存边界与测试.md)。
+创作端 Markdown 文档的统一保存协调器、提交后草稿基线推进、失败暂停、本地草稿恢复和 Authority 重试边界见[Markdown 宿主保存设计](./共享能力/Markdown文档/技术/04_宿主接入、保存边界与测试.md)。
 
 文档头部工具栏的单行与更多菜单收纳见[Markdown 文档与编辑器](./共享能力/Markdown文档/INDEX.md)。
 

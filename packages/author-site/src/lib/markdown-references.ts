@@ -158,9 +158,10 @@ export function buildMarkdownReferenceIndex(
   }
   const parsed = readIndexJson("knowledge/manifest.json");
   if (parsed && !Array.isArray(parsed.items)) throw new Error("REFERENCE_DIRECTORY_INVALID_MANIFEST");
-  const documents: Array<Record<string, unknown>> = Array.isArray(parsed?.items)
-      ? parsed.items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
-      : [];
+  const parsedItems = parsed && Array.isArray(parsed.items) ? parsed.items : [];
+  const documents: Array<Record<string, unknown>> = parsedItems.filter(
+    (item): item is Record<string, unknown> => Boolean(item && typeof item === "object"),
+  );
 
   const snapshot: ResourceDirectorySnapshot = {
     project: { id: context.projectId, name: project?.name || context.projectId },
@@ -202,7 +203,8 @@ export function buildMarkdownReferenceIndex(
   for (const page of pages) addDocument("page-convention", page.id, `${page.name} 页面公约`, `demos/${page.id}/convention.md`);
   const specManifest = readIndexJson("design-spec/manifest.json");
   if (specManifest && !Array.isArray(specManifest.items)) throw new Error("REFERENCE_DIRECTORY_INVALID_MANIFEST");
-  for (const item of Array.isArray(specManifest?.items) ? specManifest.items : []) {
+  const specItems = specManifest && Array.isArray(specManifest.items) ? specManifest.items : [];
+  for (const item of specItems) {
     if (!item || typeof item !== "object" || typeof item.id !== "string" || !/^[A-Za-z0-9_-]{1,120}$/.test(item.id)) continue;
     addDocument("design-spec", item.id, typeof item.title === "string" ? item.title : item.id, `design-spec/spec-${item.id}.json`);
   }

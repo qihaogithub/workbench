@@ -115,6 +115,51 @@ describe("DocumentSaveCoordinator", () => {
     expect(coordinator.getSnapshot().status).toBe("saved");
   });
 
+  it("提交期间产生的新草稿使用成功提交后的服务端基线", async () => {
+    let resolveSave!: (receipt: { revision: number }) => void;
+    const save = jest.fn(
+      () =>
+        new Promise<{ revision: number }>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    const { coordinator, store } = createCoordinator(save);
+    coordinator.setBase("服务端原文", 1);
+
+    coordinator.markDirty("已提交正文");
+    const inFlight = coordinator.flush();
+    coordinator.markDirty("提交期间的新草稿");
+    resolveSave({ revision: 7 });
+
+    await expect(inFlight).resolves.toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect([...store.records.values()]).toEqual([
+      expect.objectContaining({
+        content: "提交期间的新草稿",
+        baseRevision: 7,
+        baseHash: contentFingerprint("已提交正文"),
+      }),
+    ]);
+
+    const next = new DocumentSaveCoordinator<string>({
+      save: async () => ({ revision: 8 }),
+      draft: {
+        store,
+        workspaceId: "ws-1",
+        projectId: "project-1",
+        path: "document:doc-1",
+        serialize: (value) => value,
+        deserialize: (value) => value,
+      },
+    });
+    await expect(next.readDraft("已提交正文")).resolves.toMatchObject({
+      status: "match",
+      value: "提交期间的新草稿",
+    });
+
+    await coordinator.discardDraft();
+  });
+
   it("同一基线的本地草稿可以恢复，基线变化时进入冲突状态", async () => {
     const store = createDraftStore();
     await store.saveDraft({

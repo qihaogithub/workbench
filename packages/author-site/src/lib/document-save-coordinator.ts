@@ -346,6 +346,11 @@ export class DocumentSaveCoordinator<T> {
     this.updateStatus("saving");
     const request = this.save(pending.value)
       .then((receipt) => {
+        // Every successful commit becomes the baseline for drafts created by
+        // subsequent edits. This also matters when a newer edit arrived while
+        // the request was in flight: rewrite that draft after advancing the
+        // baseline so a reload does not report a false conflict.
+        this.setBase(pending.value, receipt?.revision ?? this.baseRevision);
         const latest = this.pending === null && pending.localRevision === this.localRevision;
         this.committedRevision = Math.max(
           this.committedRevision,
@@ -358,6 +363,9 @@ export class DocumentSaveCoordinator<T> {
           this.removeDraft(pending.localRevision);
         } else {
           this.updateStatus("dirty");
+          if (this.pending) {
+            this.persistDraft(this.pending.value, this.pending.localRevision);
+          }
         }
         this.onCommitted?.({
           value: pending.value,

@@ -34,7 +34,10 @@ jest.mock("@/lib/fs-utils", () => ({
 jest.mock("@/lib/project-admin-service", () => ({
   getProjectAdminService: () => admin,
   projectAdminResponse: (result: { error?: unknown }) =>
-    Response.json({ success: false, error: result.error }, { status: 403 }),
+    new Response(JSON.stringify({ success: false, error: result.error }), {
+      status: 403,
+      headers: { "content-type": "application/json" },
+    }),
 }));
 jest.mock("@/lib/markdown-references", () => ({
   resolveMarkdownReferenceWorkspace: (...args: unknown[]) =>
@@ -95,7 +98,10 @@ it("requires the existing internal token and bounded JSON body", async () => {
   jest
     .mocked(requireConversationInternalToken)
     .mockReturnValueOnce(
-      Response.json({ success: false }, { status: 401 }) as never,
+      new Response(JSON.stringify({ success: false }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      }) as never,
     );
   expect((await POST(request({}))).status).toBe(401);
   expect((await POST(request({ ownerUserId: "owner" }))).status).toBe(400);
