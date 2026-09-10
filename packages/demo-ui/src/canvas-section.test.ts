@@ -205,10 +205,10 @@ describe("canvas Section graph", () => {
         section_a: { ...section("section_a", [{ kind: "page", id: "page_1" }, { kind: "node", id: "node_1" }]), layout: { x: 100, y: 100, width: 200, height: 200 } },
       },
     }, { columns: 2, gap: 40 });
-    const sectionDx = result.sections?.section_a.layout.x! - 100;
-    const sectionDy = result.sections?.section_a.layout.y! - 100;
+    const sectionDx = result.sections!.section_a.layout.x - 100;
+    const sectionDy = result.sections!.section_a.layout.y - 100;
     expect(result.pages.page_1.x - 110).toBe(sectionDx);
     expect(result.pages.page_1.y - 110).toBe(sectionDy);
-    expect(result.nodes?.node_1.layout.x! - 140).toBe(sectionDx);
+    expect(result.nodes!.node_1.layout.x - 140).toBe(sectionDx);
   });
 });

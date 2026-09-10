@@ -117,7 +117,7 @@ describe("heading conversion semantics", () => {
   });
 
   it("refuses a mixed code selection without partial conversion", async () => {
-    await fixture("正文\n\n\`\`\`js\nconst x = 1\n\`\`\`", (view) => {
+    await fixture("正文\n\n```js\nconst x = 1\n```", (view) => {
       view.dispatch(
         view.state.tr.setSelection(new AllSelection(view.state.doc)),
       );

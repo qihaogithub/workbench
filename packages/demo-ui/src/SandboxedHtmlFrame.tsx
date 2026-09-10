@@ -77,15 +77,13 @@ export function SandboxedHtmlFrame({
     const limiter = createSandboxedHtmlRateLimiter();
     let hasReady = false;
     let hasUsefulFrame = false;
-    let timeout: number | undefined;
-    let emptyFrame: number | undefined;
-    const settle = (next: SandboxedHtmlFrameStatus) => {
+    function settle(next: SandboxedHtmlFrameStatus) {
       if (timeout !== undefined) window.clearTimeout(timeout);
       if (emptyFrame !== undefined) window.clearTimeout(emptyFrame);
       announce(next);
-    };
-    timeout = window.setTimeout(() => settle("timeout"), timeoutMs);
-    emptyFrame = window.setTimeout(() => {
+    }
+    const timeout = window.setTimeout(() => settle("timeout"), timeoutMs);
+    const emptyFrame = window.setTimeout(() => {
       if (hasReady && !hasUsefulFrame) announce("empty-first-frame");
     }, Math.min(timeoutMs, 1200));
     const onLoad = () => {
