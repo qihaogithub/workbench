@@ -50,6 +50,7 @@ AI agent 在启动任务前应优先读取 `memory.md`（如果存在），以�
 - 前端：Next.js 16 App Router、React 19、Tailwind CSS、shadcn/ui、lucide-react
 - 后端：Fastify
 - 共享包：`@workbench/shared`、`@workbench/color-picker`
+- `@workbench/shared` 以 ESM 源码子路径对外导出，`package.json` 必须保留 `"type": "module"`；否则 Node 24 + `tsx` 会把 `.ts` 子路径当作 CommonJS，导致命名导入在运行时缺失。
 - 数据目录：默认 `data/`，可由 `DATA_DIR` 覆盖
 - 环境变量文件：`.env` 被 git 忽略，`.env.docker` 用于 Docker 部署覆盖
 - OPS 工程上下文入口：`OPS/AGENTS.md`
