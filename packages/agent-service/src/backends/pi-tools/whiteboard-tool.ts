@@ -4,7 +4,6 @@ import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import {
   asWhiteboardDocumentV2,
-  getWhiteboardDocumentRevision,
   isWhiteboardDocument,
   whiteboardDocumentPath,
   type WhiteboardDocumentV2,
@@ -166,10 +165,6 @@ function validatePlaceAssetCandidates(config: AgentConfig, whiteboardId: string,
     if (!alreadyAttached || !isSafeManagedAssetSource(action.assetId, action.src)) return `asset ${action.assetId} is not a confirmed managed asset candidate`;
   }
   return null;
-}
-
-function undoKey(config: AgentConfig, whiteboardId: string): string {
-  return `${path.resolve(config.workingDir || ".")}::${whiteboardId}`;
 }
 
 function relativeDocumentPath(whiteboardId: string): string {
