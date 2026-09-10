@@ -9,9 +9,10 @@ import { KeyRound, UserRound } from "lucide-react";
 interface LoginFormProps {
   onSubmit: (username: string, password: string) => Promise<void>;
   loading: boolean;
+  isRegister?: boolean;
 }
 
-export function LoginForm({ onSubmit, loading }: LoginFormProps) {
+export function LoginForm({ onSubmit, loading, isRegister = false }: LoginFormProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
@@ -48,7 +49,7 @@ export function LoginForm({ onSubmit, loading }: LoginFormProps) {
               id="password"
               type="password"
               placeholder="请输入密码"
-              autoComplete="current-password"
+              autoComplete={isRegister ? "new-password" : "current-password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -59,7 +60,7 @@ export function LoginForm({ onSubmit, loading }: LoginFormProps) {
         </div>
       </div>
       <Button type="submit" className="auth-submit-button w-full" disabled={loading}>
-        {loading ? "登录中..." : "登录"}
+        {loading ? (isRegister ? "注册中..." : "登录中...") : isRegister ? "注册" : "登录"}
       </Button>
     </form>
   );

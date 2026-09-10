@@ -835,3 +835,56 @@ export function cleanupOrphanWorkspaces(
 
   return cleaned;
 }
+
+/**
+ * 将会话工作区同步为项目 canonical workspace 的最新内容。
+ * 用于版本恢复后显式刷新当前会话工作区。
+ */
+export function syncSessionFromProject(
+  userId: string,
+  projectId: string,
+  workspaceId: string,
+): string | null {
+  const workspacePath = findWorkspacePath(workspaceId);
+  const projectWorkspacePath = path.join(getProjectPath(projectId), "workspace");
+  if (!workspacePath || !fs.existsSync(projectWorkspacePath)) return null;
+
+  const existingMeta = getWorkspaceMetaFromFs(workspaceId);
+  const tempPath = `${workspacePath}.sync-tmp`;
+  try {
+    if (fs.existsSync(tempPath)) {
+      fs.rmSync(tempPath, { recursive: true, force: true });
+    }
+    copyWorkspaceClean(projectWorkspacePath, tempPath);
+    if (existingMeta) {
+      fs.writeFileSync(
+        path.join(tempPath, ".workspace.json"),
+        JSON.stringify({ ...existingMeta, updatedAt: Date.now() }, null, 2),
+        "utf-8",
+      );
+    } else {
+      fs.writeFileSync(
+        path.join(tempPath, ".workspace.json"),
+        JSON.stringify(
+          {
+            workspaceId,
+            demoId: projectId,
+            projectId,
+            userId,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          } satisfies WorkspaceMeta,
+          null,
+          2,
+        ),
+        "utf-8",
+      );
+    }
+    fs.rmSync(workspacePath, { recursive: true, force: true });
+    fs.renameSync(tempPath, workspacePath);
+    return workspacePath;
+  } catch {
+    fs.rmSync(tempPath, { recursive: true, force: true });
+    return null;
+  }
+}
