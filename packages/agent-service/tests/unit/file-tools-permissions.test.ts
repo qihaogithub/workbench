@@ -136,10 +136,11 @@ describe('createWriteFileTool - 权限感知', () => {
     expect(result.isError).toBeFalsy();
   });
 
-  it('写入坏页面代码后应返回非阻塞预览诊断', async () => {
+  it('写入坏页面代码前应返回阻塞预览诊断', async () => {
     (fs.promises.mkdir as any).mockResolvedValue(undefined);
     (fs.promises.writeFile as any).mockResolvedValue(undefined);
     const tool = createWriteFileTool(mockConfig);
+    const writesBefore = vi.mocked(fs.promises.writeFile).mock.calls.length;
     const result = await tool.execute('id', {
       path: 'demos/home/index.tsx',
       content: [
@@ -149,8 +150,8 @@ describe('createWriteFileTool - 权限感知', () => {
       ].join('\n'),
     } as any);
 
-    expect(result.isError).toBeFalsy();
-    expect(fs.promises.writeFile).toHaveBeenCalled();
+    expect(result.isError).toBe(true);
+    expect(fs.promises.writeFile).toHaveBeenCalledTimes(writesBefore);
     expect(result.content[0].text).toContain('Preview validation failed');
     expect(result.details?.runtimeValidation).toMatchObject({
       ok: false,
@@ -160,12 +161,13 @@ describe('createWriteFileTool - 权限感知', () => {
 });
 
 describe('createEditFileTool - 预览校验反馈', () => {
-  it('编辑坏页面代码后应返回非阻塞预览诊断', async () => {
+  it('编辑坏页面代码前应返回阻塞预览诊断', async () => {
     (fs.promises.readFile as any).mockResolvedValue(
       "export default function Demo(){ return <div />; }\n",
     );
     (fs.promises.writeFile as any).mockResolvedValue(undefined);
     const tool = createEditFileTool(mockConfig);
+    const writesBefore = vi.mocked(fs.promises.writeFile).mock.calls.length;
     const result = await tool.execute('id', {
       path: 'demos/home/index.tsx',
       edits: [{
@@ -178,8 +180,8 @@ describe('createEditFileTool - 预览校验反馈', () => {
       }],
     } as any);
 
-    expect(result.isError).toBeFalsy();
-    expect(fs.promises.writeFile).toHaveBeenCalled();
+    expect(result.isError).toBe(true);
+    expect(fs.promises.writeFile).toHaveBeenCalledTimes(writesBefore);
     expect(result.content[0].text).toContain('Preview validation failed');
     expect(result.details?.runtimeValidation).toMatchObject({
       ok: false,
