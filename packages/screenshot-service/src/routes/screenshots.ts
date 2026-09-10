@@ -42,18 +42,10 @@ import type {
   ScreenshotRenderMode,
 } from "../utils/browser-pool";
 import { getScreenshotMetrics } from "../utils/screenshot-metrics";
-
-// Keep the analyzer as the single project-core implementation while avoiding
-// pulling project-core's broad source index into this package's NodeNext type
-// graph (the service is bundled/loaded through the workspace at runtime).
-type HtmlImportNormalizer = (source: string) => {
-  analysis: { outcome: { status: string; runtimeType?: string }; sourceHash: string };
-  normalizedHash?: string;
-};
-type HtmlImportContract = {
-  normalizeHtmlImport: HtmlImportNormalizer;
-  HTML_IMPORT_ANALYSIS_VERSION: number;
-};
+import {
+  HTML_IMPORT_ANALYSIS_VERSION,
+  normalizeHtmlImport,
+} from "@workbench/project-core/html-import";
 
 // --- Request schemas ---
 
@@ -522,9 +514,6 @@ function normalizeSnapshotInput(
   const configData = normalizeConfigData(input.configData);
 
   if (input.runtimeType === "sandboxed-html") {
-    const { normalizeHtmlImport, HTML_IMPORT_ANALYSIS_VERSION } = require(
-      "@workbench/project-core",
-    ) as HtmlImportContract;
     if (typeof input.sandboxHtml !== "string" || input.sandboxHtml.length === 0 || !input.htmlImportMeta || typeof input.htmlImportMeta !== "object") return null;
     const normalized = normalizeHtmlImport(input.sandboxHtml);
     const meta = input.htmlImportMeta;
