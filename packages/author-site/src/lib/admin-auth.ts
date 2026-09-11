@@ -9,6 +9,7 @@
 
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { requireSecret } from "@workbench/runtime-config/secrets";
 
 const ADMIN_COOKIE_NAME = "admin_token";
 const ADMIN_COOKIE_MAX_AGE = 2 * 60 * 60; // 2 小时
@@ -17,7 +18,7 @@ const ADMIN_COOKIE_MAX_AGE = 2 * 60 * 60; // 2 小时
  * 获取 Admin Secret (从环境变量)
  */
 export function getAdminSecret(): string {
-  return process.env.ADMIN_SECRET || "admin-change-this-to-random-string";
+  return requireSecret("ADMIN_SECRET");
 }
 
 /**

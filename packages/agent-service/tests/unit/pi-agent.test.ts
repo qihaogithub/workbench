@@ -858,15 +858,7 @@ describe("PiAgentBackend", () => {
         sizeBytes: 100,
       });
 
-      process.env.IMAGE_DESCRIPTION_ENABLED = "true";
-      process.env.IMAGE_DESCRIPTION_MODEL = "custom/vision-model";
-
       const backend = new PiAgentBackend(textOnlyImageConfig);
-      Object.defineProperty(backend, "imageDescriber", {
-        value: {
-          getConfig: () => ({ visionModelId: "custom/vision-model" }),
-        },
-      });
 
       const result = await (backend as any).runSubagent({
         task: "分析图片",
@@ -886,15 +878,7 @@ describe("PiAgentBackend", () => {
         error: "Image not found: img_notfound",
       });
 
-      process.env.IMAGE_DESCRIPTION_ENABLED = "true";
-      process.env.IMAGE_DESCRIPTION_MODEL = "custom/vision-model";
-
       const backend = new PiAgentBackend(textOnlyImageConfig);
-      Object.defineProperty(backend, "imageDescriber", {
-        value: {
-          getConfig: () => ({ visionModelId: "custom/vision-model" }),
-        },
-      });
 
       const result = await (backend as any).runSubagent({
         task: "分析图片",
@@ -911,9 +895,6 @@ describe("PiAgentBackend", () => {
     it("vision 模式 /api/screenshots/ 应使用 screenshotServiceUrl 解析", async () => {
       const originalScreenshotUrl = process.env.SCREENSHOT_SERVICE_URL;
       process.env.SCREENSHOT_SERVICE_URL = "http://test-shot-service";
-      process.env.IMAGE_DESCRIPTION_ENABLED = "true";
-      process.env.IMAGE_DESCRIPTION_MODEL = "custom/vision-model";
-
       const originalFetch = global.fetch;
       const png = Buffer.from("screenshot-png");
       global.fetch = vi.fn().mockResolvedValue(
@@ -924,11 +905,6 @@ describe("PiAgentBackend", () => {
       );
 
       const backend = new PiAgentBackend(textOnlyImageConfig);
-      Object.defineProperty(backend, "imageDescriber", {
-        value: {
-          getConfig: () => ({ visionModelId: "custom/vision-model" }),
-        },
-      });
 
       const result = await (backend as any).runSubagent({
         task: "分析截图",
@@ -947,9 +923,6 @@ describe("PiAgentBackend", () => {
     });
 
     it("vision 模式绝对 URL 直接 fetch", async () => {
-      process.env.IMAGE_DESCRIPTION_ENABLED = "true";
-      process.env.IMAGE_DESCRIPTION_MODEL = "custom/vision-model";
-
       const originalFetch = global.fetch;
       const png = Buffer.from("external-image");
       global.fetch = vi.fn().mockResolvedValue(
@@ -960,11 +933,6 @@ describe("PiAgentBackend", () => {
       );
 
       const backend = new PiAgentBackend(textOnlyImageConfig);
-      Object.defineProperty(backend, "imageDescriber", {
-        value: {
-          getConfig: () => ({ visionModelId: "custom/vision-model" }),
-        },
-      });
 
       const result = await (backend as any).runSubagent({
         task: "分析外部图片",
@@ -1359,9 +1327,10 @@ describe("PiAgent 工具", () => {
         }),
       });
 
-      expect(tools).toHaveLength(45);
+      expect(tools).toHaveLength(51);
 
       const toolNames = tools.map((tool) => tool.name);
+      expect(toolNames).toContain("searchProjectInventory");
       expect(toolNames).toContain("readFile");
       expect(toolNames).toContain("readUploadedFile");
       expect(toolNames).toContain("editFile");
@@ -1418,7 +1387,7 @@ describe("PiAgent 工具", () => {
         includeDelegateTask: false,
       });
 
-      expect(tools).toHaveLength(44);
+      expect(tools).toHaveLength(50);
       expect(tools.map((tool) => tool.name)).not.toContain("delegateTask");
       expect(tools.map((tool) => tool.name)).toContain("activateCapabilities");
       expect(tools.map((tool) => tool.name)).toContain("readUploadedFile");

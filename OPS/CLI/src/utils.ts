@@ -14,12 +14,12 @@ export async function request<T>(
 
   const fetchOptions: RequestInit = {
     method: options?.method || "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
   };
 
-  if (options?.body) {
+  if (options?.body !== undefined) {
+    fetchOptions.headers = {
+      "Content-Type": "application/json",
+    };
     fetchOptions.body = JSON.stringify(options.body);
   }
 

@@ -82,6 +82,22 @@ function hasRuntimeFile(filePath: string): boolean {
   }
 }
 
+/**
+ * Live Workspace 的受管资源只能由 Workspace Authority 写入。
+ * 读取时的兼容性修复（例如补齐 routeKey）只能留在内存中，否则一次
+ * 普通页面读取就会绕过 Authority 改写 workspace-tree.json 并制造漂移。
+ */
+function isActiveLiveWorkspacePath(workspacePath: string): boolean {
+  try {
+    const metadata = JSON.parse(
+      fs.readFileSync(path.join(workspacePath, ".workspace.json"), "utf-8"),
+    ) as { scope?: unknown; status?: unknown };
+    return metadata.scope === "live" && metadata.status !== "archived";
+  } catch {
+    return false;
+  }
+}
+
 export function listProjects(): DemoMeta[] {
   ensureDirsExist();
 
@@ -437,7 +453,9 @@ function migrateLegacyToTree(workspacePath: string): WorkspaceTree {
     folders,
     pages: normalizeWorkspacePagesRouteKeys(pages).pages,
   };
-  writeWorkspaceTree(workspacePath, tree);
+  if (!isActiveLiveWorkspacePath(workspacePath)) {
+    writeWorkspaceTree(workspacePath, tree);
+  }
   return tree;
 }
 
@@ -470,7 +488,7 @@ export function readWorkspaceTree(workspacePath: string): WorkspaceTree {
         pages,
       };
       const normalized = normalizeWorkspacePagesRouteKeys(tree.pages);
-      if (normalized.changed) {
+      if (normalized.changed && !isActiveLiveWorkspacePath(workspacePath)) {
         writeWorkspaceTree(workspacePath, {
           folders: tree.folders,
           pages: normalized.pages,

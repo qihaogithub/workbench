@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+  compareWorkspaceResourcePaths,
   createWorkspaceResourceRegistry,
   hashWorkspaceContent,
   type WorkspaceRootManifest,
@@ -126,7 +127,7 @@ function manifestForDirectory(directory: string): WorkspaceRootManifest {
       size: content.length,
     });
   }
-  resources.sort((left, right) => left.path.localeCompare(right.path));
+  resources.sort((left, right) => compareWorkspaceResourcePaths(left.path, right.path));
   const resourceHashes = Object.fromEntries(resources.map((entry) => [entry.path, entry.hash]));
   return {
     resources,

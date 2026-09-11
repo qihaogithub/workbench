@@ -26,11 +26,21 @@ export function guardVisibilityCompletionClaim(
   files: FileChange[],
   committedVisibilityRules: boolean,
 ): string {
-  const claimsCrossPageBehavior = /(跨页面|跨页|页面联动|页面可见性|visibility)/i.test(text)
-    && /(已完成|完成了|已实现|已接入|已支持|complete|done)/i.test(text)
-    && !/(未完成|尚未|没有|无法|未提交|未通过)/i.test(text);
-  const changedPageRuntime = files.some((change) => /^demos\/[^/]+\/(?:index\.tsx|prototype\.html|sandbox\.html)$/.test(change.path));
-  if (!claimsCrossPageBehavior || !changedPageRuntime || committedVisibilityRules) return text;
+  const claimsCrossPageBehavior =
+    /(跨页面|跨页|页面联动|页面可见性|visibility)/i.test(text) &&
+    /(已完成|完成了|已实现|已接入|已支持|complete|done)/i.test(text) &&
+    !/(未完成|尚未|没有|无法|未提交|未通过)/i.test(text);
+  const changedPageRuntime = files.some((change) =>
+    /^demos\/[^/]+\/(?:index\.tsx|prototype\.html|sandbox\.html)$/.test(
+      change.path,
+    ),
+  );
+  if (
+    !claimsCrossPageBehavior ||
+    !changedPageRuntime ||
+    committedVisibilityRules
+  )
+    return text;
   return `${text}\n\n【系统校验】页面代码已修改，但联动规则未通过 Authority receipt 提交；跨页面联动尚未完成。`;
 }
 
@@ -69,14 +79,20 @@ export class ToolHookManager {
     return this.previewObservations.map((observation) => ({
       ...observation,
       identity: observation.identity ? { ...observation.identity } : undefined,
-      assertionTypes: observation.assertionTypes.map((assertion) => ({ ...assertion })),
+      assertionTypes: observation.assertionTypes.map((assertion) => ({
+        ...assertion,
+      })),
       evidence: { ...observation.evidence },
       reasons: observation.reasons ? [...observation.reasons] : undefined,
     }));
   }
 
   hasCommittedVisibilityRules(): boolean {
-    return this.mutationReceipts.some((receipt) => receipt.resources.some((resource) => resource.path === "project.visibility-rules.json"));
+    return this.mutationReceipts.some((receipt) =>
+      receipt.resources.some(
+        (resource) => resource.path === "project.visibility-rules.json",
+      ),
+    );
   }
 
   getReadKnowledgeFiles(): Set<string> {
@@ -119,7 +135,10 @@ export class ToolHookManager {
         reasons: ["observation-tool-error"],
       });
       if (this.previewObservations.length > 32) {
-        this.previewObservations.splice(0, this.previewObservations.length - 32);
+        this.previewObservations.splice(
+          0,
+          this.previewObservations.length - 32,
+        );
       }
       return;
     }
@@ -198,6 +217,18 @@ export class ToolHookManager {
     return receipt as WorkspaceMutationReceipt;
   }
 
+  private getWorkspaceReceipts(event: any): WorkspaceMutationReceipt[] {
+    const details = getToolResultDetails(event) as any;
+    const receipts = [
+      ...(details?.receipt ? [details.receipt] : []),
+      ...(Array.isArray(details?.receipts) ? details.receipts : []),
+    ];
+    return receipts.filter(
+      (receipt) =>
+        receipt?.committed === true && Array.isArray(receipt.resources),
+    );
+  }
+
   private changesFromReceipt(receipt: WorkspaceMutationReceipt): FileChange[] {
     return receipt.resources.map((resource) => ({
       path: resource.path,
@@ -219,6 +250,9 @@ export class ToolHookManager {
     if (isError) return [];
 
     const receipt = this.getWorkspaceReceipt(event);
+    const receipts = this.getWorkspaceReceipts(event);
+    if (receipts.length > 0)
+      return receipts.flatMap((item) => this.changesFromReceipt(item));
     if (receipt) return this.changesFromReceipt(receipt);
 
     // A live Workspace must never turn a successful-looking tool name into a
@@ -360,8 +394,8 @@ export class ToolHookManager {
     const changes = this.recordToolFileChange(toolName, input, isError, event);
     options?.onFileChanges?.(changes);
 
-    const receipt = this.getWorkspaceReceipt(event);
-    if (receipt) {
+    const receipts = this.getWorkspaceReceipts(event);
+    for (const receipt of receipts) {
       this.mutationReceipts.push({
         mutationId: receipt.mutationId,
         revision: receipt.revision,
@@ -374,10 +408,7 @@ export class ToolHookManager {
       });
     }
 
-    if (
-      toolName === "readFile" &&
-      !isError
-    ) {
+    if (toolName === "readFile" && !isError) {
       const readPath = input?.path;
       if (
         readPath &&

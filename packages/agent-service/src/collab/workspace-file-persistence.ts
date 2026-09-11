@@ -3,6 +3,7 @@ import crypto from "crypto";
 import path from "path";
 
 import type { CollabResourceKind } from "@workbench/shared/contracts";
+import { getDataDir } from "../config/data-paths";
 
 /**
  * Reverse-lookup: determine the CollabResourceKind from a file path.
@@ -76,19 +77,8 @@ interface WorkspaceMetaFile {
   status?: "active" | "archived" | "committed" | "expired";
 }
 
-function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, "pnpm-workspace.yaml"))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
-}
-
 export function getDefaultDataDir(): string {
-  return process.env.DATA_DIR ?? path.join(findProjectRoot(process.cwd()), "data");
+  return getDataDir();
 }
 
 export class WorkspaceFilePersistence {
@@ -312,6 +302,12 @@ export class WorkspaceFilePersistence {
     const validation = this.validateWorkspaceSession(input);
     if (!validation.ok) throw new Error(validation.reason || "WORKSPACE_MUTATION_FAILED");
     return this.authority.getCommittedEventsSince(input.projectId, input.workspaceId, input.afterRevision);
+  }
+
+  async getAuthorityMutationReceipt(input: { projectId: string; workspaceId: string; sessionId: string; mutationId: string }) {
+    const validation = this.validateWorkspaceSession(input);
+    if (!validation.ok) throw new Error(validation.reason || "WORKSPACE_MUTATION_FAILED");
+    return this.authority.getMutationReceipt(input.projectId, input.workspaceId, input.mutationId);
   }
 
   async getAuthorityProjectionAcks(input: { projectId: string; workspaceId: string; sessionId: string; afterRevision?: number }) {

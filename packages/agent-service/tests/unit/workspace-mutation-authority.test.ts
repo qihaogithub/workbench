@@ -9,6 +9,12 @@ import { normalizeHtmlImport } from "@workbench/project-core/html-import";
 
 const temporaryRoots: string[] = [];
 const hash = (content: string) => crypto.createHash("sha256").update(content).digest("hex");
+const rootHashFor = (resourceHashes: Record<string, string>, locale?: string) => hash(
+  Object.entries(resourceHashes)
+    .sort(([left], [right]) => left.localeCompare(right, locale))
+    .map(([resourcePath, resourceHash]) => `${resourcePath}:${resourceHash}`)
+    .join("\n"),
+);
 
 function createAuthority(initial = "before") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "workspace-authority-"));
@@ -762,6 +768,50 @@ describe("WorkspaceMutationAuthority", () => {
       ready: true,
       externalDrift: false,
       missingBackupCount: 0,
+    });
+  });
+
+  it("reconcile restore 不因大二进制资源的回滚快照而失败", async () => {
+    const { authority, workspacePath } = createAuthority();
+    const assetPath = path.join(workspacePath, "assets", "videos", "large.bin");
+    fs.mkdirSync(path.dirname(assetPath), { recursive: true });
+    fs.writeFileSync(assetPath, Buffer.alloc(64 * 1024 * 1024, 255));
+    await authority.bootstrap("project-1", "workspace-1");
+
+    fs.writeFileSync(
+      path.join(workspacePath, "workspace-tree.json"),
+      JSON.stringify({ folders: [], pages: [] }),
+      "utf-8",
+    );
+
+    const restored = await authority.reconcileRestore("project-1", "workspace-1");
+
+    expect(restored.revision).toBe(1);
+    expect(fs.existsSync(path.join(workspacePath, "workspace-tree.json"))).toBe(false);
+    expect(authority.getHealth("project-1", "workspace-1")).toMatchObject({
+      ready: true,
+      externalDrift: false,
+    });
+  });
+
+  it("reconcile restore 规范化旧 locale root hash 且保持 revision", async () => {
+    const { authority, workspacePath } = createAuthority();
+    fs.mkdirSync(path.join(workspacePath, "knowledge"), { recursive: true });
+    fs.writeFileSync(path.join(workspacePath, "knowledge", "manifest.json"), "{}", "utf-8");
+    fs.writeFileSync(path.join(workspacePath, "knowledge", "未命名文档.md"), "doc", "utf-8");
+    const state = await authority.bootstrap("project-1", "workspace-1");
+    const statePath = path.join(path.dirname(workspacePath), "data", "workspace-authority", "workspace-1", "state.json");
+    fs.writeFileSync(statePath, JSON.stringify({ ...state, rootHash: rootHashFor(state.resourceHashes, "zh-CN") }), "utf-8");
+    fs.writeFileSync(path.join(workspacePath, "workspace-tree.json"), JSON.stringify({ folders: [], pages: [] }), "utf-8");
+
+    const restored = await authority.reconcileRestore("project-1", "workspace-1");
+
+    expect(restored.revision).toBe(state.revision);
+    expect(restored.rootHash).toBe(rootHashFor(state.resourceHashes));
+    expect(fs.existsSync(path.join(workspacePath, "workspace-tree.json"))).toBe(false);
+    expect(authority.getHealth("project-1", "workspace-1")).toMatchObject({
+      ready: true,
+      externalDrift: false,
     });
   });
 

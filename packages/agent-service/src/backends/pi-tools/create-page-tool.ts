@@ -18,6 +18,7 @@ import {
   getPageEntryFileName,
   getPageDir,
   isSafePageId,
+  normalizeWorkspacePageRouteKeys,
   type WorkspacePage,
   type WorkspaceTree,
 } from "./workspace-page-utils";
@@ -171,7 +172,7 @@ function buildTree(tree: WorkspaceTree, args: CreatePageParams): WorkspaceTree {
     order: args.order,
     runtimeType: args.runtimeType,
   };
-  return { ...tree, pages: [...tree.pages, page] };
+  return { ...tree, pages: normalizeWorkspacePageRouteKeys([...tree.pages, page]) };
 }
 
 function pageOperations(args: CreatePageParams, tree: WorkspaceTree, treeContent: string): WorkspaceMutationRequest["operations"] {

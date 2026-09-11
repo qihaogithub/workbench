@@ -2062,6 +2062,10 @@ const workspaceWriteAllowlist = new Map([
     "isolated temporary deployment-preflight fixtures only",
   ],
   [
+    "scripts/check-config-drift.test.mjs",
+    "isolated temporary configuration-drift fixtures only",
+  ],
+  [
     "scripts/development/configure-prototype-canvas-mvp-project.mjs",
     "development fixture input/temp output only",
   ],
@@ -2128,6 +2132,10 @@ const workspaceWriteAllowlist = new Map([
   [
     "scripts/inventory-legacy-conversations.test.mjs",
     "isolated temporary legacy conversation inventory fixtures only",
+  ],
+  [
+    "scripts/reset-encrypted-credentials.mjs",
+    "operator-triggered credential cleanup outside live Workspace; apply requires an explicit backup path and confirmation token",
   ],
 ]);
 

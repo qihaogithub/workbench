@@ -6,6 +6,7 @@
  */
 import * as fs from "fs";
 import * as path from "path";
+import { getDataDir } from "../../config/data-paths";
 import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type {
@@ -25,22 +26,8 @@ const AGENT_AUTHOR: FeedbackAuthor = {
   isAgent: true,
 };
 
-function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, "pnpm-workspace.yaml"))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
-}
-
 function getFeedbackPath(): string {
-  const dataDir = path.resolve(
-    process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data"),
-  );
-  return path.join(dataDir, "feedback", "feedback.json");
+  return path.join(getDataDir(), "feedback", "feedback.json");
 }
 
 function readFeedbackStore(): FeedbackStoreData {

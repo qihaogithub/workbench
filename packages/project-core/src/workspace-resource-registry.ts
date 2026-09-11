@@ -7,6 +7,7 @@ import {
   WHITEBOARD_DOCUMENT_MAX_BYTES,
 } from "./shared-runtime.js";
 import { parseVisibilityRules } from "@workbench/shared";
+import { validateInventoryOverrides } from "./project-inventory.js";
 
 export type WorkspaceResourceKind =
   | "page-code"
@@ -23,6 +24,7 @@ export type WorkspaceResourceKind =
   | "page-requirements"
   | "project-schema"
   | "project-config-values"
+  | "project-inventory-overrides"
   | "visibility-rules"
   | "workspace-tree"
   | "workspace-convention"
@@ -40,7 +42,7 @@ export interface WorkspaceResourceDescriptor {
   kind: WorkspaceResourceKind;
   text: boolean;
   maxBytes: number;
-  validation: "text" | "json-object" | "workspace-tree" | "sketch-scene" | "whiteboard-document" | "whiteboard-bindings" | "visibility-rules" | "binary";
+  validation: "text" | "json-object" | "workspace-tree" | "sketch-scene" | "whiteboard-document" | "whiteboard-bindings" | "visibility-rules" | "inventory-overrides" | "binary";
 }
 
 export interface WorkspaceRootManifest {
@@ -66,6 +68,10 @@ export function hashWorkspaceContent(content: string | Buffer): string {
   return crypto.createHash("sha256").update(content).digest("hex");
 }
 
+export function compareWorkspaceResourcePaths(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 /** Centralized resource policy for every durable active-Workspace write. */
 export class WorkspaceResourceRegistry {
   describe(resourcePath: string): WorkspaceResourceDescriptor | null {
@@ -85,6 +91,7 @@ export class WorkspaceResourceRegistry {
     if (/^demos\/[^/]+\/requirements\.md$/.test(normalized)) return { kind: "page-requirements", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
     if (normalized === "project.config.schema.json") return { kind: "project-schema", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
     if (normalized === "project.config.values.json") return { kind: "project-config-values", text: true, maxBytes: TEXT_MAX_BYTES, validation: "json-object" };
+    if (normalized === "project.inventory-overrides.json") return { kind: "project-inventory-overrides", text: true, maxBytes: TEXT_MAX_BYTES, validation: "inventory-overrides" };
     if (normalized === "project.visibility-rules.json") return { kind: "visibility-rules", text: true, maxBytes: TEXT_MAX_BYTES, validation: "visibility-rules" };
     if (normalized === "workspace-tree.json") return { kind: "workspace-tree", text: true, maxBytes: TEXT_MAX_BYTES, validation: "workspace-tree" };
     if (normalized === "convention.md") return { kind: "workspace-convention", text: true, maxBytes: TEXT_MAX_BYTES, validation: "text" };
@@ -135,7 +142,7 @@ export class WorkspaceResourceRegistry {
         hash: hashWorkspaceContent(bytes),
         size: bytes.length,
       };
-    }).sort((a, b) => a.path.localeCompare(b.path));
+    }).sort((left, right) => compareWorkspaceResourcePaths(left.path, right.path));
     const resourceHashes = Object.fromEntries(entries.map((entry) => [entry.path, entry.hash]));
     const rootHash = hashWorkspaceContent(entries.map((entry) => `${entry.path}:${entry.hash}`).join("\n"));
     return { rootHash, resourceHashes, resources: entries };
@@ -166,6 +173,14 @@ export class WorkspaceResourceRegistry {
     }
     if (descriptor.validation === "visibility-rules") {
       if (!parseVisibilityRules(parsed)) throw new Error("WORKSPACE_INVALID_OPERATION");
+      return;
+    }
+    if (descriptor.validation === "inventory-overrides") {
+      try {
+        validateInventoryOverrides(parsed);
+      } catch {
+        throw new Error("WORKSPACE_INVALID_OPERATION");
+      }
       return;
     }
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {

@@ -55,7 +55,7 @@ describe("createPage", () => {
     expect(fs.readFileSync(path.join(root, "demos/home_1/prototype.css"), "utf8")).toContain("rebeccapurple");
     expect(fs.existsSync(path.join(root, "demos/home_1/config.schema.json"))).toBe(true);
     expect(JSON.parse(fs.readFileSync(path.join(root, "workspace-tree.json"), "utf8")).pages).toEqual([
-      expect.objectContaining({ id: "home_1", name: "首页", parentId: "folder_design", order: 0, runtimeType: "prototype-html-css" }),
+      expect.objectContaining({ id: "home_1", name: "首页", routeKey: "page", parentId: "folder_design", order: 0, runtimeType: "prototype-html-css" }),
     ]);
     expect(result.details).toMatchObject({
       createdPage: { id: "home_1", runtimeType: "prototype-html-css" },

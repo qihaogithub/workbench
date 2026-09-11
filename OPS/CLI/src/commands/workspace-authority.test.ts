@@ -449,9 +449,14 @@ test("workspaceAuthorityReconcileRestore 默认 dry-run 不调用 restore", asyn
 
 test("workspaceAuthorityReconcileRestore 加 apply 后调用 restore POST", async () => {
   const originalFetch = global.fetch;
-  const calls: Array<{ url: string; method?: string }> = [];
+  const calls: Array<{ url: string; method?: string; contentType?: string; body?: unknown }> = [];
   global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    calls.push({ url: String(input), method: init?.method });
+    calls.push({
+      url: String(input),
+      method: init?.method,
+      contentType: new Headers(init?.headers).get("Content-Type") ?? undefined,
+      body: init?.body,
+    });
     if (String(input).includes("/reconcile/restore")) {
       return new Response(JSON.stringify({
         success: true,
@@ -477,7 +482,7 @@ test("workspaceAuthorityReconcileRestore 加 apply 后调用 restore POST", asyn
     assert.equal(parsed.action, "reconcile_restore");
     assert.equal(parsed.applied, true);
     assert.equal(parsed.state.revision, 3);
-    assert.deepEqual(calls, [
+    assert.deepEqual(calls.map(({ url, method }) => ({ url, method })), [
       {
         url: "http://agent.test/api/workspace-authority/projects/project-1/workspaces/live-1/health?sessionId=session-1",
         method: "GET",
@@ -487,6 +492,8 @@ test("workspaceAuthorityReconcileRestore 加 apply 后调用 restore POST", asyn
         method: "POST",
       },
     ]);
+    assert.equal(calls[1]?.contentType, undefined);
+    assert.equal(calls[1]?.body, undefined);
   } finally {
     global.fetch = originalFetch;
   }

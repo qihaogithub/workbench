@@ -125,6 +125,28 @@ export async function getWorkspaceAuthorityEvents(input: {
   );
 }
 
+export async function getWorkspaceMutationReceipt(input: {
+  projectId: string;
+  workspaceId: string;
+  sessionId: string;
+  mutationId: string;
+}): Promise<WorkspaceMutationReceipt | undefined> {
+  try {
+    return await requestAuthorityJson(
+      authorityUrl(
+        input.projectId,
+        input.workspaceId,
+        `/receipts/${encodeURIComponent(input.mutationId)}?sessionId=${encodeURIComponent(input.sessionId)}`,
+      ),
+      { method: "GET" },
+      "WORKSPACE_RESOURCE_NOT_FOUND",
+    );
+  } catch (error) {
+    if (error instanceof WorkspaceAuthorityClientError && error.code === "WORKSPACE_RESOURCE_NOT_FOUND") return undefined;
+    throw error;
+  }
+}
+
 export async function getWorkspaceProjectionAcks(input: {
   projectId: string;
   workspaceId: string;

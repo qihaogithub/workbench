@@ -3,6 +3,7 @@ import path from 'path';
 
 import { createEditorDiagnosticEvent, type EditorDiagnosticEvent } from '@workbench/shared';
 
+import { getDataDir } from '../config/data-paths';
 import { AgentError, AgentEvent, AgentResult, RunSummary } from '../core/types';
 import { logger } from '../utils/logger';
 import { isPreviewObservationResult } from '@workbench/shared/demo/preview-observation';
@@ -70,30 +71,15 @@ interface PendingLogEntry {
 const LOG_FLUSH_INTERVAL_MS = 25;
 const MAX_PENDING_LOG_ENTRIES = 256;
 
-function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
-}
-
 function getRunLogRoot(): string {
   return (
     process.env.AGENT_RUN_LOG_DIR ||
-    path.join(
-      process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data'),
-      'agent-run-logs',
-    )
+    path.join(getDataDir(), 'agent-run-logs')
   );
 }
 
 function getDiagnosticsJsonlPath(): string {
-  const root = process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data');
-  return path.join(root, 'editor-diagnostics', 'agent-service.jsonl');
+  return path.join(getDataDir(), 'editor-diagnostics', 'agent-service.jsonl');
 }
 
 function safePathPart(value: string): string {

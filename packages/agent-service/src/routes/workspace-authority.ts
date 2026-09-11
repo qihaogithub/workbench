@@ -22,6 +22,7 @@ interface WorkspaceParams { projectId: string; workspaceId: string; }
 interface SessionQuery { sessionId?: string; }
 interface EventsQuery extends SessionQuery { afterRevision?: string; }
 interface ResourceParams extends WorkspaceParams { "*": string; }
+interface ReceiptParams extends WorkspaceParams { mutationId: string; }
 type RecoveryBody = Partial<WorkspaceRecoveryRebuildApiRequest>;
 
 const ERROR_STATUS: Record<WorkspaceAuthorityApiErrorCode, number> = {
@@ -168,6 +169,16 @@ export async function registerWorkspaceAuthorityRoutes(
           sessionId: request.query.sessionId,
           afterRevision,
         }) };
+      } catch (error) { return failure(reply, error); }
+    },
+  );
+
+  fastify.get<{ Params: ReceiptParams; Querystring: SessionQuery }>(
+    "/api/workspace-authority/projects/:projectId/workspaces/:workspaceId/receipts/:mutationId",
+    async (request, reply) => {
+      if (!request.query.sessionId) return failure(reply, new Error("SESSION_NOT_FOUND"));
+      try {
+        return { success: true, data: await persistence.getAuthorityMutationReceipt({ ...request.params, sessionId: request.query.sessionId }) };
       } catch (error) { return failure(reply, error); }
     },
   );

@@ -121,6 +121,7 @@ describe("ProjectAdminService", () => {
               parentId: null,
               runtimeType: "high-fidelity-react",
               reference: {
+                grantId: "grant-1",
                 sourceProjectId,
                 sourcePageId: "source-page",
               },

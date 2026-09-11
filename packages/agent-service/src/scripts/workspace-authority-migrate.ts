@@ -2,6 +2,7 @@
 
 import path from "node:path";
 
+import { getDataDir } from "../config/data-paths";
 import { migrateWorkspaceAuthorities } from "../workspace/workspace-authority-migration";
 
 function parseArgs(argv: string[]) {
@@ -14,7 +15,7 @@ function parseArgs(argv: string[]) {
     apply: boolean;
     json: boolean;
   } = {
-    dataDir: process.env.DATA_DIR || path.join(process.env.INIT_CWD || process.cwd(), "data"),
+    dataDir: getDataDir(process.env.INIT_CWD || process.cwd()),
     apply: false,
     json: false,
   };

@@ -277,12 +277,17 @@ describe('createWorkbenchTools - permissions 透传', () => {
         durationMs: 1,
       }),
     });
-    expect(tools).toHaveLength(44);
+    expect(new Set(tools.map(tool => tool.name)).size).toBe(tools.length);
     expect(tools.some(t => t.name === 'readUploadedFile')).toBe(true);
     expect(tools.some(t => t.name === 'webRead')).toBe(true);
     expect(tools.some(t => t.name === 'webSearch')).toBe(false);
     expect(tools.some(t => t.name === 'readPreinstalledSkill')).toBe(true);
     expect(tools.some(t => t.name === 'requestUserChoice')).toBe(true);
+    expect(tools.some(t => t.name === 'listTransferSourcePages')).toBe(true);
+    expect(tools.some(t => t.name === 'transferPages')).toBe(true);
+    expect(tools.some(t => t.name === 'getPageTransferStatus')).toBe(true);
+    expect(tools.some(t => t.name === 'resolvePageTransferConflicts')).toBe(true);
+    expect(tools.some(t => t.name === 'revokePageReference')).toBe(true);
     expect(tools.some(t => t.name === 'readSketchScene')).toBe(false);
     expect(tools.some(t => t.name === 'patchSketchScene')).toBe(false);
     // 通过读取工具验证：custom/path.ts 应被允许
@@ -304,7 +309,7 @@ describe('createWorkbenchTools - permissions 透传', () => {
       }),
     });
 
-    expect(tools).toHaveLength(45);
+    expect(new Set(tools.map(tool => tool.name)).size).toBe(tools.length);
     expect(tools.some(t => t.name === 'webSearch')).toBe(true);
     expect(tools.some(t => t.name === 'readUploadedFile')).toBe(true);
     expect(tools.some(t => t.name === 'readPreinstalledSkill')).toBe(true);

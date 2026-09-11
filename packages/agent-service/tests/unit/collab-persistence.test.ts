@@ -123,7 +123,7 @@ describe("WorkspaceFilePersistence", () => {
     const workspacePath = path.join(tempDir, "workspaces", "user-1", "proj-1", "ws-1");
     writeJson(path.join(workspacePath, "workspace-tree.json"), {
       pages: [
-        { id: "page-1", reference: { sourceProjectId: "source", sourcePageId: "source-page" } },
+        { id: "page-1", reference: { grantId: "grant-1", sourceProjectId: "source", sourcePageId: "source-page" } },
         { id: "template-1", isTemplatePage: true },
         { id: "normal-1" },
       ],

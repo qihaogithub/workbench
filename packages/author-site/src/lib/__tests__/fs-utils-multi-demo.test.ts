@@ -341,6 +341,34 @@ describe("多 Demo 页面 — fs-utils", () => {
       expect(page?.routeKey).toBe("landing-page");
       expect(fs.readFileSync(path.join(ws, "workspace-tree.json"), "utf-8")).toContain("routeKey");
     });
+
+    it("读取 live workspace-tree 时只在内存补齐 routeKey，不绕过 Authority 写盘", () => {
+      const demoDir = path.join(ws, "demos", "landing_1234");
+      fs.mkdirSync(demoDir, { recursive: true });
+      fs.writeFileSync(path.join(demoDir, "index.tsx"), "export default function Page() { return <div />; }", "utf-8");
+      fs.writeFileSync(path.join(demoDir, "config.schema.json"), "{}", "utf-8");
+      fs.writeFileSync(
+        path.join(ws, ".workspace.json"),
+        JSON.stringify({ scope: "live", status: "active" }),
+        "utf-8",
+      );
+      const original = JSON.stringify({
+        folders: [],
+        pages: [{
+          id: "landing_1234",
+          name: "Landing Page",
+          routeKey: "landing-page-中文后缀",
+          order: 0,
+          parentId: null,
+        }],
+      });
+      fs.writeFileSync(path.join(ws, "workspace-tree.json"), original, "utf-8");
+
+      const page = readDemoPageMeta(ws, "landing_1234");
+
+      expect(page?.routeKey).toBe("landing-page");
+      expect(fs.readFileSync(path.join(ws, "workspace-tree.json"), "utf-8")).toBe(original);
+    });
   });
 
   describe("app graph", () => {

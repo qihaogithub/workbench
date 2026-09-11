@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 
+import { getDataDir } from "../../config/data-paths";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const SUPPORTED_FORMATS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
 
@@ -62,22 +63,7 @@ let dataDirCache: string | null = null;
 
 function getRootDataDir(): string {
   if (dataDirCache) return dataDirCache;
-
-  if (process.env.DATA_DIR) {
-    dataDirCache = path.resolve(process.env.DATA_DIR);
-    return dataDirCache;
-  }
-
-  let current = path.resolve(process.cwd());
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, "pnpm-workspace.yaml"))) {
-      dataDirCache = path.join(current, "data");
-      return dataDirCache;
-    }
-    current = path.dirname(current);
-  }
-
-  dataDirCache = path.join(process.cwd(), "data");
+  dataDirCache = getDataDir();
   return dataDirCache;
 }
 

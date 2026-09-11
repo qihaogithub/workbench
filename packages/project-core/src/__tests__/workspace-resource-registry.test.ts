@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultSketchScene } from "@workbench/sketch-core";
+import { PROJECT_INVENTORY_SCHEMA_VERSION } from "@workbench/shared";
 
 import {
   createWorkspaceResourceRegistry,
@@ -34,6 +35,23 @@ describe("WorkspaceResourceRegistry", () => {
       text: true,
     });
     expect(() => registry.assertTextWrite("project.config.values.json", "{}")).not.toThrow();
+  });
+
+  it("将项目清单覆盖作为 Authority 管理的受管 JSON 资源", () => {
+    const registry = createWorkspaceResourceRegistry();
+    expect(registry.describe("project.inventory-overrides.json")).toMatchObject({
+      kind: "project-inventory-overrides",
+      text: true,
+      validation: "inventory-overrides",
+    });
+    expect(() => registry.assertTextWrite("project.inventory-overrides.json", JSON.stringify({
+      schemaVersion: PROJECT_INVENTORY_SCHEMA_VERSION,
+      entries: { "wb://page/project-1/home": { summary: "首页简介" } },
+    }))).not.toThrow();
+    expect(() => registry.assertTextWrite("project.inventory-overrides.json", JSON.stringify({
+      schemaVersion: PROJECT_INVENTORY_SCHEMA_VERSION,
+      entries: { "wb://page/project-1/home": { unexpected: true } },
+    }))).toThrow("WORKSPACE_INVALID_OPERATION");
   });
 
   it("将项目级配置联动规则作为受管 JSON 资源", () => {
@@ -201,5 +219,18 @@ describe("WorkspaceResourceRegistry", () => {
       .not.toBe(first.rootHash);
     expect(() => registry.createRootManifest({ "assets/image.png": "not-binary" })).toThrow("WORKSPACE_INVALID_OPERATION");
     expect(() => registry.createRootManifest({ "unmanaged.txt": "x" })).toThrow("WORKSPACE_INVALID_OPERATION");
+  });
+
+  it("root manifest 的路径顺序不受进程 locale 影响", () => {
+    const registry = createWorkspaceResourceRegistry();
+    const manifest = registry.createRootManifest({
+      "knowledge/未命名文档.md": "doc",
+      "knowledge/manifest.json": "{}",
+    });
+
+    expect(manifest.resources.map((entry) => entry.path)).toEqual([
+      "knowledge/manifest.json",
+      "knowledge/未命名文档.md",
+    ]);
   });
 });

@@ -13,15 +13,19 @@ describe("on-demand tool activation", () => {
     const initial = getInitialActiveToolNames(tools);
 
     expect(tools.map((tool) => tool.name)).toContain("deletePages");
+    expect(tools.map((tool) => tool.name)).toContain("transferPages");
     expect(initial).toContain("activateCapabilities");
     expect(initial).toContain("readPreinstalledSkill");
     expect(initial).toContain("readProjectReference");
     expect(initial).not.toContain("deletePages");
+    expect(initial).not.toContain("transferPages");
     expect(initial).not.toContain("figmaMcp");
   });
 
   it("does not expose author reference reads or image generation in viewer mode", () => {
-    const names = createWorkbenchTools({ sessionId: "viewer" }, undefined, { mode: "viewer-readonly" }).map(tool => tool.name);
+    const names = createWorkbenchTools({ sessionId: "viewer" }, undefined, {
+      mode: "viewer-readonly",
+    }).map((tool) => tool.name);
     expect(names).not.toContain("readProjectReference");
     expect(names).not.toContain("generateReferenceImage");
   });
@@ -31,6 +35,7 @@ describe("on-demand tool activation", () => {
 
     expect(names).toContain("writeFile");
     expect(names).toContain("deletePages");
+    expect(names).toContain("transferPages");
     expect(names).toContain("activateCapabilities");
     expect(names).toContain("readProjectReference");
     expect(tools.map((tool) => tool.name)).toContain("figmaMcp");
@@ -63,6 +68,8 @@ describe("on-demand tool activation", () => {
     });
 
     expect(result.isError).not.toBe(true);
-    expect(result.details).toMatchObject({ toolNames: ["writeFile", "editFile"] });
+    expect(result.details).toMatchObject({
+      toolNames: ["writeFile", "editFile"],
+    });
   });
 });

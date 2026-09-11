@@ -41,17 +41,15 @@ import {
 import type { BaseAgent } from "../core/agent";
 import { getConversationLedgerClient } from "../services/conversation-ledger-client";
 import { previewObservationBroker } from "../session/preview-observation-broker";
+import { getBackendProvidersManager } from "../config/backend-providers";
 
 function resolveDefaultModelId(): string {
-  const raw =
-    process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS ||
-    process.env.DEFAULT_MODEL ||
-    "";
-  const first = raw.split(",")[0]?.trim();
-  return first || "";
+  const configured = getBackendProvidersManager().getActiveModelId();
+  if (configured) return configured;
+  const provider = process.env.PI_AGENT_PROVIDER?.trim();
+  const model = process.env.PI_AGENT_MODEL?.trim();
+  return provider && model ? `${provider}/${model}` : "";
 }
-
-const DEFAULT_MODEL_ID = resolveDefaultModelId();
 
 function resolveAuthorAuthorization(
   sessionId: string,
@@ -432,7 +430,8 @@ export async function registerWebSocketRoutes(
                 projectId: authorAuthorization?.projectId || message.projectId,
                 demoId: message.demoId,
                 referencedProjects: message.referencedProjects,
-                model: requestedModelId || currentModelId || DEFAULT_MODEL_ID,
+                model:
+                  requestedModelId || currentModelId || resolveDefaultModelId(),
                 toolVersion: getWorkbenchToolCapabilities().toolVersion,
                 backendProviders: getSessionModelConfigs().get(sessionId),
                 externalAuth: getSessionExternalAuthConfigs().get(sessionId),
@@ -951,7 +950,7 @@ export async function registerWebSocketRoutes(
                 projectId: authorAuthorization.projectId || message.projectId,
                 demoId: message.demoId,
                 referencedProjects: message.referencedProjects,
-                model: currentModelId || DEFAULT_MODEL_ID,
+                model: currentModelId || resolveDefaultModelId(),
                 toolVersion: getWorkbenchToolCapabilities().toolVersion,
                 backendProviders: getSessionModelConfigs().get(resumeSessionId),
                 externalAuth:
@@ -1117,7 +1116,7 @@ export async function registerWebSocketRoutes(
                   projectId:
                     authorAuthorization?.projectId || message.projectId,
                   demoId: message.demoId,
-                  model: DEFAULT_MODEL_ID,
+                  model: resolveDefaultModelId(),
                   toolVersion: getWorkbenchToolCapabilities().toolVersion,
                   backendProviders: sessionBackendProviders,
                   externalAuth: getSessionExternalAuthConfigs().get(sessionId),

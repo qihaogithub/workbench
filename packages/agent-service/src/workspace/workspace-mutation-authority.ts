@@ -5,6 +5,7 @@ import path from "node:path";
 import { normalizeHtmlImport } from "@workbench/project-core/html-import";
 import { classifyManagedDocumentPath } from "@workbench/project-core/document-proposal";
 import {
+  compareWorkspaceResourcePaths,
   createWorkspaceResourceRegistry,
   normalizeWorkspaceResourcePath,
 } from "@workbench/project-core/workspace-resource-registry";
@@ -78,7 +79,11 @@ interface PreparedReconcileRestore {
   projectId: string;
   workspaceId: string;
   state: WorkspaceAuthorityState;
-  before: PreparedMutation["before"];
+  before: Record<string, {
+    exists: boolean;
+    hash: string | null;
+    contentBackupHash?: string;
+  }>;
   preparedAt: number;
 }
 
@@ -146,6 +151,25 @@ export class WorkspaceMutationAuthority {
       .filter((receipt) => receipt.projectId === projectId && receipt.workspaceId === workspaceId && receipt.revision > afterRevision)
       .sort((left, right) => left.revision - right.revision)
       .map((receipt) => ({ type: "workspace_mutation_committed" as const, receipt }));
+  }
+
+  async getMutationReceipt(
+    projectId: string,
+    workspaceId: string,
+    mutationId: string,
+  ): Promise<WorkspaceMutationReceipt> {
+    const state = await this.ensureStateForRead(projectId, workspaceId);
+    if (state.projectId !== projectId) throw new WorkspaceMutationAuthorityError("WORKSPACE_NOT_FOUND");
+    if (!mutationId || mutationId.includes("/") || mutationId.includes("\\") || mutationId.includes("..")) {
+      throw new WorkspaceMutationAuthorityError("INVALID_REQUEST");
+    }
+    const receiptPath = this.receiptPath(workspaceId, mutationId);
+    if (!fs.existsSync(receiptPath)) throw new WorkspaceMutationAuthorityError("WORKSPACE_RESOURCE_NOT_FOUND", "Workspace mutation receipt not found");
+    const receipt = this.readJson<WorkspaceMutationReceipt>(receiptPath);
+    if (receipt.projectId !== projectId || receipt.workspaceId !== workspaceId || receipt.mutationId !== mutationId) {
+      throw new WorkspaceMutationAuthorityError("WORKSPACE_RESOURCE_NOT_FOUND");
+    }
+    return receipt;
   }
 
   async getProjectionAcks(
@@ -408,9 +432,30 @@ export class WorkspaceMutationAuthority {
 
       const committed = this.readCommittedBackups(workspaceId, state.resourceHashes);
       const reconcileId = crypto.randomUUID();
-      const before: PreparedMutation["before"] = {};
-      for (const resourcePath of new Set([...Object.keys(actualHashes), ...Object.keys(state.resourceHashes)])) {
-        before[resourcePath] = this.readResource(workspacePath, resourcePath);
+      const reconcileBeforeDir = this.reconcileBeforeDir(workspaceId, reconcileId);
+      const changedResourcePaths = [...new Set([...Object.keys(actualHashes), ...Object.keys(state.resourceHashes)])]
+        .filter((resourcePath) => actualHashes[resourcePath] !== state.resourceHashes[resourcePath]);
+      const before: PreparedReconcileRestore["before"] = {};
+      try {
+        for (const resourcePath of changedResourcePaths) {
+          const snapshot = this.readResource(workspacePath, resourcePath);
+          before[resourcePath] = {
+            exists: snapshot.exists,
+            hash: snapshot.hash,
+            ...(snapshot.exists && snapshot.hash
+              ? { contentBackupHash: snapshot.hash }
+              : {}),
+          };
+          if (snapshot.exists && snapshot.hash) {
+            this.writeBufferAtomic(
+              path.join(reconcileBeforeDir, `${snapshot.hash}.bin`),
+              this.contentBuffer(snapshot.content),
+            );
+          }
+        }
+      } catch (error) {
+        fs.rmSync(reconcileBeforeDir, { recursive: true, force: true });
+        throw error;
       }
       const prepared: PreparedReconcileRestore = {
         reconcileId,
@@ -420,7 +465,12 @@ export class WorkspaceMutationAuthority {
         before,
         preparedAt: Date.now(),
       };
-      this.writeJsonAtomic(this.reconcilePreparedPath(workspaceId, reconcileId), prepared);
+      try {
+        this.writeJsonAtomic(this.reconcilePreparedPath(workspaceId, reconcileId), prepared);
+      } catch (error) {
+        fs.rmSync(reconcileBeforeDir, { recursive: true, force: true });
+        throw error;
+      }
 
       try {
         for (const resourcePath of Object.keys(actualHashes)) {
@@ -429,35 +479,47 @@ export class WorkspaceMutationAuthority {
           }
         }
         for (const [resourcePath, content] of Object.entries(committed)) {
-          this.writeBufferAtomic(this.resolve(workspacePath, resourcePath), content);
+          if (actualHashes[resourcePath] !== state.resourceHashes[resourcePath]) {
+            this.writeBufferAtomic(this.resolve(workspacePath, resourcePath), content);
+          }
         }
         const restoredHashes = this.readResourceHashes(workspacePath);
         const restoredRootHash = this.rootHash(restoredHashes);
-        if (restoredRootHash !== state.rootHash) {
+        if (!this.resourceHashesEqual(restoredHashes, state.resourceHashes)) {
           throw new WorkspaceMutationAuthorityError("WORKSPACE_EXTERNAL_DRIFT");
+        }
+        const reconciledState = restoredRootHash === state.rootHash
+          ? state
+          : { ...state, rootHash: restoredRootHash, updatedAt: Date.now() };
+        if (reconciledState !== state) {
+          this.writeJsonAtomic(this.statePath(workspaceId), reconciledState);
         }
         this.writeJsonAtomic(this.reconcileReceiptPath(workspaceId, reconcileId), {
           reconcileId,
           mode: "restore",
           projectId,
           workspaceId,
-          revision: state.revision,
-          rootHash: state.rootHash,
+          revision: reconciledState.revision,
+          rootHash: reconciledState.rootHash,
           restoredAt: Date.now(),
         });
         this.appendJournal(workspaceId, {
           type: "reconciled",
           mode: "restore",
           at: Date.now(),
-          revision: state.revision,
+          revision: reconciledState.revision,
           reconcileId,
           previousActualRootHash: actualRootHash,
         });
         fs.rmSync(this.reconcilePreparedPath(workspaceId, reconcileId), { force: true });
-        return state;
+        fs.rmSync(reconcileBeforeDir, { recursive: true, force: true });
+        return reconciledState;
       } catch (error) {
-        this.restoreResourceSnapshot(before, workspacePath);
+        this.restoreReconcileResourceSnapshot(before, workspacePath, reconcileBeforeDir);
+        this.writeJsonAtomic(this.statePath(workspaceId), state);
+        fs.rmSync(this.reconcileReceiptPath(workspaceId, reconcileId), { force: true });
         fs.rmSync(this.reconcilePreparedPath(workspaceId, reconcileId), { force: true });
+        fs.rmSync(reconcileBeforeDir, { recursive: true, force: true });
         this.appendJournal(workspaceId, { type: "rolled_back", mode: "restore", at: Date.now(), reconcileId });
         throw error;
       }
@@ -1497,6 +1559,27 @@ export class WorkspaceMutationAuthority {
     }
   }
 
+  private restoreReconcileResourceSnapshot(
+    before: PreparedReconcileRestore["before"],
+    workspacePath: string,
+    beforeDir: string,
+  ): void {
+    for (const [resourcePath, value] of Object.entries(before)) {
+      const target = this.resolve(workspacePath, resourcePath);
+      if (value.exists) {
+        if (!value.contentBackupHash) {
+          throw new WorkspaceMutationAuthorityError("WORKSPACE_MUTATION_FAILED");
+        }
+        this.writeBufferAtomic(
+          target,
+          fs.readFileSync(path.join(beforeDir, `${value.contentBackupHash}.bin`)),
+        );
+      } else {
+        fs.rmSync(target, { force: true });
+      }
+    }
+  }
+
   private assertExpected(value: PreparedMutation["before"][string], expectedHash: string | undefined, expectedAbsent: boolean | undefined, resourcePath: string): void {
     if ((expectedAbsent && value.exists) || (!expectedAbsent && expectedHash !== undefined && value.hash !== expectedHash)) {
       throw new WorkspaceMutationAuthorityError("WORKSPACE_RESOURCE_CONFLICT", "Workspace resource conflict", { path: resourcePath, currentHash: value.hash });
@@ -1529,7 +1612,14 @@ export class WorkspaceMutationAuthority {
   }
 
   private rootHash(hashes: Record<string, string>): string {
-    return hashWorkspaceContent(Object.entries(hashes).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key}:${value}`).join("\n"));
+    return hashWorkspaceContent(Object.entries(hashes).sort(([left], [right]) => compareWorkspaceResourcePaths(left, right)).map(([key, value]) => `${key}:${value}`).join("\n"));
+  }
+
+  private resourceHashesEqual(left: Record<string, string>, right: Record<string, string>): boolean {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+    return leftKeys.length === rightKeys.length
+      && leftKeys.every((resourcePath) => left[resourcePath] === right[resourcePath]);
   }
 
   private readResource(workspacePath: string, resourcePath: string): PreparedMutation["before"][string] {
@@ -1651,6 +1741,7 @@ export class WorkspaceMutationAuthority {
   private stagingPath(workspaceId: string, stagingId: string): string { return path.join(this.authorityDir(workspaceId), "staging", `${stagingId}.bin`); }
   private backupPath(workspaceId: string, hash: string): string { return path.join(this.authorityDir(workspaceId), "backups", `${hash}.bin`); }
   private reconcilePreparedPath(workspaceId: string, reconcileId: string): string { return path.join(this.authorityDir(workspaceId), "reconcile-prepared", `${reconcileId}.json`); }
+  private reconcileBeforeDir(workspaceId: string, reconcileId: string): string { return path.join(this.authorityDir(workspaceId), "reconcile-prepared", `${reconcileId}.before`); }
   private reconcileReceiptPath(workspaceId: string, reconcileId: string): string { return path.join(this.authorityDir(workspaceId), "reconcile-receipts", `${reconcileId}.json`); }
   private readState(workspaceId: string): WorkspaceAuthorityState | null { const file = this.statePath(workspaceId); return fs.existsSync(file) ? this.readJson<WorkspaceAuthorityState>(file) : null; }
   private readJson<T>(file: string): T { return JSON.parse(fs.readFileSync(file, "utf-8")) as T; }
@@ -1945,9 +2036,11 @@ export class WorkspaceMutationAuthority {
       const file = path.join(directory, entry.name);
       const prepared = this.readJson<PreparedReconcileRestore>(file);
       const receiptPath = this.reconcileReceiptPath(workspaceId, prepared.reconcileId);
+      const beforeDir = this.reconcileBeforeDir(workspaceId, prepared.reconcileId);
       let outcome: "rolled_back" | "committed_cleanup";
       if (!fs.existsSync(receiptPath)) {
-        this.restoreResourceSnapshot(prepared.before, workspacePath);
+        this.restoreReconcileResourceSnapshot(prepared.before, workspacePath, beforeDir);
+        this.writeJsonAtomic(this.statePath(workspaceId), prepared.state);
         outcome = "rolled_back";
         result.rolledBackCount += 1;
       } else {
@@ -1981,6 +2074,7 @@ export class WorkspaceMutationAuthority {
         payload: { mode: "reconcile_restore", outcome, revision: prepared.state.revision },
       });
       fs.rmSync(file, { force: true });
+      fs.rmSync(beforeDir, { recursive: true, force: true });
       result.recoveredCount += 1;
     }
     return result;

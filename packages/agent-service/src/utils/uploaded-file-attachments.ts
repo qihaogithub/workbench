@@ -2,6 +2,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 
+import { getDataDir } from "../config/data-paths";
 import type { FileAttachment } from "../core/types";
 
 export const AI_ATTACHMENT_MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -42,19 +43,6 @@ export class AttachmentUploadError extends Error {
   ) {
     super(message);
   }
-}
-
-function findProjectRoot(startDir: string): string {
-  let directory = startDir;
-  while (directory !== path.dirname(directory)) {
-    if (fs.existsSync(path.join(directory, "pnpm-workspace.yaml"))) return directory;
-    directory = path.dirname(directory);
-  }
-  return startDir;
-}
-
-function getDataDir(): string {
-  return process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
 }
 
 function sanitizeFilename(value: string): string {

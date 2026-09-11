@@ -1,5 +1,9 @@
 import { PreviewRuntimeContractError, type RuntimeContractIssue } from '@workbench/preview-contract/runtime';
 import { compilePreviewPageSource } from '@workbench/preview-contract/compiler';
+import {
+  MAX_PROTOTYPE_CSS_LENGTH,
+  MAX_PROTOTYPE_HTML_LENGTH,
+} from '@workbench/prototype-core';
 import { checkConfigSchemaAgainstPrototype } from '@workbench/shared/demo/config-runtime-compatibility';
 import { resolvePagePresentation } from '@workbench/shared';
 import { validateConfigSchemaContract } from './schema-contract-validation';
@@ -88,8 +92,6 @@ function toToolIssue(file: string, pageId: string, issue: RuntimeContractIssue, 
   return result;
 }
 
-const MAX_PROTOTYPE_HTML_LENGTH = 2_000_000;
-const MAX_PROTOTYPE_CSS_LENGTH = 120_000;
 const PROTOTYPE_GLOBAL_SELECTOR_RE = /(^|[,{;]\s*)(html|body|:root)\b/i;
 
 function toPrototypeToolValidation(

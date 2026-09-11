@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { getDataDir } from "../../config/data-paths";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import {
   createWorkspaceResourceRegistry,
@@ -192,13 +193,13 @@ interface DraftRecordWithApproval extends DraftRecord {
 }
 
 function failedDraftDirectory(workspaceId: string): string {
-  const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
+  const dataDir = getDataDir();
   const workspaceKey = crypto.createHash("sha256").update(workspaceId).digest("hex").slice(0, 32);
   return path.join(dataDir, "agent-visibility-drafts", workspaceKey, "failed");
 }
 
 function approvalDirectory(workspaceId: string): string {
-  const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
+  const dataDir = getDataDir();
   const workspaceKey = crypto.createHash("sha256").update(workspaceId).digest("hex").slice(0, 32);
   return path.join(dataDir, "agent-visibility-drafts", workspaceKey, "approvals");
 }

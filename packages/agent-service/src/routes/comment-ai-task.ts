@@ -38,6 +38,7 @@ import { broadcastCommentEvent } from "./comments-ws";
 import { projectWorkspaceManager } from "../workspace/project-workspace-manager";
 import { discoverLiveWorkspaces } from "../workspace/workspace-authority-migration";
 import { logger } from "../utils/logger";
+import { getBackendProvidersManager } from "../config/backend-providers";
 
 const TOKEN_HEADER = "x-internal-token";
 
@@ -49,12 +50,11 @@ const MAX_BATCH_ITERATIONS = 20;
 const PROCESSING_STALE_MS = 5 * 60 * 1000;
 
 function resolveDefaultModelId(): string {
-  const raw =
-    process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS ||
-    process.env.DEFAULT_MODEL ||
-    "";
-  const first = raw.split(",")[0]?.trim();
-  return first || "";
+  const configured = getBackendProvidersManager().getActiveModelId();
+  if (configured) return configured;
+  const provider = process.env.PI_AGENT_PROVIDER?.trim();
+  const model = process.env.PI_AGENT_MODEL?.trim();
+  return provider && model ? `${provider}/${model}` : "";
 }
 
 interface CommentTaskSession {
