@@ -13,7 +13,7 @@ index 9f9623b7a7338976203d38aca92163d2eb0d4b89..25b460dafaa96a630f8fb1a71cb916c8
 +  const open = ref(false)
 +  let observer
 +  let frame = 0
-+  const labels = { 'document-heading': '标题样式', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
++  const labels = { 'document-heading': '标题样式', 'document-insert': '插入', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
 +  function close(focus = false) {
 +    open.value = false
 +    if (focus) root.value?.querySelector('.top-bar-more')?.focus()
@@ -155,7 +155,7 @@ index 3acfaf245b6c30ec2a0bb46c9fe93b7ae4362f1d..48740e1eace759b146e48e98f5038787
 +  const open = ref(false)
 +  let observer
 +  let frame = 0
-+  const labels = { 'document-heading': '标题样式', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
++  const labels = { 'document-heading': '标题样式', 'document-insert': '插入', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
 +  function close(focus = false) {
 +    open.value = false
 +    if (focus) root.value?.querySelector('.top-bar-more')?.focus()
@@ -297,7 +297,7 @@ index 82fd0fd68e17dec4394169ffb0d26d03366b3d56..3f5a6c5fa86cae5fcf8da0e0ea9005a6
 +  const open = ref(false)
 +  let observer
 +  let frame = 0
-+  const labels = { 'document-heading': '标题样式', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
++  const labels = { 'document-heading': '标题样式', 'document-insert': '插入', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
 +  function close(focus = false) {
 +    open.value = false
 +    if (focus) root.value?.querySelector('.top-bar-more')?.focus()
@@ -439,7 +439,7 @@ index f17d9b1e95303427378d444861a4307733dc0e0d..a0be4a9f2762ac1b58f6b887d36e1782
 +  const open = ref(false)
 +  let observer
 +  let frame = 0
-+  const labels = { 'document-heading': '标题样式', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
++  const labels = { 'document-heading': '标题样式', 'document-insert': '插入', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
 +  function close(focus = false) {
 +    open.value = false
 +    if (focus) root.value?.querySelector('.top-bar-more')?.focus()
@@ -624,7 +624,7 @@ index 0000000000000000000000000000000000000000..db9723e7f844cb9b3e6ee6ac38231b51
 +  const open = ref(false)
 +  let observer
 +  let frame = 0
-+  const labels = { 'document-heading': '标题样式', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
++  const labels = { 'document-heading': '标题样式', 'document-insert': '插入', bold: '加粗', italic: '斜体', strikethrough: '删除线', code: '行内代码', 'bullet-list': '无序列表', 'ordered-list': '有序列表', 'task-list': '任务列表', link: '链接', image: '图片', table: '表格', 'code-block': '代码块', math: '公式', quote: '引用', hr: '分隔线' }
 +  function close(focus = false) {
 +    open.value = false
 +    if (focus) root.value?.querySelector('.top-bar-more')?.focus()
