@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { requireSecret } from "@workbench/runtime-config/secrets";
 
 import type {
   DingtalkExternalAuthCredential,
@@ -16,7 +17,7 @@ const PROVIDERS: ExternalAuthProvider[] = ["figma", "dingtalk"];
 const FIGMA_REFRESH_URL = "https://api.figma.com/v1/oauth/refresh";
 const FIGMA_REFRESH_WINDOW_MS = 5 * 60 * 1000;
 
-type ExternalAuthCredential =
+export type ExternalAuthCredential =
   | FigmaExternalAuthCredential
   | DingtalkExternalAuthCredential;
 
@@ -57,15 +58,13 @@ export interface ExternalAuthUpsertInput {
 }
 
 function getEncryptionKey(): Buffer {
-  const secret =
-    process.env.MODEL_CONFIG_ENCRYPTION_KEY ||
-    process.env.JWT_SECRET ||
-    "change-me-in-production";
-
-  return crypto.createHash("sha256").update(secret).digest();
+  return crypto
+    .createHash("sha256")
+    .update(requireSecret("EXTERNAL_AUTH_ENCRYPTION_KEY"))
+    .digest();
 }
 
-function encryptCredential(credential: ExternalAuthCredential): string {
+export function encryptExternalAuthCredential(credential: ExternalAuthCredential): string {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", getEncryptionKey(), iv);
   const encrypted = Buffer.concat([
@@ -82,7 +81,7 @@ function encryptCredential(credential: ExternalAuthCredential): string {
   ].join(":");
 }
 
-function decryptCredential(value: string): ExternalAuthCredential {
+export function decryptExternalAuthCredential(value: string): ExternalAuthCredential {
   const [version, ivRaw, tagRaw, encryptedRaw] = value.split(":");
   if (version !== ENCRYPTION_VERSION || !ivRaw || !tagRaw || !encryptedRaw) {
     throw new Error("外部授权加密格式无效");
@@ -164,7 +163,7 @@ export function upsertExternalAuthConfig(
       input.status === "connected" ? existing?.connectedAt ?? now : existing?.connectedAt,
     expiresAt: input.expiresAt,
     encryptedCredential: input.credential
-      ? encryptCredential(input.credential)
+      ? encryptExternalAuthCredential(input.credential)
       : existing?.encryptedCredential,
     message: input.message,
   };
@@ -208,7 +207,7 @@ export function readExternalAuthSessionConfig(
   const config: ExternalAuthSessionConfig = {};
 
   if (figma?.status === "connected" && figma.encryptedCredential) {
-    const credential = decryptCredential(
+    const credential = decryptExternalAuthCredential(
       figma.encryptedCredential,
     ) as FigmaExternalAuthCredential;
     if (!figma.expiresAt || figma.expiresAt > Date.now()) {
@@ -222,7 +221,7 @@ export function readExternalAuthSessionConfig(
   }
 
   if (dingtalk?.status === "connected" && dingtalk.encryptedCredential) {
-    const credential = decryptCredential(
+    const credential = decryptExternalAuthCredential(
       dingtalk.encryptedCredential,
     ) as DingtalkExternalAuthCredential;
     config.dingtalk = {
@@ -341,7 +340,7 @@ export async function readExternalAuthSessionConfigWithRefresh(
     return config;
   }
 
-  const credential = decryptCredential(
+  const credential = decryptExternalAuthCredential(
     figma.encryptedCredential,
   ) as FigmaExternalAuthCredential;
   const refreshed = await refreshFigmaCredential(userId, figma, credential);

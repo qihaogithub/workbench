@@ -18,8 +18,7 @@ describe("user model config", () => {
     jest.resetModules();
     dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "ow-user-model-"));
     process.env.DATA_DIR = dataDir;
-    process.env.JWT_SECRET = "test-secret";
-    delete process.env.MODEL_CONFIG_ENCRYPTION_KEY;
+    process.env.MODEL_CONFIG_ENCRYPTION_KEY = "test-model-config-secret";
   });
 
   afterEach(async () => {
@@ -27,6 +26,7 @@ describe("user model config", () => {
     closeDb();
     fs.rmSync(dataDir, { recursive: true, force: true });
     delete process.env.DATA_DIR;
+    delete process.env.MODEL_CONFIG_ENCRYPTION_KEY;
   });
 
   it("saves encrypted API key and returns only safe config", async () => {

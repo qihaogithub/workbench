@@ -16,6 +16,9 @@ export interface AuthorContextIntegration {
   fetchContextPrefix(
     workingDir: string,
     pageId?: string,
+    projectId?: string,
+    sessionId?: string,
+    question?: string,
   ): Promise<{
     l3: string;
     memoryPrefix: string | null;

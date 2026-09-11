@@ -7,6 +7,7 @@ import {
 } from "./agent-providers";
 import { readDbConfigWithMeta } from "./db-config";
 import { getServerAgentServiceUrl } from "./runtime-config";
+import { hydrateBackendProviders } from "./global-model-secrets";
 
 const CONFIG_ID = "model_config";
 const STARTUP_SYNC_DELAY_MS = 3000;
@@ -117,9 +118,17 @@ function summarizeConfig(
 export function readStoredBackendProvidersConfig(): StoredBackendProviders {
   const entry = readDbConfigWithMeta(CONFIG_ID);
   const rawConfig = entry?.config?.backendProviders;
-  const config = isBackendProvidersConfig(rawConfig)
-    ? rawConfig
-    : null;
+  let config: BackendProvidersConfig | null = null;
+  try {
+    config = isBackendProvidersConfig(rawConfig)
+      ? hydrateBackendProviders(rawConfig) ?? null
+      : null;
+  } catch (error) {
+    console.warn(
+      "[BackendProviders Sync] Stored credentials require reset:",
+      error instanceof Error ? error.message : error,
+    );
+  }
 
   return {
     config,

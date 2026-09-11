@@ -193,6 +193,7 @@ export default function LoginPage() {
     toast({
       title: "无法拉起钉钉登录",
       description:
+        dingtalkConfig.message ||
         "请配置 DINGTALK_LOGIN_REDIRECT_URI，或在钉钉工作台内打开应用",
       variant: "destructive",
     });

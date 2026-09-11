@@ -321,12 +321,18 @@ export class StreamService {
       let ctx = await authorContext.fetchContextPrefix(
         workingDir,
         hasDemoId ? demoId : undefined,
+        projectId,
+        this.currentSessionId,
+        rawUserMessage,
       );
       if (!ctx.l3 && !ctx.memoryPrefix && !ctx.knowledgePrefix) {
         await new Promise((r) => setTimeout(r, 200));
         ctx = await authorContext.fetchContextPrefix(
           workingDir,
           hasDemoId ? demoId : undefined,
+          projectId,
+          this.currentSessionId,
+          rawUserMessage,
         );
       }
       if (ctx.l3) {

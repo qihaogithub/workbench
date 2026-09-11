@@ -1,107 +1,93 @@
 import { NextRequest } from "next/server";
 
-jest.mock("@/lib/auth/jwt", () => ({
-  createToken: jest.fn(),
-  setAuthCookieOnResponse: jest.fn(),
-}));
-jest.mock("@/lib/user", () => ({
-  findOrCreateUserByDingtalkIdentity: jest.fn(),
-}));
 jest.mock("@/lib/dingtalk-login", () => ({
   exchangeDingtalkBrowserAuthCode: jest.fn(),
-  readDingtalkLoginConfig: jest.fn(() => ({
-    redirectUri: process.env.DINGTALK_LOGIN_REDIRECT_URI,
-  })),
 }));
 
 describe("DingTalk browser OAuth callback route", () => {
-  const previousState = process.env.DINGTALK_LOGIN_REDIRECT_URI;
+  const envKeys = [
+    "DINGTALK_LOGIN_TARGET_ID",
+    "DINGTALK_LOGIN_HANDOFF_SECRET",
+    "DINGTALK_LOGIN_TARGETS_JSON",
+  ];
+  const previousValues = new Map<string, string | undefined>();
 
   beforeEach(() => {
     jest.resetModules();
-    process.env.DINGTALK_LOGIN_REDIRECT_URI =
-      "http://localhost:4200/api/auth/dingtalk/callback";
+    for (const key of envKeys) previousValues.set(key, process.env[key]);
+    process.env.DINGTALK_LOGIN_TARGET_ID = "hub";
+    process.env.DINGTALK_LOGIN_HANDOFF_SECRET =
+      "test-handoff-secret-with-at-least-32-bytes";
+    process.env.DINGTALK_LOGIN_TARGETS_JSON = JSON.stringify({
+      dev: "http://10.0.0.11:4200",
+    });
   });
 
   afterEach(() => {
-    if (previousState === undefined) delete process.env.DINGTALK_LOGIN_REDIRECT_URI;
-    else process.env.DINGTALK_LOGIN_REDIRECT_URI = previousState;
+    for (const key of envKeys) {
+      const value = previousValues.get(key);
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
-  it("rejects a callback whose OAuth state does not match the saved state", async () => {
+  it("rejects a callback whose signed OAuth state is invalid", async () => {
     const { GET } = await import("./route");
     const request = new NextRequest(
       "http://localhost:4200/api/auth/dingtalk/callback?authCode=code&state=wrong",
-      {
-        headers: {
-          cookie:
-            "dingtalk_oauth_state=expected; dingtalk_oauth_redirect=%2Fworkbench",
-        },
-      },
     );
 
     const response = await GET(request);
-    const location = response.headers.get("location");
-    expect(response.status).toBe(307);
-    expect(location).toBe(
-      "http://localhost:4200/login?redirect=%2Fworkbench&dingtalkError=%E9%92%89%E9%92%89%E6%8E%88%E6%9D%83%E7%8A%B6%E6%80%81%E5%B7%B2%E5%A4%B1%E6%95%88%EF%BC%8C%E8%AF%B7%E9%87%8D%E6%96%B0%E7%99%BB%E5%BD%95",
-    );
+    expect(response.status).toBe(400);
   });
 
-  it("creates a local session and returns to the saved path after OAuth", async () => {
+  it("exchanges the code and hands the safe profile to the target environment", async () => {
     const { GET } = await import("./route");
     const { exchangeDingtalkBrowserAuthCode } = await import(
       "@/lib/dingtalk-login"
     );
-    const { createToken, setAuthCookieOnResponse } = await import(
-      "@/lib/auth/jwt"
-    );
-    const { findOrCreateUserByDingtalkIdentity } = await import("@/lib/user");
+    const {
+      createDingtalkOAuthState,
+      verifyDingtalkLoginHandoff,
+    } = await import("@/lib/dingtalk-login-handoff");
 
     (exchangeDingtalkBrowserAuthCode as jest.Mock).mockResolvedValue({
       corpId: "ding-corp",
       dingtalkUserId: "openid-1",
       unionId: "union-1",
       name: "Ding User",
-      raw: {},
+      raw: { accessToken: "must-not-leak" },
     });
-    (findOrCreateUserByDingtalkIdentity as jest.Mock).mockResolvedValue({
-      created: true,
-      identity: { id: "identity-1" },
-      user: { id: "user-1", username: "dt_user_1", role: "editor" },
-    });
-    (createToken as jest.Mock).mockResolvedValue("jwt-token");
+    process.env.DINGTALK_LOGIN_TARGET_ID = "dev";
+    const { state } = await createDingtalkOAuthState("/demo/project-1");
+    process.env.DINGTALK_LOGIN_TARGET_ID = "hub";
 
     const request = new NextRequest(
-      "http://localhost:4200/api/auth/dingtalk/callback?authCode=browser-code&state=expected",
-      {
-        headers: {
-          cookie:
-            "dingtalk_oauth_state=expected; dingtalk_oauth_redirect=%2Fdemo%2Fproject-1",
-        },
-      },
+      `http://localhost:4200/api/auth/dingtalk/callback?authCode=browser-code&state=${encodeURIComponent(state)}`,
     );
-
     const response = await GET(request);
+
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe(
-      "http://localhost:4200/demo/project-1",
+    const location = new URL(response.headers.get("location")!);
+    expect(location.origin + location.pathname).toBe(
+      "http://10.0.0.11:4200/api/auth/dingtalk/complete",
     );
-    expect(exchangeDingtalkBrowserAuthCode).toHaveBeenCalledWith(
-      "browser-code",
-    );
-    expect(findOrCreateUserByDingtalkIdentity).toHaveBeenCalledWith(
-      expect.objectContaining({
+    const handoff = location.searchParams.get("handoff");
+    expect(handoff).toBeTruthy();
+    await expect(
+      verifyDingtalkLoginHandoff(handoff!, "dev"),
+    ).resolves.toMatchObject({
+      targetId: "dev",
+      redirectPath: "/demo/project-1",
+      profile: {
         corpId: "ding-corp",
         unionId: "union-1",
         dingtalkUserId: "openid-1",
-      }),
-    );
-    expect(createToken).toHaveBeenCalledWith({
-      userId: "user-1",
-      username: "dt_user_1",
-      role: "editor",
+        name: "Ding User",
+      },
     });
-    expect(setAuthCookieOnResponse).toHaveBeenCalledWith(response, "jwt-token");
+    expect(exchangeDingtalkBrowserAuthCode).toHaveBeenCalledWith(
+      "browser-code",
+    );
   });
 });

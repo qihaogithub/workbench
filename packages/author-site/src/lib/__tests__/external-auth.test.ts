@@ -18,8 +18,7 @@ describe("external auth config", () => {
     jest.resetModules();
     dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "ow-external-auth-"));
     process.env.DATA_DIR = dataDir;
-    process.env.JWT_SECRET = "test-secret";
-    delete process.env.MODEL_CONFIG_ENCRYPTION_KEY;
+    process.env.EXTERNAL_AUTH_ENCRYPTION_KEY = "test-external-auth-secret";
   });
 
   afterEach(async () => {
@@ -29,6 +28,7 @@ describe("external auth config", () => {
     jest.restoreAllMocks();
     Reflect.deleteProperty(global, "fetch");
     delete process.env.DATA_DIR;
+    delete process.env.EXTERNAL_AUTH_ENCRYPTION_KEY;
     delete process.env.FIGMA_OAUTH_CLIENT_ID;
     delete process.env.FIGMA_OAUTH_CLIENT_SECRET;
   });

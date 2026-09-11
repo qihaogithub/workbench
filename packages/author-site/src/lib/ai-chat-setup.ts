@@ -17,6 +17,9 @@ import {
 async function fetchContextPrefix(
   workingDir: string,
   pageId?: string,
+  projectId?: string,
+  sessionId?: string,
+  question?: string,
 ): Promise<{
   l3: string;
   memoryPrefix: string | null;
@@ -27,6 +30,9 @@ async function fetchContextPrefix(
   try {
     const params = new URLSearchParams({ workingDir });
     if (pageId) params.set("pageId", pageId);
+    if (projectId) params.set("projectId", projectId);
+    if (sessionId) params.set("sessionId", sessionId);
+    if (question) params.set("question", question.slice(0, 512));
     const response = await fetch(
       `/api/agent/workspace-context?${params.toString()}`,
       { method: "GET" },
@@ -60,9 +66,11 @@ async function fetchContextPrefix(
     const memoryPrefix = json.data.memoryContent
       ? buildMemoryPrefix(json.data.memoryContent)
       : null;
-    const knowledgePrefix = json.data.knowledgeIndex
-      ? buildKnowledgeIndexPrefix(json.data.knowledgeIndex)
-      : null;
+    const knowledgePrefix = json.data.inventoryPrefix
+      ? null
+      : json.data.knowledgeIndex
+        ? buildKnowledgeIndexPrefix(json.data.knowledgeIndex)
+        : null;
     const conventionPrefix = buildConventionPrefix(json.data.conventionContent);
     const pageConventionPrefix = buildPageConventionPrefix(
       json.data.pageConventionContent,

@@ -1,10 +1,9 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies, headers } from "next/headers";
+import { requireSecret } from "@workbench/runtime-config/secrets";
 
 function getSecret(): Uint8Array {
-  return new TextEncoder().encode(
-    process.env.JWT_SECRET || "change-me-in-production",
-  );
+  return new TextEncoder().encode(requireSecret("JWT_SECRET"));
 }
 
 export function getAuthCookieName(): string {

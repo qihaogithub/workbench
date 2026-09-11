@@ -103,9 +103,7 @@ describe("useChatModels", () => {
           frontend: {
             enabledModels: ["custom/default", "custom/preferred"],
             autoEnableRules: [],
-            allowedPrefixes: ["custom/"],
-            blacklist: [],
-            nameFilters: [],
+            excludedModels: [],
           },
           multimodalModels: [],
         },

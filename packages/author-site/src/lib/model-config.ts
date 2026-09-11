@@ -1,212 +1,248 @@
 /**
- * 模型配置读取层
+ * 全局模型配置读取层。
  *
- * 优先从数据库读取配置(管理后台动态配置)
- * Fallback 到环境变量(保持向后兼容)
- *
- * 支持缓存机制,避免频繁读取数据库
+ * 数据库是运行时主来源；数据库没有可用的 canonical 配置时，使用
+ * PI_AGENT_PROVIDERS 或 PI_AGENT_PROVIDER/PI_AGENT_MODEL 生成完整 fallback。
+ * 前端策略只允许 enabledModels、autoEnableRules、excludedModels 三个字段。
  */
 
 import { readDbConfig } from "./db-config";
-import { getModelEnvConfig } from "./runtime-config";
+import {
+  DEFAULT_IMAGE_GEN_CONFIG as RUNTIME_IMAGE_GEN_DEFAULTS,
+  type AutoEnableRule,
+  type FrontendModelPolicy,
+  type ImageGenConfig as RuntimeImageGenConfig,
+} from "@workbench/runtime-config/model";
+import {
+  hydrateBackendProviders,
+  hydrateImageGen,
+} from "./global-model-secrets";
 import type { BackendProvidersConfig } from "@workbench/shared";
 
 const CONFIG_ID = "model_config";
-const CACHE_TTL = 60 * 1000; // 1 分钟缓存
+const CACHE_TTL = 60 * 1000;
+
+export type { AutoEnableRule } from "@workbench/runtime-config/model";
+export type ImageGenConfig = RuntimeImageGenConfig & { apiKey: string };
+export type FrontendModelConfig = {
+  -readonly [Key in keyof FrontendModelPolicy]: FrontendModelPolicy[Key];
+};
+
+export interface ModelConfigData {
+  frontend: FrontendModelConfig;
+  backendProviders?: BackendProvidersConfig;
+  imageGen?: ImageGenConfig;
+}
+
+export const DEFAULT_IMAGE_GEN_CONFIG: ImageGenConfig = {
+  ...RUNTIME_IMAGE_GEN_DEFAULTS,
+  apiKey: "",
+};
 
 interface CachedConfig {
   data: ModelConfigData;
   lastFetched: number;
 }
 
-/**
- * 自动启用规则
- *
- * - type="prefix"     : 按分组前缀匹配,如 "xjjj/"
- * - type="nameFilter": 按分组+关键词匹配,格式 "分组:关键词",如 "workbench:Free"
- */
-export type AutoEnableRule =
-  | { type: "prefix"; value: string }
-  | { type: "nameFilter"; value: string };
-
-export interface ModelConfigData {
-  frontend: {
-    /** 启用并按优先级排序的模型 ID 列表(新结构,顺序即优先级) */
-    enabledModels?: string[];
-    /** 自动启用规则(新结构,匹配的新发现模型自动启用) */
-    autoEnableRules?: AutoEnableRule[];
-    /** @deprecated 旧结构: 白名单分组前缀,从 autoEnableRules type=prefix 兼容 */
-    allowedPrefixes: string[];
-    /** @deprecated 旧结构: 黑名单模型 ID,启用列表模式时为空 */
-    blacklist: string[];
-    /** @deprecated 旧结构: 默认模型 ID 列表,启用列表模式时等于 enabledModels */
-    defaultModelIds: string[];
-    /** @deprecated 旧结构: 名称过滤器,从 autoEnableRules type=nameFilter 兼容 */
-    nameFilters: string[];
-  };
-  /**
-   * AI 后端供应商配置(用于 agent-service 的 LLM 后端)
-   * 字段缺失时视为空(agent-service 走 .env PI_AGENT_PROVIDERS fallback)
-   */
-  backendProviders?: BackendProvidersConfig;
-}
-
 let cachedConfig: CachedConfig | null = null;
 
-/**
- * 从环境变量读取配置 (Fallback)
- */
-function readFromEnv(): ModelConfigData {
-  const { allowedPrefixes, nameFilters, defaultModelIds, blacklist } =
-    getModelEnvConfig();
+function uniqueStrings(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+}
 
+function normalizeRules(value: unknown): AutoEnableRule[] {
+  if (!Array.isArray(value)) return [];
+  const rules: AutoEnableRule[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const rule = item as { type?: unknown; value?: unknown };
+    if (
+      (rule.type !== "prefix" && rule.type !== "nameFilter") ||
+      typeof rule.value !== "string" ||
+      !rule.value.trim()
+    ) {
+      continue;
+    }
+    const normalized = rule.value.trim();
+    const key = `${rule.type}:${normalized}`;
+    if (!seen.has(key)) {
+      rules.push({ type: rule.type, value: normalized });
+      seen.add(key);
+    }
+  }
+  return rules;
+}
+
+export function normalizeFrontendModelConfig(value: unknown): FrontendModelConfig {
+  const frontend =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
   return {
-    frontend: {
-      // 新结构: 从环境变量反向转换
-      enabledModels: defaultModelIds,
-      autoEnableRules: [
-        ...allowedPrefixes.map((v) => ({ type: "prefix" as const, value: v })),
-        ...nameFilters.map((v) => ({ type: "nameFilter" as const, value: v })),
-      ],
-      // 旧结构: 原样保留
-      allowedPrefixes,
-      blacklist,
-      defaultModelIds,
-      nameFilters,
-    },
+    enabledModels: uniqueStrings(frontend.enabledModels),
+    autoEnableRules: normalizeRules(frontend.autoEnableRules),
+    excludedModels: uniqueStrings(frontend.excludedModels),
   };
 }
 
-/**
- * 将数据库原始配置规范化为完整 ModelConfigData
- *
- * 兼容规则:
- * - 如果包含 enabledModels / autoEnableRules, 保留并据此生成旧字段
- * - 如果仅有旧字段, 反向转换为 enabledModels / autoEnableRules
- * - 确保两种模式都能被下游代码消费
- */
-function normalizeConfig(dbConfig: Record<string, any>): ModelConfigData {
-  const frontend = dbConfig.frontend || {};
-  const backendProviders: BackendProvidersConfig | undefined =
-    dbConfig.backendProviders &&
-    Array.isArray(dbConfig.backendProviders.providers)
-      ? (dbConfig.backendProviders as BackendProvidersConfig)
+function normalizeBackendProviders(
+  value: unknown,
+): BackendProvidersConfig | undefined {
+  return hydrateBackendProviders(value);
+}
+
+function normalizeImageGen(value: unknown): ImageGenConfig | undefined {
+  const hydrated = hydrateImageGen(value);
+  if (!hydrated) return undefined;
+  return {
+    ...DEFAULT_IMAGE_GEN_CONFIG,
+    ...hydrated,
+  };
+}
+
+function parseProvidersFromEnv(): BackendProvidersConfig {
+  const raw = process.env.PI_AGENT_PROVIDERS?.trim();
+  const providers: Array<BackendProvidersConfig["providers"][number]> = [];
+
+  if (raw) {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (!item || typeof item !== "object") continue;
+          const provider = item as Record<string, unknown>;
+          const id = typeof provider.id === "string" ? provider.id.trim() : "";
+          const baseURL =
+            typeof provider.baseURL === "string" ? provider.baseURL.trim() : "";
+          const models = uniqueStrings(provider.models);
+          if (!id || !baseURL || models.length === 0) continue;
+          providers.push({
+            id,
+            name:
+              typeof provider.name === "string" && provider.name.trim()
+                ? provider.name.trim()
+                : id,
+            baseURL,
+            apiKey: typeof provider.apiKey === "string" ? provider.apiKey : "",
+            models,
+            defaultModel:
+              typeof provider.defaultModel === "string"
+                ? provider.defaultModel
+                : undefined,
+            enabled: provider.enabled !== false,
+            contextWindow:
+              typeof provider.contextWindow === "number"
+                ? provider.contextWindow
+                : undefined,
+            maxTokens:
+              typeof provider.maxTokens === "number"
+                ? provider.maxTokens
+                : undefined,
+          });
+        }
+      }
+    } catch {
+      // agent-service 负责记录 provider 解析错误；这里保持 API 可用。
+    }
+  }
+
+  const activeProviderId = process.env.PI_AGENT_PROVIDER?.trim() || undefined;
+  const activeModel = process.env.PI_AGENT_MODEL?.trim() || undefined;
+  const activeModelId =
+    activeProviderId && activeModel
+      ? `${activeProviderId}/${activeModel}`
       : undefined;
 
-  // 读取新结构
-  const enabledModels: string[] | undefined = Array.isArray(
-    frontend.enabledModels,
-  )
-    ? frontend.enabledModels
-    : undefined;
-  const autoEnableRules: AutoEnableRule[] | undefined = Array.isArray(
-    frontend.autoEnableRules,
-  )
-    ? (frontend.autoEnableRules as AutoEnableRule[])
-    : undefined;
-
-  // 读取旧结构
-  let allowedPrefixes: string[] = Array.isArray(frontend.allowedPrefixes)
-    ? frontend.allowedPrefixes
-    : [];
-  let blacklist: string[] = Array.isArray(frontend.blacklist)
-    ? frontend.blacklist
-    : [];
-  let defaultModelIds: string[] = Array.isArray(frontend.defaultModelIds)
-    ? frontend.defaultModelIds
-    : [];
-  let nameFilters: string[] = Array.isArray(frontend.nameFilters)
-    ? frontend.nameFilters
-    : [];
-
-  // 新结构 → 旧结构
-  if (enabledModels && !defaultModelIds.length) {
-    defaultModelIds = [...enabledModels];
-  }
-  if (autoEnableRules && autoEnableRules.length > 0) {
-    if (!allowedPrefixes.length) {
-      allowedPrefixes = autoEnableRules
-        .filter((r) => r.type === "prefix")
-        .map((r) => r.value);
-    }
-    if (!nameFilters.length) {
-      nameFilters = autoEnableRules
-        .filter((r) => r.type === "nameFilter")
-        .map((r) => r.value);
-    }
+  if (providers.length === 0 && activeProviderId && activeModel) {
+    providers.push({
+      id: activeProviderId,
+      name: activeProviderId,
+      baseURL:
+        process.env.PI_AGENT_BASE_URL?.trim() || "https://api.openai.com/v1",
+      apiKey: process.env.PI_AGENT_API_KEY || "",
+      models: [activeModel],
+      defaultModel: activeModel,
+      enabled: true,
+    });
   }
 
-  // 旧结构 → 新结构 (仅当新结构不存在时)
-  const finalEnabledModels = enabledModels ?? [...defaultModelIds];
-  const finalAutoEnableRules = autoEnableRules ?? [
-    ...allowedPrefixes.map((v) => ({ type: "prefix" as const, value: v })),
-    ...nameFilters.map((v) => ({ type: "nameFilter" as const, value: v })),
-  ];
+  return { providers, activeProviderId, activeModelId };
+}
+
+function buildEnvFallback(): ModelConfigData {
+  const backendProviders = parseProvidersFromEnv();
+  const enabledModels = backendProviders.providers
+    .filter((provider) => provider.enabled !== false)
+    .flatMap((provider) =>
+      provider.models.map((model) => `${provider.id}/${model}`),
+    );
+  const providerIds = Array.from(
+    new Set(
+      backendProviders.providers
+        .filter((provider) => provider.enabled !== false)
+        .map((provider) => provider.id),
+    ),
+  );
 
   return {
     frontend: {
-      enabledModels: finalEnabledModels,
-      autoEnableRules: finalAutoEnableRules,
-      allowedPrefixes,
-      blacklist,
-      defaultModelIds,
-      nameFilters,
+      enabledModels,
+      autoEnableRules: providerIds.map((value) => ({
+        type: "prefix" as const,
+        value: `${value}/`,
+      })),
+      excludedModels: [],
     },
     backendProviders,
+    imageGen: { ...DEFAULT_IMAGE_GEN_CONFIG },
   };
 }
 
-/**
- * 获取模型配置 (优先数据库, fallback 环境变量)
- *
- * 注意: 此函数可在服务端和客户端调用
- * - 服务端: 直接读取数据库
- * - 客户端: 通过 API 读取 (自动 fallback)
- */
+function normalizeConfig(value: Record<string, unknown>): ModelConfigData {
+  const config: ModelConfigData = {
+      frontend: normalizeFrontendModelConfig(value.frontend),
+  };
+  const backendProviders = normalizeBackendProviders(value.backendProviders);
+  if (backendProviders) config.backendProviders = backendProviders;
+  const imageGen = normalizeImageGen(value.imageGen);
+  if (imageGen) config.imageGen = imageGen;
+  return config;
+}
+
 export async function getModelConfig(): Promise<ModelConfigData> {
-  // 检查缓存
   if (cachedConfig && Date.now() - cachedConfig.lastFetched < CACHE_TTL) {
     return cachedConfig.data;
   }
 
   try {
-    // 尝试从数据库读取
     const dbConfig = readDbConfig(CONFIG_ID);
-
     if (dbConfig && dbConfig.frontend) {
       const config = normalizeConfig(dbConfig);
-
-      // 更新缓存
       cachedConfig = { data: config, lastFetched: Date.now() };
       return config;
     }
   } catch (error) {
-    // 数据库读取失败, fallback 到环境变量
-    console.warn(
-      "[model-config] Failed to read from database, falling back to env:",
-      error,
-    );
+    console.warn("[model-config] Failed to read database config:", error);
   }
 
-  // Fallback: 从环境变量读取
-  const envConfig = readFromEnv();
-  cachedConfig = { data: envConfig, lastFetched: Date.now() };
-  return envConfig;
+  const fallback = buildEnvFallback();
+  cachedConfig = { data: fallback, lastFetched: Date.now() };
+  return fallback;
 }
 
-/**
- * 清除配置缓存 (用于配置更新后强制刷新)
- */
+export function getModelConfigSync(): ModelConfigData {
+  return buildEnvFallback();
+}
+
 export function invalidateConfigCache(): void {
   cachedConfig = null;
-}
-
-/**
- * 同步获取配置 (仅用于服务端同步场景,不支持数据库读取)
- *
- * 警告: 此函数仅从环境变量读取,不读取数据库
- * 仅用于构建时或无法使用异步的场景
- */
-export function getModelConfigSync(): ModelConfigData {
-  return readFromEnv();
 }

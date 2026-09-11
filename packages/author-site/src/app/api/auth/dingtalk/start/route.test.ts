@@ -7,6 +7,8 @@ describe("DingTalk browser OAuth start route", () => {
     "DINGTALK_APP_KEY",
     "DINGTALK_APP_SECRET",
     "DINGTALK_LOGIN_REDIRECT_URI",
+    "DINGTALK_LOGIN_TARGET_ID",
+    "DINGTALK_LOGIN_HANDOFF_SECRET",
   ];
   const previousValues = new Map<string, string | undefined>();
 
@@ -19,6 +21,9 @@ describe("DingTalk browser OAuth start route", () => {
     process.env.DINGTALK_APP_SECRET = "app-secret";
     process.env.DINGTALK_LOGIN_REDIRECT_URI =
       "http://localhost:4200/api/auth/dingtalk/callback";
+    process.env.DINGTALK_LOGIN_TARGET_ID = "dev";
+    process.env.DINGTALK_LOGIN_HANDOFF_SECRET =
+      "test-handoff-secret-with-at-least-32-bytes";
   });
 
   afterEach(() => {
@@ -29,8 +34,11 @@ describe("DingTalk browser OAuth start route", () => {
     }
   });
 
-  it("redirects to DingTalk and stores state plus a safe post-login path", async () => {
+  it("redirects to DingTalk with signed state and stores its browser nonce", async () => {
     const { GET } = await import("./route");
+    const { verifyDingtalkOAuthState } = await import(
+      "@/lib/dingtalk-login-handoff"
+    );
     const request = new NextRequest(
       "http://localhost:4200/api/auth/dingtalk/start?redirect=%2Fdemo%2Fproject-1",
     );
@@ -48,12 +56,15 @@ describe("DingTalk browser OAuth start route", () => {
     expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(
       "http://localhost:4200/api/auth/dingtalk/callback",
     );
-    expect(authorizationUrl.searchParams.get("state")).toBeTruthy();
+    const state = authorizationUrl.searchParams.get("state");
+    expect(state).toBeTruthy();
+    const verifiedState = await verifyDingtalkOAuthState(state!);
+    expect(verifiedState).toMatchObject({
+      targetId: "dev",
+      redirectPath: "/demo/project-1",
+    });
     expect(response.headers.get("set-cookie")).toContain(
-      "dingtalk_oauth_state=",
-    );
-    expect(response.headers.get("set-cookie")).toContain(
-      "dingtalk_oauth_redirect=%2Fdemo%2Fproject-1",
+      `dingtalk_oauth_state=${verifiedState.nonce}`,
     );
   });
 
@@ -69,5 +80,15 @@ describe("DingTalk browser OAuth start route", () => {
       success: false,
       error: { code: "INTERNAL_ERROR" },
     });
+  });
+
+  it("rejects browser OAuth when the multi-environment handoff is missing", async () => {
+    delete process.env.DINGTALK_LOGIN_HANDOFF_SECRET;
+    const { GET } = await import("./route");
+    const response = await GET(
+      new NextRequest("http://localhost:4200/api/auth/dingtalk/start"),
+    );
+
+    expect(response.status).toBe(503);
   });
 });

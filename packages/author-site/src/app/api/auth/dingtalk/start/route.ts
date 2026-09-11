@@ -1,16 +1,16 @@
-import { randomBytes } from "node:crypto";
-
 import { NextRequest, NextResponse } from "next/server";
 
 import {
   createDingtalkOAuthAuthorizationUrl,
   readDingtalkLoginConfig,
 } from "@/lib/dingtalk-login";
-import { getSafeRedirectPath } from "@/lib/auth/redirect";
+import {
+  createDingtalkOAuthState,
+  isDingtalkLoginHandoffConfigured,
+} from "@/lib/dingtalk-login-handoff";
 import { createApiError } from "@/lib/fs-utils";
 
 const STATE_COOKIE = "dingtalk_oauth_state";
-const REDIRECT_COOKIE = "dingtalk_oauth_redirect";
 const OAUTH_COOKIE_MAX_AGE = 10 * 60;
 
 function oauthCookieOptions() {
@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
     !config.corpId ||
     !config.appKey ||
     !config.appSecret ||
-    !config.redirectUri
+    !config.redirectUri ||
+    !isDingtalkLoginHandoffConfigured()
   ) {
     return NextResponse.json(
       createApiError(
@@ -43,14 +44,13 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const state = randomBytes(32).toString("base64url");
-  const redirect = getSafeRedirectPath(
+  const { state, nonce } = await createDingtalkOAuthState(
     request.nextUrl.searchParams.get("redirect"),
   );
   const response = NextResponse.redirect(
     createDingtalkOAuthAuthorizationUrl(config, state),
   );
-  response.cookies.set(STATE_COOKIE, state, oauthCookieOptions());
-  response.cookies.set(REDIRECT_COOKIE, redirect, oauthCookieOptions());
+  response.cookies.set(STATE_COOKIE, nonce, oauthCookieOptions());
+  response.cookies.delete("dingtalk_oauth_redirect");
   return response;
 }

@@ -8,36 +8,21 @@
  * - 末尾的 catch-all `{ matcher: /.*\//, enabled: false }` 禁用所有未列入白名单的模型
  *
  * 配置读取:
- * - 优先使用数据库配置 (通过管理后台动态配置)
- * - Fallback 到环境变量 (保持向后兼容)
- * - 使用 model-config.ts 中的 getModelConfig() 函数
+ * - 优先使用服务端返回的 canonical frontend policy
+ * - API 不可用时使用当前 agent session 已提供的模型列表
  */
 
-interface ModelEnvConfig {
-  allowedPrefixes: string[];
-  nameFilters: string[];
-  defaultModelIds: string[];
-  blacklist: string[];
-}
-
-function parseCsvEnv(value: string | undefined): string[] {
-  return (value || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-// NEXT_PUBLIC_* 由宿主 Next.js 应用在构建期内联（两站点均通过 transpilePackages 处理本包）
-function getModelEnvConfig(): ModelEnvConfig {
-  return {
-    allowedPrefixes: parseCsvEnv(process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES),
-    nameFilters: parseCsvEnv(process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS),
-    defaultModelIds: parseCsvEnv(process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS),
-    blacklist: parseCsvEnv(process.env.NEXT_PUBLIC_MODEL_BLACKLIST),
-  };
-}
-
 export type ModelMatcher = RegExp | string;
+
+export type AutoEnableRule =
+  | { type: "prefix"; value: string }
+  | { type: "nameFilter"; value: string };
+
+export interface FrontendModelPolicy {
+  enabledModels: string[];
+  autoEnableRules: AutoEnableRule[];
+  excludedModels: string[];
+}
 
 export type ThinkingDepth = "low" | "medium" | "high";
 
@@ -81,144 +66,17 @@ export type ResolvedModel = {
   depthVariantIds: Record<string, string>;
 };
 
-/**
- * 从配置数据解析动态白名单前缀
- *
- * 格式: 前缀数组,如 ["deepseek/", "qwen/", "custom/"]
- * 未设置时默认为空(不额外放行任何分组)
- */
-function parseDynamicPrefixesFromConfig(prefixes: string[]): ModelConfig[] {
-  if (!prefixes || prefixes.length === 0) return [];
-  return prefixes.map((prefix) => ({ matcher: prefix }));
-}
-
-/**
- * 从环境变量 NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES 解析动态白名单前缀
- *
- * 格式: 逗号分隔的前缀列表,如 "deepseek/,qwen/,custom/"
- * 未设置时默认为空(不额外放行任何分组)
- *
- * @deprecated 使用 parseDynamicPrefixesFromConfig 替代
- */
-function parseDynamicPrefixes(): ModelConfig[] {
-  return getModelEnvConfig().allowedPrefixes.map((prefix) => ({
-    matcher: prefix,
-  }));
-}
-
-/**
- * 从配置数据解析黑名单模型 ID 集合
- *
- * 格式: 完整模型 ID 数组,如 ["xjjj/old-model", "xjjj/test-model"]
- * 黑名单中的模型会在白名单过滤之后被排除
- */
-function parseBlacklistFromConfig(blacklist: string[]): Set<string> {
-  if (!blacklist || blacklist.length === 0) return new Set();
-  return new Set(blacklist);
-}
-
-/**
- * 从环境变量 NEXT_PUBLIC_MODEL_BLACKLIST 解析黑名单模型 ID 集合
- *
- * 格式: 逗号分隔的完整模型 ID,如 "xjjj/old-model,xjjj/test-model"
- * 黑名单中的模型会在白名单过滤之后被排除
- *
- * @deprecated 使用 parseBlacklistFromConfig 替代
- */
-function parseBlacklist(): Set<string> {
-  return new Set(getModelEnvConfig().blacklist);
-}
-
-/**
- * 从配置数据解析分组名称过滤器
- *
- * 格式: "分组:关键词" 数组,如 ["workbench:Free", "othergroup:Pro"]
- * 配置后,该分组下仅保留模型名称中包含指定关键词的模型
- * 大小写不敏感;未配置的分组不受限制
- */
-function parseNameFiltersFromConfig(
-  filters: string[],
-): Array<{ group: string; keyword: string }> {
-  if (!filters || filters.length === 0) return [];
-  return filters
-    .map((entry) => {
-      const idx = entry.indexOf(":");
-      if (idx < 0) return { group: entry, keyword: "" };
-      return {
-        group: entry.slice(0, idx).trim(),
-        keyword: entry
-          .slice(idx + 1)
-          .trim()
-          .toLowerCase(),
-      };
-    })
-    .filter((f) => f.keyword.length > 0);
-}
-
-/**
- * 从环境变量 NEXT_PUBLIC_MODEL_NAME_FILTERS 解析分组名称过滤器
- *
- * 格式: 逗号分隔的 "分组:关键词" 条目,如 "workbench:Free,othergroup:Pro"
- * 配置后,该分组下仅保留模型名称中包含指定关键词的模型
- * 大小写不敏感;未配置的分组不受限制
- *
- * @deprecated 使用 parseNameFiltersFromConfig 替代
- */
-function parseNameFilters(): Array<{ group: string; keyword: string }> {
-  return getModelEnvConfig().nameFilters
-    .map((entry) => {
-      const idx = entry.indexOf(":");
-      if (idx < 0) return { group: entry, keyword: "" };
-      return {
-        group: entry.slice(0, idx).trim(),
-        keyword: entry
-          .slice(idx + 1)
-          .trim()
-          .toLowerCase(),
-      };
-    })
-    .filter((f) => f.keyword.length > 0);
-}
-
-/**
- * 从环境变量 NEXT_PUBLIC_DEFAULT_MODEL_IDS 解析默认模型 ID 列表
- *
- * 格式: 逗号分隔的完整模型 ID,按优先级从高到低排列
- * 如 "xjjj/deepseek-v4-flash,xjjj/gpt-model"
- * 未设置时为空数组
- */
-function parseDefaultModelIds(): string[] {
-  return getModelEnvConfig().defaultModelIds;
-}
-
-export function isModelBlacklisted(id: string): boolean {
-  return parseBlacklist().has(id);
-}
-
-/**
- * 解析默认模型 ID
- *
- * 按优先级顺序尝试匹配默认模型列表中的每个 ID:
- *   1. 先精确匹配 id
- *   2. 再尝试匹配深度变体 (depthVariantIds)
- * 如果默认列表中的所有模型都未在可用模型中找到,
- * 则回退到可用模型列表的第一个模型。
- *
- * 返回最终选定的模型基础 ID,如果可用模型列表为空则返回 null
- */
-export function resolveDefaultModelId(models: ResolvedModel[]): string | null {
+export function resolveDefaultModelId(
+  models: ResolvedModel[],
+  enabledModels: string[] = [],
+): string | null {
   if (models.length === 0) return null;
-
-  const defaultIds = parseDefaultModelIds();
-  for (const defaultId of defaultIds) {
+  for (const modelId of enabledModels) {
     for (const model of models) {
-      if (model.id === defaultId) return defaultId;
-      for (const variantId of Object.values(model.depthVariantIds)) {
-        if (variantId === defaultId) return model.id;
-      }
+      if (model.id === modelId) return model.id;
+      if (Object.values(model.depthVariantIds).includes(modelId)) return model.id;
     }
   }
-
   return models[0].id;
 }
 
@@ -228,17 +86,14 @@ export function resolveDefaultModelId(models: ResolvedModel[]): string | null {
  * 列表顺序即匹配优先级,首个命中的配置生效;最后一条 catch-all 禁用其余所有模型。
  * 分组即模型 id 中 `/` 前的前缀,如 `workbench/nemotron-3-super` 的分组为 `workbench`。
  *
- * 动态前缀通过环境变量 NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES 注入,
- * 无需修改代码即可支持用户自定义的供应商名称。
+ * 动态 provider 规则由服务端 canonical policy 注入；共享包本身不读取
+ * NEXT_PUBLIC 模型过滤变量。
  */
 export function buildModelConfigs(): ModelConfig[] {
   return [
     // === 内置分组:始终放行 ===
     { matcher: "workbench/" },
     { matcher: "jojo/" },
-
-    // === 动态分组:通过环境变量注入的用户自定义供应商前缀 ===
-    ...parseDynamicPrefixes(),
 
     // === 其他分组全部禁用 ===
     { matcher: /.*/, enabled: false },
@@ -295,10 +150,7 @@ function parseDepthSuffix(id: string): {
 export function applyModelConfigs(
   raw: Array<{ id: string; label: string }>,
 ): ResolvedModel[] {
-  return applyModelConfigsWithData(raw, {
-    blacklist: [],
-    nameFilters: [],
-  });
+  return applyModelConfigsWithData(raw);
 }
 
 /**
@@ -311,15 +163,12 @@ export function applyViewerModelConfigs(
 ): ResolvedModel[] {
   return applyModelConfigsWithFullData(raw, {
     configs: [{ matcher: /.*/ }],
-    blacklist: new Set<string>(),
-    nameFilters: [],
+    excludedModels: new Set<string>(),
   });
 }
 
 /**
- * 异步版本: 通过 API 从数据库读取完整配置并应用
- *
- * 包含白名单前缀、黑名单、名称过滤器、启用列表等全部配置
+ * 异步版本: 通过 API 从数据库读取 canonical frontend policy 并应用
  * 通过 HTTP API 读取,避免客户端直接依赖 Node.js 模块
  * Fallback 到环境变量配置
  *
@@ -329,11 +178,9 @@ export async function applyModelConfigsAsync(
   raw: Array<{ id: string; label: string }>,
 ): Promise<ResolvedModel[]> {
   let configData: {
-    enabledModels?: string[];
-    autoEnableRules?: Array<{ type: "prefix" | "nameFilter"; value: string }>;
-    allowedPrefixes: string[];
-    blacklist: string[];
-    nameFilters: string[];
+    enabledModels: string[];
+    autoEnableRules: AutoEnableRule[];
+    excludedModels: string[];
   };
 
   try {
@@ -341,11 +188,15 @@ export async function applyModelConfigsAsync(
     if (res.ok) {
       const { data } = await res.json();
       configData = {
-        enabledModels: data.frontend?.enabledModels,
-        autoEnableRules: data.frontend?.autoEnableRules,
-        allowedPrefixes: data.frontend?.allowedPrefixes ?? [],
-        blacklist: data.frontend?.blacklist ?? [],
-        nameFilters: data.frontend?.nameFilters ?? [],
+        enabledModels: Array.isArray(data.frontend?.enabledModels)
+          ? data.frontend.enabledModels
+          : [],
+        autoEnableRules: Array.isArray(data.frontend?.autoEnableRules)
+          ? data.frontend.autoEnableRules
+          : [],
+        excludedModels: Array.isArray(data.frontend?.excludedModels)
+          ? data.frontend.excludedModels
+          : [],
       };
     } else {
       configData = getEnvFallbackConfig();
@@ -354,50 +205,23 @@ export async function applyModelConfigsAsync(
     configData = getEnvFallbackConfig();
   }
 
-  const configs = buildModelConfigsFromData(configData.allowedPrefixes);
-  const blacklist = parseBlacklistFromConfig(configData.blacklist);
-  const nameFilters = parseNameFiltersFromConfig(configData.nameFilters);
   return applyModelConfigsWithFullData(raw, {
-    configs,
-    blacklist,
-    nameFilters,
+    configs: [{ matcher: /.*/ }],
+    excludedModels: new Set(configData.excludedModels),
     enabledModels: configData.enabledModels,
     autoEnableRules: configData.autoEnableRules,
   });
-
 }
 
 /**
  * 环境变量 fallback 配置 (当 API 不可用时使用)
  */
 function getEnvFallbackConfig() {
-  const { allowedPrefixes, nameFilters, defaultModelIds, blacklist } =
-    getModelEnvConfig();
   return {
-    enabledModels: defaultModelIds,
-    autoEnableRules: [
-      ...allowedPrefixes.map((v) => ({ type: "prefix" as const, value: v })),
-      ...nameFilters.map((v) => ({ type: "nameFilter" as const, value: v })),
-    ],
-    allowedPrefixes,
-    blacklist,
-    nameFilters,
+    enabledModels: [],
+    autoEnableRules: [],
+    excludedModels: [],
   };
-}
-
-/**
- * 从配置数据构建模型配置表(含动态白名单前缀)
- */
-function buildModelConfigsFromData(prefixes: string[]): ModelConfig[] {
-  return [
-    // 内置分组:始终放行
-    { matcher: "workbench/" },
-    { matcher: "jojo/" },
-    // 动态分组:从数据库或环境变量注入
-    ...parseDynamicPrefixesFromConfig(prefixes),
-    // 其他分组全部禁用
-    { matcher: /.*/, enabled: false },
-  ];
 }
 
 /**
@@ -408,8 +232,8 @@ function buildModelConfigsFromData(prefixes: string[]): ModelConfig[] {
  *    - 放行 enabledModels 中的模型,按列表顺序返回
  *    - 非空 enabledModels 允许 autoEnableRules 追加新发现模型
  *    - enabledModels 为空数组表示管理员未启用任何模型
- * 2. 前缀模式 (向后兼容):
- *    - 使用 configs 白名单 + blacklist + nameFilters 过滤
+ * 2. 静态配置模式 (enabledModels 未提供时):
+ *    - 使用调用方提供的 configs 过滤
  *
  * @param raw 原始模型列表
  * @param data 完整的配置数据
@@ -418,16 +242,14 @@ export function applyModelConfigsWithFullData(
   raw: Array<{ id: string; label: string }>,
   data: {
     configs: ModelConfig[];
-    blacklist: Set<string>;
-    nameFilters: Array<{ group: string; keyword: string }>;
+    excludedModels: Set<string>;
     enabledModels?: string[];
-    autoEnableRules?: Array<{ type: "prefix" | "nameFilter"; value: string }>;
+    autoEnableRules?: AutoEnableRule[];
   },
 ): ResolvedModel[] {
   const {
     configs,
-    blacklist,
-    nameFilters,
+    excludedModels,
     enabledModels,
     autoEnableRules,
   } = data;
@@ -482,7 +304,7 @@ export function applyModelConfigsWithFullData(
         autoEnableRules?.some((rule) => matchesAutoEnableRule(m, rule));
       if (!inEnabledList && !autoEnabled) continue;
     } else {
-      // 前缀模式 (向后兼容)
+      // 没有远程 canonical policy 时使用调用方的静态配置。
       const config = configs.find((c) => matchesId(c.matcher, m.id)) ?? null;
       const enabled = config?.enabled ?? UNCONFIGURED_DEFAULT.enabled;
       if (!enabled) continue;
@@ -564,29 +386,12 @@ export function applyModelConfigsWithFullData(
     }
   }
 
-  // 过滤黑名单 + 名称过滤器
+  // excludedModels 是持续排除规则，始终优先于显式启用和自动规则。
   const filtered = unorderedResult.filter((model) => {
-    if (blacklist.has(model.id)) return false;
+    if (excludedModels.has(model.id)) return false;
     for (const variantId of Object.values(model.depthVariantIds)) {
-      if (blacklist.has(variantId)) return false;
+      if (excludedModels.has(variantId)) return false;
     }
-
-    // 启用列表模式下,跳过 nameFilters(因为启用列表本身已精确指定)
-    if (!useEnabledList) {
-      for (const filter of nameFilters) {
-        if (model.group === filter.group) {
-          const nameLower = model.id.toLowerCase();
-          const labelLower = model.label.toLowerCase();
-          if (
-            !nameLower.includes(filter.keyword) &&
-            !labelLower.includes(filter.keyword)
-          ) {
-            return false;
-          }
-        }
-      }
-    }
-
     return true;
   });
 
@@ -616,10 +421,7 @@ export function applyModelConfigsWithFullData(
  */
 export function applyModelConfigsWithData(
   raw: Array<{ id: string; label: string }>,
-  configData: {
-    blacklist?: string[];
-    nameFilters?: string[];
-  } = {},
+  configData: { excludedModels?: string[] } = {},
 ): ResolvedModel[] {
   const parsed: Array<{
     rawId: string;
@@ -705,31 +507,12 @@ export function applyModelConfigsWithData(
     }
   }
 
-  // 优先使用传入的配置,否则从环境变量读取
-  const blacklist = configData.blacklist
-    ? parseBlacklistFromConfig(configData.blacklist)
-    : parseBlacklist();
-  const nameFilters = configData.nameFilters
-    ? parseNameFiltersFromConfig(configData.nameFilters)
-    : parseNameFilters();
+  const excludedModels = new Set(configData.excludedModels ?? []);
 
   return result.filter((model) => {
-    if (blacklist.has(model.id)) return false;
+    if (excludedModels.has(model.id)) return false;
     for (const variantId of Object.values(model.depthVariantIds)) {
-      if (blacklist.has(variantId)) return false;
-    }
-
-    for (const filter of nameFilters) {
-      if (model.group === filter.group) {
-        const nameLower = model.id.toLowerCase();
-        const labelLower = model.label.toLowerCase();
-        if (
-          !nameLower.includes(filter.keyword) &&
-          !labelLower.includes(filter.keyword)
-        ) {
-          return false;
-        }
-      }
+      if (excludedModels.has(variantId)) return false;
     }
 
     return true;

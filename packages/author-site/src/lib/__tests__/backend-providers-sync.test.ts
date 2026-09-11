@@ -50,6 +50,9 @@ function mockBackendProvidersModules(options: {
     getServerAgentServiceUrl: () => "http://localhost:3201",
     getInternalApiToken: () => "test-token",
   }));
+  jest.doMock("@/lib/global-model-secrets", () => ({
+    hydrateBackendProviders: (value: BackendProvidersConfig) => value,
+  }));
 
   // Mock global fetch for health check
   const originalFetch = global.fetch;

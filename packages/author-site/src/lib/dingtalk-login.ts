@@ -1,3 +1,5 @@
+import { isDingtalkLoginHandoffConfigured } from "@/lib/dingtalk-login-handoff";
+
 export interface DingtalkLoginConfig {
   enabled: boolean;
   corpId?: string;
@@ -71,11 +73,13 @@ export function readDingtalkLoginConfig(): DingtalkLoginConfig {
 
 export function readSafeDingtalkLoginConfig(): SafeDingtalkLoginConfig {
   const config = readDingtalkLoginConfig();
+  const handoffConfigured = isDingtalkLoginHandoffConfigured();
   const browserOAuthEnabled = Boolean(
     config.enabled &&
       config.appKey &&
       config.appSecret &&
-      config.redirectUri,
+      config.redirectUri &&
+      handoffConfigured,
   );
   if (!config.enabled) {
     return {
@@ -102,6 +106,11 @@ export function readSafeDingtalkLoginConfig(): SafeDingtalkLoginConfig {
     corpId: config.corpId,
     authUrl: config.authUrl,
     redirectUri: config.redirectUri,
+    message: browserOAuthEnabled
+      ? undefined
+      : !config.redirectUri
+        ? "钉钉浏览器登录未配置回调地址"
+        : "钉钉浏览器登录未配置目标环境 ID 或 handoff 密钥",
   };
 }
 

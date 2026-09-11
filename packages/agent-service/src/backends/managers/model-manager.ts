@@ -6,7 +6,7 @@ import { getBackendProvidersManager } from '../../config/backend-providers';
 import { getGetModel, getGetModels } from './pi-agent-deps';
 import { logger } from '../../utils/logger';
 
-// 惰性加载 serviceConfig:避免在 dotenv.config() 执行前读取环境变量
+// 惰性加载 serviceConfig，确保服务启动入口已完成 workspace 环境加载。
 let _serviceConfig: ServiceConfig | null = null;
 
 function getServiceConfig(): ServiceConfig {

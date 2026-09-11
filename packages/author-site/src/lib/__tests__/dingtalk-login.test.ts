@@ -16,6 +16,9 @@ describe("DingTalk enterprise login", () => {
     process.env.DINGTALK_APP_SECRET = "app-secret";
     process.env.DINGTALK_LOGIN_REDIRECT_URI =
       "http://localhost:4200/api/auth/dingtalk/callback";
+    process.env.DINGTALK_LOGIN_TARGET_ID = "dev";
+    process.env.DINGTALK_LOGIN_HANDOFF_SECRET =
+      "test-handoff-secret-with-at-least-32-bytes";
   });
 
   afterEach(async () => {
@@ -31,6 +34,8 @@ describe("DingTalk enterprise login", () => {
     delete process.env.DINGTALK_APP_KEY;
     delete process.env.DINGTALK_APP_SECRET;
     delete process.env.DINGTALK_LOGIN_REDIRECT_URI;
+    delete process.env.DINGTALK_LOGIN_TARGET_ID;
+    delete process.env.DINGTALK_LOGIN_HANDOFF_SECRET;
   });
 
   it("exchanges auth code and reuses the same local user", async () => {
@@ -125,8 +130,11 @@ describe("DingTalk enterprise login", () => {
   });
 
   it("builds the browser OAuth authorization URL with the configured callback", async () => {
-    const { createDingtalkOAuthAuthorizationUrl, readDingtalkLoginConfig } =
-      await import("@/lib/dingtalk-login");
+    const {
+      createDingtalkOAuthAuthorizationUrl,
+      readDingtalkLoginConfig,
+      readSafeDingtalkLoginConfig,
+    } = await import("@/lib/dingtalk-login");
 
     const url = new URL(
       createDingtalkOAuthAuthorizationUrl(
@@ -146,6 +154,23 @@ describe("DingTalk enterprise login", () => {
     expect(url.searchParams.get("scope")).toBe("openid");
     expect(url.searchParams.get("prompt")).toBe("consent");
     expect(url.searchParams.get("state")).toBe("state-value");
+    expect(readSafeDingtalkLoginConfig()).toMatchObject({
+      enabled: true,
+      browserOAuthEnabled: true,
+    });
+  });
+
+  it("reports the missing multi-environment browser login configuration", async () => {
+    delete process.env.DINGTALK_LOGIN_HANDOFF_SECRET;
+    const { readSafeDingtalkLoginConfig } = await import(
+      "@/lib/dingtalk-login"
+    );
+
+    expect(readSafeDingtalkLoginConfig()).toMatchObject({
+      enabled: true,
+      browserOAuthEnabled: false,
+      message: "钉钉浏览器登录未配置目标环境 ID 或 handoff 密钥",
+    });
   });
 
   it("exchanges a browser OAuth authCode through the user token API", async () => {

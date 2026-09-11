@@ -1,104 +1,103 @@
-import { timingSafeEqual } from "node:crypto";
-
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSafeRedirectPath } from "@/lib/auth/redirect";
+import { exchangeDingtalkBrowserAuthCode } from "@/lib/dingtalk-login";
 import {
-  exchangeDingtalkBrowserAuthCode,
-  readDingtalkLoginConfig,
-} from "@/lib/dingtalk-login";
-import { createToken, setAuthCookieOnResponse } from "@/lib/auth/jwt";
-import { findOrCreateUserByDingtalkIdentity } from "@/lib/user";
+  createDingtalkLoginHandoff,
+  resolveDingtalkLoginTargetOrigin,
+  verifyDingtalkOAuthState,
+} from "@/lib/dingtalk-login-handoff";
+import { createApiError } from "@/lib/fs-utils";
 
-const STATE_COOKIE = "dingtalk_oauth_state";
-const REDIRECT_COOKIE = "dingtalk_oauth_redirect";
-
-function clearOAuthCookies(response: NextResponse): void {
-  response.cookies.delete(STATE_COOKIE);
-  response.cookies.delete(REDIRECT_COOKIE);
+interface VerifiedCallbackState {
+  targetId: string;
+  targetOrigin: string;
+  redirectPath: string;
+  nonce: string;
 }
 
-function getLoginOrigin(request: NextRequest): string {
-  const configuredRedirectUri = readDingtalkLoginConfig().redirectUri;
-  if (configuredRedirectUri) {
-    try {
-      return new URL(configuredRedirectUri).origin;
-    } catch {
-      // Fall back to the request origin when a local configuration is invalid.
-    }
-  }
-  return request.nextUrl.origin;
-}
-function redirectToLogin(
-  request: NextRequest,
-  message: string,
-  redirectPath?: string,
-): NextResponse {
-  const loginUrl = new URL("/login", getLoginOrigin(request));
-  loginUrl.searchParams.set(
-    "redirect",
-    getSafeRedirectPath(redirectPath),
-  );
-  loginUrl.searchParams.set("dingtalkError", message);
-  const response = NextResponse.redirect(loginUrl);
-  clearOAuthCookies(response);
+function addPrivateResponseHeaders(response: NextResponse): NextResponse {
+  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("Referrer-Policy", "no-referrer");
   return response;
 }
 
-function statesMatch(expected: string | undefined, received: string | null): boolean {
-  if (!expected || !received) return false;
-  const expectedBuffer = Buffer.from(expected);
-  const receivedBuffer = Buffer.from(received);
-  return (
-    expectedBuffer.length === receivedBuffer.length &&
-    timingSafeEqual(expectedBuffer, receivedBuffer)
+function invalidStateResponse(): NextResponse {
+  return NextResponse.json(
+    createApiError(
+      "VALIDATION_ERROR",
+      "DingTalk OAuth state is invalid or expired",
+    ),
+    {
+      status: 400,
+      headers: {
+        "Cache-Control": "no-store",
+        "Referrer-Policy": "no-referrer",
+      },
+    },
   );
 }
 
+async function readCallbackState(
+  request: NextRequest,
+): Promise<VerifiedCallbackState | null> {
+  const encodedState = request.nextUrl.searchParams.get("state");
+  if (!encodedState) return null;
+  try {
+    const state = await verifyDingtalkOAuthState(encodedState);
+    return {
+      ...state,
+      targetOrigin: resolveDingtalkLoginTargetOrigin(state.targetId),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function redirectToTargetLogin(
+  state: VerifiedCallbackState,
+  message: string,
+): NextResponse {
+  const loginUrl = new URL("/login", state.targetOrigin);
+  loginUrl.searchParams.set(
+    "redirect",
+    getSafeRedirectPath(state.redirectPath),
+  );
+  loginUrl.searchParams.set("dingtalkError", message);
+  return addPrivateResponseHeaders(NextResponse.redirect(loginUrl));
+}
+
 export async function GET(request: NextRequest) {
-  const redirectPath = request.cookies.get(REDIRECT_COOKIE)?.value;
-  const queryError = request.nextUrl.searchParams.get("error");
-  if (queryError) {
-    return redirectToLogin(request, "钉钉授权未完成，请重试", redirectPath);
+  const state = await readCallbackState(request);
+  if (!state) {
+    return invalidStateResponse();
+  }
+
+  if (request.nextUrl.searchParams.get("error")) {
+    return redirectToTargetLogin(state, "钉钉授权未完成，请重试");
   }
 
   const authCode =
     request.nextUrl.searchParams.get("authCode") ||
     request.nextUrl.searchParams.get("code");
   if (!authCode) {
-    return redirectToLogin(request, "未获取到钉钉授权码，请重试", redirectPath);
-  }
-
-  const expectedState = request.cookies.get(STATE_COOKIE)?.value;
-  const receivedState = request.nextUrl.searchParams.get("state");
-  if (!statesMatch(expectedState, receivedState)) {
-    return redirectToLogin(request, "钉钉授权状态已失效，请重新登录", redirectPath);
+    return redirectToTargetLogin(state, "未获取到钉钉授权码，请重试");
   }
 
   try {
     const profile = await exchangeDingtalkBrowserAuthCode(authCode);
-    const { user } = await findOrCreateUserByDingtalkIdentity({
-      corpId: profile.corpId,
-      unionId: profile.unionId,
-      dingtalkUserId: profile.dingtalkUserId,
-      name: profile.name,
-      avatar: profile.avatar,
-      raw: profile.raw,
-    });
-    const token = await createToken({
-      userId: user.id,
-      username: user.username,
-      ...(user.role ? { role: user.role } : {}),
-    });
-
-    const response = NextResponse.redirect(
-      new URL(getSafeRedirectPath(redirectPath), getLoginOrigin(request)),
+    const handoff = await createDingtalkLoginHandoff(state, profile);
+    const completionUrl = new URL(
+      "/api/auth/dingtalk/complete",
+      state.targetOrigin,
     );
-    setAuthCookieOnResponse(response, token);
-    clearOAuthCookies(response);
-    return response;
+    completionUrl.searchParams.set("handoff", handoff);
+    return addPrivateResponseHeaders(NextResponse.redirect(completionUrl));
   } catch (error) {
-    console.error("[DingTalk Browser OAuth] Error:", error);
-    return redirectToLogin(request, "钉钉登录失败，请重试", redirectPath);
+    console.error(
+      "[DingTalk Browser OAuth] Error:",
+      error instanceof Error ? error.message : "unknown error",
+    );
+    return redirectToTargetLogin(state, "钉钉登录失败，请重试");
   }
 }

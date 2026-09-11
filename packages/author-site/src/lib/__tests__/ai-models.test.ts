@@ -183,8 +183,7 @@ describe("applyModelConfigsWithFullData", () => {
       { matcher: "jojo/" },
       { matcher: /.*/, enabled: false },
     ],
-    blacklist: new Set<string>(),
-    nameFilters: [],
+    excludedModels: new Set<string>(),
     autoEnableRules: [{ type: "prefix" as const, value: "jojo/" }],
   };
 
@@ -235,6 +234,16 @@ describe("applyModelConfigsWithFullData", () => {
       "jojo/deepseek-v4-flash",
       "jojo/kimi-k2.6",
     ]);
+  });
+
+  it("excludedModels 持续排除显式启用和自动启用的模型", () => {
+    const result = applyModelConfigsWithFullData(rawModels, {
+      ...data,
+      enabledModels: ["deepseek/deepseek-v4-flash"],
+      excludedModels: new Set(["deepseek/deepseek-v4-flash", "jojo/kimi-k2.6"]),
+    });
+
+    expect(result.map((model) => model.id)).toEqual(["jojo/deepseek-v4-flash"]);
   });
 });
 

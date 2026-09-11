@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { requireSecret } from "@workbench/runtime-config/secrets";
 
 import type {
   BackendProvider,
@@ -42,12 +43,10 @@ interface UserModelConfigRow {
 }
 
 function getEncryptionKey(): Buffer {
-  const secret =
-    process.env.MODEL_CONFIG_ENCRYPTION_KEY ||
-    process.env.JWT_SECRET ||
-    "change-me-in-production";
-
-  return crypto.createHash("sha256").update(secret).digest();
+  return crypto
+    .createHash("sha256")
+    .update(requireSecret("MODEL_CONFIG_ENCRYPTION_KEY"))
+    .digest();
 }
 
 function encryptApiKey(apiKey: string): string {

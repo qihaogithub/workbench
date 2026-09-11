@@ -21,11 +21,8 @@ describe("GET /api/models/config", () => {
       frontend: {
         enabledModels: ["admin/default"],
         autoEnableRules: [],
-        allowedPrefixes: ["admin/"],
-        blacklist: [],
-        nameFilters: [],
+        excludedModels: [],
       },
-      multimodalModels: [],
     });
   });
 
@@ -52,7 +49,7 @@ describe("GET /api/models/config", () => {
             "admin/default",
             "deepseek/deepseek-v4-flash-vision-exp",
           ],
-          allowedPrefixes: ["admin/", "deepseek/"],
+          autoEnableRules: [{ type: "prefix", value: "deepseek/" }],
         },
       },
     });
@@ -74,6 +71,7 @@ describe("GET /api/models/config", () => {
       data: {
         frontend: {
           enabledModels: ["admin/default"],
+          excludedModels: [],
         },
       },
     });
@@ -86,12 +84,9 @@ describe("GET /api/models/config", () => {
       frontend: {
         enabledModels: ["admin/default"],
         autoEnableRules: [],
-        allowedPrefixes: ["admin/"],
-        blacklist: [],
-        nameFilters: [],
+        excludedModels: [],
       },
       backendProviders: { providers: [] },
-      multimodalModels: [],
     });
 
     const { GET } = await import("./route");
@@ -102,8 +97,6 @@ describe("GET /api/models/config", () => {
       type: "prefix",
       value: "mydeepseek/",
     });
-    expect(body.data.frontend.allowedPrefixes).toContain("mydeepseek/");
-
     delete process.env.PI_AGENT_PROVIDER;
     delete process.env.PI_AGENT_MODEL;
   });

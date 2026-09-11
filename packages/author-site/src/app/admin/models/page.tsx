@@ -68,6 +68,8 @@ interface ProviderFormState {
   enabled: boolean;
 }
 
+type AdminProvider = BackendProvider & { hasApiKey?: boolean };
+
 interface AvailableModel {
   id: string;
   label: string;
@@ -83,7 +85,7 @@ interface AutoEnableRule {
 interface ModelConfigState {
   enabledModels: string[];
   autoEnableRules: AutoEnableRule[];
-  blacklist: string[];
+  excludedModels: string[];
 }
 
 interface BackendProvidersSyncStatus {
@@ -148,12 +150,12 @@ function matchesAutoRule(modelId: string, rule: AutoEnableRule): boolean {
   return modelId.toLowerCase().includes(keyword);
 }
 
-function providerToForm(p: BackendProvider): ProviderFormState {
+function providerToForm(p: AdminProvider): ProviderFormState {
   return {
     id: p.id,
     name: p.name,
     baseURL: p.baseURL,
-    apiKey: p.apiKey,
+    apiKey: "",
     modelsText: p.models.join("\n"),
     defaultModel: p.defaultModel || "",
     contextWindow: p.contextWindow ? String(p.contextWindow) : "",
@@ -194,7 +196,7 @@ const EMPTY_FORM: ProviderFormState = {
 const EMPTY_CONFIG: ModelConfigState = {
   enabledModels: [],
   autoEnableRules: [],
-  blacklist: [],
+  excludedModels: [],
 };
 
 const GROUP_COLORS: Record<string, string> = {};
@@ -374,7 +376,7 @@ export default function ModelsPage() {
    ============================================================ */
 
 function SuppliersTab() {
-  const [providers, setProviders] = useState<BackendProvider[]>([]);
+  const [providers, setProviders] = useState<AdminProvider[]>([]);
   const [activeProviderId, setActiveProviderId] = useState<string>("");
   const [activeModelId, setActiveModelId] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -406,7 +408,14 @@ function SuppliersTab() {
         throw new Error(await readApiErrorMessage(res, "加载配置失败"));
       }
       const { data } = await res.json();
-      setProviders(data.backendProviders?.providers || []);
+      setProviders(
+        (data.backendProviders?.providers || []).map(
+          (provider: Omit<BackendProvider, "apiKey"> & { hasApiKey?: boolean }) => ({
+            ...provider,
+            apiKey: "",
+          }),
+        ),
+      );
       setActiveProviderId(data.backendProviders?.activeProviderId || "");
       setActiveModelId(data.backendProviders?.activeModelId || "");
       setConfigReady(true);
@@ -483,6 +492,15 @@ function SuppliersTab() {
       return { ok: false, message: body.error?.message || "保存失败" };
     }
 
+    if (providers.some((provider) => provider.apiKey)) {
+      setProviders((body.data?.backendProviders?.providers || []).map(
+        (provider: Omit<BackendProvider, "apiKey"> & { hasApiKey?: boolean }) => ({
+          ...provider,
+          apiKey: "",
+        }),
+      ));
+    }
+
     if (body.agentPushResult) {
       setPushResult(body.agentPushResult);
       if (body.agentPushResult.ok) {
@@ -532,7 +550,7 @@ function SuppliersTab() {
     setForm(EMPTY_FORM);
   }, []);
 
-  const handleEdit = useCallback((p: BackendProvider) => {
+  const handleEdit = useCallback((p: AdminProvider) => {
     setIsAdding(false);
     setEditingId(p.id);
     setForm(providerToForm(p));
@@ -1030,7 +1048,7 @@ function SupplierCard({
   onDelete,
   disabled,
 }: {
-  provider: BackendProvider;
+  provider: AdminProvider;
   isActive: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -1092,12 +1110,10 @@ function SupplierCard({
               ))}
             </div>
           )}
-          {provider.apiKey && (
+          {provider.hasApiKey && (
             <div className="flex items-center gap-1.5 text-xs text-neutral-500 mt-1">
               <Key className="h-3 w-3 shrink-0" />
-              <code className="truncate">
-                {provider.apiKey.slice(0, 4)}...({provider.apiKey.length})
-              </code>
+              <span>API Key 已配置</span>
             </div>
           )}
         </div>
@@ -1163,7 +1179,7 @@ function ModelConfigTab() {
       setConfig({
         enabledModels: data.frontend?.enabledModels || [],
         autoEnableRules: data.frontend?.autoEnableRules || [],
-        blacklist: data.frontend?.blacklist || [],
+        excludedModels: data.frontend?.excludedModels || [],
       });
       setConfigReady(true);
     } catch (err) {
@@ -1211,7 +1227,7 @@ function ModelConfigTab() {
         frontend: {
           enabledModels: config.enabledModels,
           autoEnableRules: config.autoEnableRules,
-          blacklist: config.blacklist,
+          excludedModels: config.excludedModels,
         },
       }),
     });
@@ -1228,7 +1244,7 @@ function ModelConfigTab() {
     [
       config.enabledModels,
       config.autoEnableRules,
-      config.blacklist,
+      config.excludedModels,
       configReady,
     ],
     500,
@@ -1268,15 +1284,23 @@ function ModelConfigTab() {
   const toggleModel = useCallback((id: string, enable: boolean) => {
     setConfig((prev) => {
       if (enable) {
-        if (prev.enabledModels.includes(id)) return prev;
+        if (prev.enabledModels.includes(id) && !prev.excludedModels.includes(id)) {
+          return prev;
+        }
         return {
           ...prev,
-          enabledModels: [...prev.enabledModels, id],
+          enabledModels: prev.enabledModels.includes(id)
+            ? prev.enabledModels
+            : [...prev.enabledModels, id],
+          excludedModels: prev.excludedModels.filter((model) => model !== id),
         };
       }
       return {
         ...prev,
         enabledModels: prev.enabledModels.filter((m) => m !== id),
+        excludedModels: prev.excludedModels.includes(id)
+          ? prev.excludedModels
+          : [...prev.excludedModels, id],
       };
     });
   }, []);
@@ -1309,6 +1333,9 @@ function ModelConfigTab() {
       setConfig((prev) => ({
         ...prev,
         enabledModels: [...prev.enabledModels, ...toEnable.map((m) => m.id)],
+        excludedModels: prev.excludedModels.filter(
+          (id) => !toEnable.some((model) => model.id === id),
+        ),
       }));
     },
     [availableModels, enabledSet],
@@ -1762,6 +1789,7 @@ function ImageGenTab() {
 
   const [enabled, setEnabled] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [hasApiKey, setHasApiKey] = useState(false);
   const [baseUrl, setBaseUrl] = useState("https://api.openai.com/v1");
   const [model, setModel] = useState("dall-e-3");
   const [apiProfile, setApiProfile] =
@@ -1782,7 +1810,8 @@ function ImageGenTab() {
       if (body.success && body.data?.imageGen) {
         const c = body.data.imageGen as ImageGenConfig;
         setEnabled(Boolean(c.enabled));
-        setApiKey(c.apiKey || "");
+        setApiKey("");
+        setHasApiKey(Boolean((c as ImageGenConfig & { hasApiKey?: boolean }).hasApiKey));
         setBaseUrl(c.baseUrl || "https://api.openai.com/v1");
         setModel(c.model || "dall-e-3");
         setApiProfile(c.apiProfile || "auto");
@@ -1826,6 +1855,10 @@ function ImageGenTab() {
     });
     const body = await res.json();
     if (body.success) {
+      if (apiKey) {
+        setApiKey("");
+        setHasApiKey(true);
+      }
       const genMsg = body.imageGenPushResult?.ok
         ? "，已同步至 agent-service"
         : body.imageGenPushResult
@@ -1933,11 +1966,13 @@ function ImageGenTab() {
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-..."
+            placeholder={hasApiKey ? "已配置；留空表示保留" : "sk-..."}
             className="bg-neutral-900 border-neutral-700 text-neutral-200 placeholder:text-neutral-500"
           />
           <p className="text-xs text-neutral-500">
-            图像生成接口的 API Key（OpenAI 兼容）
+            {hasApiKey
+              ? "API Key 已加密保存；输入新值可替换"
+              : "图像生成接口的 API Key（OpenAI 兼容）"}
           </p>
         </div>
 

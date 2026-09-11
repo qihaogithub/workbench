@@ -13,11 +13,16 @@ import {
   upsertExternalAuthConfig,
   type ExternalAuthUpsertInput,
 } from "@/lib/external-auth";
+import {
+  createFigmaOAuthState,
+  isFigmaOAuthHandoffConfigured,
+} from "@/lib/figma-oauth-handoff";
 import { createApiError, createApiSuccess } from "@/lib/fs-utils";
 import { listActiveSessionsForUser } from "@/lib/session-manager";
 
 const FIGMA_AUTH_URL = "https://www.figma.com/oauth";
 const DEFAULT_FIGMA_OAUTH_SCOPES = "file_content:read";
+const FIGMA_STATE_COOKIE = "figma_oauth_state";
 
 function getSigningSecret(): string {
   return process.env.JWT_SECRET || "change-me-in-production";
@@ -60,6 +65,18 @@ function getMissingFigmaOAuthMessage(): string {
     return "Figma OAuth 客户端未配置。开发环境请在 packages/author-site/.env.local 设置 FIGMA_OAUTH_CLIENT_ID 和 FIGMA_OAUTH_CLIENT_SECRET，重启 pnpm dev 后重试。";
   }
   return "Figma OAuth 客户端未配置，无法启用 Figma MCP 授权";
+}
+
+function figmaOAuthCookieOptions() {
+  return {
+    httpOnly: true,
+    secure:
+      process.env.NODE_ENV === "production" &&
+      process.env.USE_SECURE_COOKIE !== "false",
+    sameSite: "lax" as const,
+    maxAge: 10 * 60,
+    path: "/",
+  };
 }
 
 async function syncExternalAuthToActiveSessions(
@@ -158,13 +175,40 @@ export async function GET(
     }
 
     const redirectUri = buildFigmaRedirectUri(request);
-    const state = signState({
-      provider,
-      userId,
-      exp: Date.now() + 10 * 60_000,
-      nonce: crypto.randomUUID(),
-      sessionId: requestedSessionId,
-    });
+    const handoffConfigured = isFigmaOAuthHandoffConfigured();
+    const handoffSettingsPresent = Boolean(
+      process.env.FIGMA_OAUTH_TARGET_ID ||
+        process.env.FIGMA_OAUTH_HANDOFF_SECRET,
+    );
+    if (handoffSettingsPresent && !handoffConfigured) {
+      const status = upsertExternalAuthConfig(userId, {
+        provider,
+        status: "unsupported",
+        message:
+          "Figma OAuth 跨环境转发未完整配置，请检查 FIGMA_OAUTH_TARGET_ID、FIGMA_OAUTH_HANDOFF_SECRET 和 FIGMA_OAUTH_REDIRECT_URI",
+      });
+      await syncExternalAuthToActiveSessions(userId, requestedSessionId);
+      return NextResponse.json(createApiSuccess(status));
+    }
+
+    let state: string;
+    let stateNonce: string | undefined;
+    if (handoffConfigured) {
+      const created = await createFigmaOAuthState({
+        userId,
+        sessionId: requestedSessionId,
+      });
+      state = created.state;
+      stateNonce = created.nonce;
+    } else {
+      state = signState({
+        provider,
+        userId,
+        exp: Date.now() + 10 * 60_000,
+        nonce: crypto.randomUUID(),
+        sessionId: requestedSessionId,
+      });
+    }
     const url = new URL(FIGMA_AUTH_URL);
     url.searchParams.set("client_id", clientId);
     url.searchParams.set("redirect_uri", redirectUri);
@@ -181,7 +225,7 @@ export async function GET(
       message: "请在浏览器完成 Figma 授权",
     });
     await syncExternalAuthToActiveSessions(userId, requestedSessionId);
-    return NextResponse.json(
+    const response = NextResponse.json(
       createApiSuccess({
         provider,
         status: "pending",
@@ -189,6 +233,10 @@ export async function GET(
         expiresAt: Date.now() + 10 * 60_000,
       }),
     );
+    if (stateNonce) {
+      response.cookies.set(FIGMA_STATE_COOKIE, stateNonce, figmaOAuthCookieOptions());
+    }
+    return response;
   } catch (error) {
     return NextResponse.json(
       createApiError(
