@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 import * as path from "node:path";
 
+import { E2E_BASE_URL } from "./support/e2e-config";
+
 export default defineConfig({
   testDir: path.dirname(__filename),
   testMatch: "whiteboard-dialog-flow.spec.ts",
@@ -10,14 +12,14 @@ export default defineConfig({
   workers: 1,
   reporter: [["list"]],
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:4200",
+    baseURL: E2E_BASE_URL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
   webServer: {
     command:
       "NEXT_PUBLIC_WHITEBOARD_AUTHORING_ENABLED=true corepack pnpm --filter @workbench/author-site dev",
-    url: process.env.E2E_BASE_URL ?? "http://localhost:4200",
+    url: E2E_BASE_URL,
     reuseExistingServer: true,
     timeout: 120_000,
   },

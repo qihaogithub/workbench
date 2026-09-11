@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 
+import { getE2EBaseURL } from './support/e2e-config';
+
 const outputRoot = path.join(__dirname, 'test-outputs');
 const artifactDir = path.join(outputRoot, 'artifacts');
 const reportDir = path.join(outputRoot, 'test-reports');
@@ -9,7 +11,7 @@ if (!fs.existsSync(outputRoot)) {
   fs.mkdirSync(outputRoot, { recursive: true });
 }
 
-const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:4200';
+const baseURL = getE2EBaseURL();
 
 export default defineConfig({
   testDir: './',

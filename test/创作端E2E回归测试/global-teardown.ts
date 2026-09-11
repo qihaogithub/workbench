@@ -9,6 +9,7 @@ import {
   readE2EProjectRegistry,
 } from "./support/e2e-projects";
 import { loginE2EUser } from "./support/e2e-auth";
+import { getE2ELoginCredentials } from "./support/e2e-config";
 
 export default async function globalTeardown(): Promise<void> {
   const state = getE2ERunState();
@@ -17,11 +18,7 @@ export default async function globalTeardown(): Promise<void> {
   // registered fixture behind and made the cleanup warnings misleading.
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ baseURL: state.baseURL });
-  await loginE2EUser(page, {
-    baseURL: state.baseURL,
-    username: process.env.E2E_USER ?? "qihao",
-    password: process.env.E2E_PASSWORD ?? "130015",
-  });
+  await loginE2EUser(page, getE2ELoginCredentials(state.baseURL));
   const api = page.request;
 
   try {

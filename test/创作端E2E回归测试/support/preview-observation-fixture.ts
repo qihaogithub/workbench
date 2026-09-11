@@ -1,8 +1,7 @@
 import type { APIResponse, Page } from "@playwright/test";
 
+import { E2E_BASE_URL } from "./e2e-config";
 import { createE2EProject } from "./e2e-projects";
-
-const E2E_BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:4200";
 
 function absoluteApiUrl(pathname: string): string {
   return new URL(pathname, E2E_BASE_URL).toString();

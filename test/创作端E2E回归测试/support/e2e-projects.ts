@@ -2,6 +2,8 @@ import type { APIRequestContext, Page } from "@playwright/test";
 import * as fs from "fs";
 import * as path from "path";
 
+import { E2E_BASE_URL } from "./e2e-config";
+
 export const E2E_PROJECT_CATEGORY = "__e2e__";
 export const E2E_PROJECT_STALE_MS = 24 * 60 * 60 * 1000;
 
@@ -35,8 +37,6 @@ type E2EProjectRegistry = {
 };
 
 const sharedProjectCache = new Map<string, E2EProjectMeta>();
-
-const E2E_BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:4200";
 
 function absoluteApiUrl(pathname: string): string {
   return new URL(pathname, E2E_BASE_URL).toString();

@@ -5,8 +5,14 @@ import { fileURLToPath } from 'node:url';
 
 import { chromium } from '@playwright/test';
 
+import {
+  DEFAULT_E2E_BASE_URL,
+  getE2EPassword,
+  getE2EUser,
+} from './e2e-config.mjs';
+
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const defaultBaseUrl = 'http://localhost:4200';
+const defaultBaseUrl = DEFAULT_E2E_BASE_URL;
 
 function printUsage() {
   console.log(`Usage:
@@ -21,8 +27,8 @@ Options:
   --sample-ms <ms>        Sampling interval. Default: 500.
   --headed                Run Chromium with a visible window.
   --headless              Run Chromium headless.
-  --user <username>       Login username. Default: E2E_USER or qihao.
-  --password <password>   Login password. Default: E2E_PASSWORD or 130015.
+  --user <username>       Login username. Default: E2E_USER or test.
+  --password <password>   Login password. Required unless --list-projects/--help.
   --report-dir <path>     Output directory. Default: tmp/sync-status-flap.
   --flush-only            Only run the workspace flush probe. Skips visible status assertions.
   --list-projects         List local data/projects candidates and exit.
@@ -70,8 +76,8 @@ function parseArgs(argv) {
     sampleMs: process.env.SYNC_STATUS_SAMPLE_MS ?? '500',
     durationMs: process.env.SYNC_STATUS_DURATION_MS ?? '20000',
     headless: process.env.HEADLESS !== '0',
-    user: process.env.E2E_USER ?? 'qihao',
-    password: process.env.E2E_PASSWORD ?? '130015',
+    user: getE2EUser(),
+    password: process.env.E2E_PASSWORD,
     reportDir: path.join(repoRoot, 'tmp', 'sync-status-flap'),
     flushOnly: false,
     listProjects: false,
@@ -185,7 +191,7 @@ const selectedProjectId = getProjectIdFromUrl(targetUrl);
 const selectedProject = localProjects.find((project) => project.id === selectedProjectId) ?? null;
 const headless = cliOptions.headless;
 const e2eUser = cliOptions.user;
-const e2ePassword = cliOptions.password;
+const e2ePassword = cliOptions.password ?? getE2EPassword();
 const reportDir = cliOptions.reportDir;
 const reportPath = path.join(reportDir, 'report.json');
 const screenshotPath = path.join(reportDir, 'last-page.png');

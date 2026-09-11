@@ -9,6 +9,10 @@ import type {
 
 import { loginE2EUser } from "./support/e2e-auth";
 import {
+  E2E_BASE_URL,
+  getE2ELoginCredentials,
+} from "./support/e2e-config";
+import {
   addPreviewObservationPage,
   createPreviewObservationCompileFailureFixture,
   createPreviewObservationFixture,
@@ -16,9 +20,6 @@ import {
   type PreviewObservationFixture,
 } from "./support/preview-observation-fixture";
 
-const E2E_BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:4200";
-const E2E_USER = process.env.E2E_USER ?? "qihao";
-const E2E_PASSWORD = process.env.E2E_PASSWORD ?? "130015";
 const RUN_PREVIEW_OBSERVATION_E2E = process.env.E2E_PREVIEW_OBSERVATION === "1";
 const RUN_REAL_PREVIEW_BROKER_E2E =
   process.env.E2E_PREVIEW_OBSERVATION_REAL === "1";
@@ -501,11 +502,7 @@ async function openFixtureEditor(
       });
     });
   }
-  await loginE2EUser(page, {
-    baseURL: E2E_BASE_URL,
-    username: E2E_USER,
-    password: E2E_PASSWORD,
-  });
+  await loginE2EUser(page, getE2ELoginCredentials());
   await page.goto(`${E2E_BASE_URL}/demo/${fixture.projectId}/edit`, {
     waitUntil: "domcontentloaded",
   });
@@ -635,11 +632,7 @@ test.describe("OBS-009/OBS-105 浏览器运行时观察验收", () => {
       });
     });
     try {
-      await loginE2EUser(page, {
-        baseURL: E2E_BASE_URL,
-        username: E2E_USER,
-        password: E2E_PASSWORD,
-      });
+      await loginE2EUser(page, getE2ELoginCredentials());
       const fixture = await createPreviewObservationFixture(
         page,
         `OBS-009/OBS-105 浏览器观察 ${testInfo.testId}`,
@@ -1132,11 +1125,7 @@ test.describe("OBS-009/OBS-105 浏览器运行时观察验收", () => {
       });
     });
     try {
-      await loginE2EUser(page, {
-        baseURL: E2E_BASE_URL,
-        username: E2E_USER,
-        password: E2E_PASSWORD,
-      });
+      await loginE2EUser(page, getE2ELoginCredentials());
       const fixture = await createPreviewObservationCompileFailureFixture(
         page,
         `OBS-009 编译失败 ${testInfo.testId}`,
@@ -1294,11 +1283,7 @@ test.describe("OBS-009/OBS-105 浏览器运行时观察验收", () => {
       });
     });
     try {
-      await loginE2EUser(page, {
-        baseURL: E2E_BASE_URL,
-        username: E2E_USER,
-        password: E2E_PASSWORD,
-      });
+      await loginE2EUser(page, getE2ELoginCredentials());
       const fixture = await createPreviewObservationFixture(
         page,
         `OBS-009 截图服务不可用 ${testInfo.testId}`,
@@ -1416,11 +1401,7 @@ test.describe("OBS-009/OBS-105 浏览器运行时观察验收", () => {
       });
     });
     try {
-      await loginE2EUser(page, {
-        baseURL: E2E_BASE_URL,
-        username: E2E_USER,
-        password: E2E_PASSWORD,
-      });
+      await loginE2EUser(page, getE2ELoginCredentials());
       const fixture = await createPreviewObservationFixture(
         page,
         `OBS-009 快速切页 ${testInfo.testId}`,
@@ -1648,11 +1629,7 @@ test.describe("OBS-009/OBS-105 浏览器运行时观察验收", () => {
       });
     });
     try {
-      await loginE2EUser(page, {
-        baseURL: E2E_BASE_URL,
-        username: E2E_USER,
-        password: E2E_PASSWORD,
-      });
+      await loginE2EUser(page, getE2ELoginCredentials());
       const fixture = await createPreviewObservationFixture(
         page,
         `OBS-009 多标签连接隔离 ${testInfo.testId}`,
@@ -1841,11 +1818,7 @@ test.describe("OBS-009/OBS-105 浏览器运行时观察验收", () => {
       });
     });
     try {
-      await loginE2EUser(page, {
-        baseURL: E2E_BASE_URL,
-        username: E2E_USER,
-        password: E2E_PASSWORD,
-      });
+      await loginE2EUser(page, getE2ELoginCredentials());
       const fixture = await createPreviewObservationRuntimeErrorFixture(
         page,
         `OBS-105 高保真 runtime error ${testInfo.testId}`,

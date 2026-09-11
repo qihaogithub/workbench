@@ -7,10 +7,11 @@ import {
   e2eProjectName,
   ensureE2EProjectCategory,
 } from './support/e2e-projects';
-
-const E2E_BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3200';
-const E2E_USER = process.env.E2E_USER ?? 'qihao';
-const E2E_PASSWORD = process.env.E2E_PASSWORD ?? '130015';
+import {
+  E2E_BASE_URL,
+  E2E_USER,
+  getE2EPassword,
+} from './support/e2e-config';
 
 type ApiEnvelope<T> = {
   success: boolean;
@@ -193,7 +194,7 @@ async function doLogin(page: Page, logger: TestLogger): Promise<boolean> {
 
     const passwordInput = page.locator('#password');
     await passwordInput.waitFor({ state: 'visible', timeout: 10000 });
-    await passwordInput.fill(E2E_PASSWORD);
+    await passwordInput.fill(getE2EPassword());
     logger.log('已填写密码');
 
     const loginButton = page.getByRole('button', { name: /^登录$/i }).first();

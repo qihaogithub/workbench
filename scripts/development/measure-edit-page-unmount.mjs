@@ -14,9 +14,9 @@
  *   node scripts/development/measure-edit-page-unmount.mjs [projectId]
  *
  * 环境变量:
- *   BASE_URL  — 创作端地址（默认 http://localhost:4200）
+ *   E2E_BASE_URL  — 创作端地址（默认 http://localhost:4200；BASE_URL 为兼容别名）
  *   PROJECT_ID — 项目 ID（默认取 data/projects/ 下第一个）
- *   USERNAME / PASSWORD — 登录凭据
+ *   E2E_USER / E2E_PASSWORD — 登录凭据（密码无默认值；USERNAME/PASSWORD 为兼容别名）
  *   NO_LOGIN — 设为 1 跳过自动登录
  *   RUNS — 重复测量次数（默认 3）
  */
@@ -24,9 +24,14 @@
 import { execSync } from "child_process";
 import { readdirSync } from "fs";
 
-const BASE_URL = process.env.BASE_URL || "http://localhost:4200";
-const USERNAME = process.env.USERNAME || "qihao";
-const PASSWORD = process.env.PASSWORD || "130015";
+import {
+  getE2EBaseURL,
+  getE2EPassword,
+  getE2EUser,
+} from "./e2e-config.mjs";
+
+const BASE_URL = getE2EBaseURL("BASE_URL");
+const USERNAME = getE2EUser("USERNAME");
 const SKIP_LOGIN = process.env.NO_LOGIN === "1";
 const RUNS = Math.max(1, Number(process.env.RUNS) || 3);
 
@@ -68,7 +73,7 @@ ${SKIP_LOGIN ? "" : `
   if (onLoginPage) {
     cliLog('logging in...');
     await fillInput('input[type="text"], input[type="email"]', '${esc(USERNAME)}');
-    await fillInput('input[type="password"]', '${esc(PASSWORD)}');
+    await fillInput('input[type="password"]', '${esc(getE2EPassword("PASSWORD"))}');
     await click('button[type="submit"]', { label: 'login' });
     await wait(5);
   }

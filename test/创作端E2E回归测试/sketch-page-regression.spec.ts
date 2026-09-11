@@ -2,11 +2,8 @@
 import { expect, type APIResponse, type Page, test } from '@playwright/test';
 
 import { loginE2EUser } from './support/e2e-auth';
+import { E2E_BASE_URL, getE2ELoginCredentials } from './support/e2e-config';
 import { createE2EProject } from './support/e2e-projects';
-
-const E2E_BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3200';
-const E2E_USER = process.env.E2E_USER ?? 'qihao';
-const E2E_PASSWORD = process.env.E2E_PASSWORD ?? '130015';
 
 type ApiSuccess<T> = {
   success: true;
@@ -46,11 +43,7 @@ async function parseApiResponse<T>(response: APIResponse): Promise<T> {
 }
 
 async function openHome(page: Page): Promise<void> {
-  await loginE2EUser(page, {
-    baseURL: E2E_BASE_URL,
-    username: E2E_USER,
-    password: E2E_PASSWORD,
-  });
+  await loginE2EUser(page, getE2ELoginCredentials());
   await page.goto(E2E_BASE_URL, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle');
 }

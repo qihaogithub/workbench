@@ -5,6 +5,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { getE2EBaseURL } from "./e2e-config.mjs";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../..");
 const owBin = path.join(repoRoot, "packages/project-cli/bin/ow.mjs");
@@ -240,11 +242,11 @@ try {
     projects: {
       prototype: {
         projectId: prototypeProjectId,
-        editUrl: `http://localhost:4200/demo/${prototypeProjectId}/edit`,
+        editUrl: `${getE2EBaseURL()}/demo/${prototypeProjectId}/edit`,
       },
       highFidelity: {
         projectId: highFidelityProjectId,
-        editUrl: `http://localhost:4200/demo/${highFidelityProjectId}/edit`,
+        editUrl: `${getE2EBaseURL()}/demo/${highFidelityProjectId}/edit`,
       },
     },
   }, null, 2));

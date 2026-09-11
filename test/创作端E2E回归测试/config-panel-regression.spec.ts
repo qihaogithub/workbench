@@ -2,11 +2,11 @@
 import { expect, type APIResponse, type Page, test } from '@playwright/test';
 
 import { loginE2EUser } from './support/e2e-auth';
+import {
+  E2E_BASE_URL,
+  getE2ELoginCredentials,
+} from './support/e2e-config';
 import { createE2EProject } from './support/e2e-projects';
-
-const E2E_BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3200';
-const USERNAME = process.env.E2E_USER ?? process.env.E2E_USERNAME ?? 'qihao';
-const PASSWORD = process.env.E2E_PASSWORD ?? '130015';
 
 type ApiEnvelope<T> = {
   success: boolean;
@@ -209,11 +209,7 @@ test.describe('创作端配置功能回归', () => {
   test.describe.configure({ timeout: 180000 });
 
   test('覆盖项目级配置、页面级配置、画布选中联动、空白选择和 schema 冲突', async ({ page }) => {
-    await loginE2EUser(page, {
-      baseURL: E2E_BASE_URL,
-      username: USERNAME,
-      password: PASSWORD,
-    });
+    await loginE2EUser(page, getE2ELoginCredentials());
 
     await page.goto(E2E_BASE_URL, { waitUntil: 'networkidle' });
 

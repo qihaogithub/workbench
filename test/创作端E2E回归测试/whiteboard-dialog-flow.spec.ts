@@ -1,11 +1,8 @@
 import { expect, type APIResponse, type Page, test } from "@playwright/test";
 
 import { loginE2EUser } from "./support/e2e-auth";
+import { E2E_BASE_URL, getE2ELoginCredentials } from "./support/e2e-config";
 import { createE2EProject } from "./support/e2e-projects";
-
-const E2E_BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:4200";
-const E2E_USER = process.env.E2E_USER ?? "qihao";
-const E2E_PASSWORD = process.env.E2E_PASSWORD ?? "130015";
 
 const WHITEBOARD_SCHEMA = JSON.stringify(
   {
@@ -73,11 +70,7 @@ async function parseApi<T>(response: APIResponse): Promise<T> {
 async function openEditPage(
   page: Page,
 ): Promise<{ projectId: string; sessionId: string }> {
-  await loginE2EUser(page, {
-    baseURL: E2E_BASE_URL,
-    username: E2E_USER,
-    password: E2E_PASSWORD,
-  });
+  await loginE2EUser(page, getE2ELoginCredentials());
   const project = await createE2EProject(page, "配置图片白板宿主回归");
   createdProjectId = project.id;
   const session = await parseApi<SessionData>(

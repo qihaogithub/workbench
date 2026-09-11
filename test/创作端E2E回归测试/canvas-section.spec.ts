@@ -8,10 +8,11 @@ import {
 } from "@playwright/test";
 
 import { createE2EProject } from "./support/e2e-projects";
-
-const E2E_BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:4200";
-const E2E_USER = process.env.E2E_USER ?? "qihao";
-const E2E_PASSWORD = process.env.E2E_PASSWORD ?? "130015";
+import {
+  E2E_BASE_URL,
+  E2E_USER,
+  getE2EPassword,
+} from "./support/e2e-config";
 
 type ApiSuccess<T> = { success: true; data: T };
 type ApiFailure = { success: false; error?: { message?: string } };
@@ -44,7 +45,7 @@ async function parseApiResponse<T>(
 async function login(page: Page): Promise<void> {
   await parseApiResponse<unknown>(
     await page.request.post("/api/auth/login", {
-      data: { username: E2E_USER, password: E2E_PASSWORD },
+      data: { username: E2E_USER, password: getE2EPassword() },
     }),
   );
 }

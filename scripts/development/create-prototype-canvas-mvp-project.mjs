@@ -5,6 +5,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { getE2EBaseURL } from "./e2e-config.mjs";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../..");
 const owBin = path.join(repoRoot, "packages/project-cli/bin/ow.mjs");
@@ -211,7 +213,7 @@ try {
   runOw(["edit", "commit", edit.editId, "--note", "创建 30 个 HTML/CSS 原型页画布体验项目"]);
   runOw(["project", "validate-runtime", project.id]);
 
-  const url = `http://localhost:4200/demo/${project.id}/edit`;
+  const url = `${getE2EBaseURL()}/demo/${project.id}/edit`;
   console.log(JSON.stringify({
     ok: true,
     projectId: project.id,

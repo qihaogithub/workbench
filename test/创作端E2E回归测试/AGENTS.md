@@ -17,6 +17,7 @@ test/创作端E2E回归测试/
 ├── global-setup.ts                   # 生成 E2E runId 和项目登记文件
 ├── global-teardown.ts                # 清理本轮和过期 E2E 测试项目
 ├── support/e2e-auth.ts               # E2E 登录 helper
+├── support/e2e-config.ts             # 地址与测试账号统一配置入口
 ├── support/e2e-projects.ts           # E2E 测试项目创建、登记和清理 helper
 ├── support/preview-observation-fixture.ts # 预览观察 DOM/布局夹具
 ├── support/preview-observation-fake-llm.mjs # 真实 Broker opt-in 的确定性模型服务
@@ -27,7 +28,7 @@ test/创作端E2E回归测试/
 
 测试脚本实现以下完整流程：
 
-1. **打开首页** - 导航至 `http://localhost:3200`
+1. **打开首页** - 默认导航至 local profile 的 `http://localhost:4200`
 2. **新建项目** - 点击新建项目按钮，填写项目名称
 3. **打开编辑页** - 进入项目编辑页面
 4. **粘贴代码** - 将预设模板代码粘贴到代码编辑区
@@ -62,12 +63,14 @@ test/创作端E2E回归测试/
    pnpm playwright install chromium
    ```
 
-3. 可选环境变量：
+3. 配置测试环境。密码没有默认值，必须显式提供：
    ```bash
-   E2E_BASE_URL=http://localhost:3200
-   E2E_USER=qihao
-   E2E_PASSWORD=130015
+   E2E_BASE_URL=http://localhost:4200
+   E2E_USER=test
+   E2E_PASSWORD=<测试账号密码>
    ```
+
+   Docker profile 显式使用 `E2E_BASE_URL=http://localhost:3200`。测试代码不得自行读取这些变量，统一通过 `support/e2e-config.ts`。
 
 ### 执行命令
 
@@ -152,7 +155,7 @@ pnpm test:e2e -- -t "完整流程"
 
 ```bash
 # 打开浏览器并逐步执行
-playwright-cli open http://localhost:3200
+playwright-cli open http://localhost:4200
 
 # 查看页面快照（获取元素引用）
 playwright-cli snapshot

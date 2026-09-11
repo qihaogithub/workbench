@@ -3,6 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { chromium } from "@playwright/test";
 
+import {
+  getE2EBaseURL,
+  getE2EPassword,
+  getE2EUser,
+} from "./e2e-config.mjs";
+
 function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
@@ -31,15 +37,15 @@ function resolveUrl(args) {
   if (!projectId) {
     throw new Error("Missing --url or --project-id");
   }
-  const baseUrl = args["base-url"] ?? process.env.PROTOTYPE_CANVAS_BASE_URL ?? "http://localhost:4200";
+  const baseUrl = args["base-url"] ?? process.env.PROTOTYPE_CANVAS_BASE_URL ?? getE2EBaseURL();
   return `${String(baseUrl).replace(/\/$/, "")}/demo/${encodeURIComponent(projectId)}/edit`;
 }
 
 async function loginIfNeeded(page, targetUrl, args) {
   if (!page.url().includes("/login")) return { attempted: false, ok: true };
   const url = new URL(targetUrl);
-  const username = args.user ?? process.env.E2E_USER ?? "qihao";
-  const password = args.password ?? process.env.E2E_PASSWORD ?? "130015";
+  const username = args.user ?? getE2EUser();
+  const password = args.password ?? getE2EPassword();
   try {
     await page.getByLabel("用户名").fill(username);
     await page.getByLabel("密码").fill(password);
