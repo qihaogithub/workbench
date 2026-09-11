@@ -37,13 +37,16 @@ function request(
     origin?: string;
     cookie?: string;
     authorization?: string;
+    baseUrl?: string;
+    host?: string;
   } = {},
 ) {
   const headers = new Headers();
   if (options.origin) headers.set("origin", options.origin);
   if (options.cookie) headers.set("cookie", options.cookie);
   if (options.authorization) headers.set("authorization", options.authorization);
-  const url = new URL(path, "http://localhost");
+  const url = new URL(path, options.baseUrl ?? "http://localhost");
+  headers.set("host", options.host ?? url.host);
   return {
     cookies: {
       get: (name: string) => {
@@ -99,6 +102,32 @@ describe("proxy authentication and CORS contract", () => {
     expect(response.headers.get("location")).toBe(
       "http://localhost/login?redirect=%2Fdemo%2Fproject-1",
     );
+  });
+
+  it("canonicalizes the unspecified Docker host for browser page requests", async () => {
+    const response = await proxy(
+      request("/workbench?tab=templates", {
+        baseUrl: "http://0.0.0.0:3200",
+      }),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3200/workbench?tab=templates",
+    );
+    expect(verifyToken).not.toHaveBeenCalled();
+  });
+
+  it("trusts the visible host header when Next uses the container hostname", async () => {
+    const response = await proxy(
+      request("/login", {
+        baseUrl: "http://0.0.0.0:3200",
+        host: "localhost:3200",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
   });
 
   it("redirects an authenticated user away from the login page", async () => {

@@ -23,9 +23,23 @@ const AUTH_ROUTES = ["/login"];
 const ADMIN_ROUTES = ["/admin"];
 const ADMIN_API_ROUTES = ["/api/admin"];
 const DEFAULT_CORS_ORIGINS = ["http://localhost:3300", "http://127.0.0.1:3300"];
+const UNSPECIFIED_HOSTNAMES = new Set(["0.0.0.0", "::", "[::]"]);
 
 function matchesRoute(pathname: string, route: string): boolean {
   return pathname === route || pathname.startsWith(`${route}/`);
+}
+
+function getRequestHostname(request: NextRequest): string {
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = forwardedHost?.split(",", 1)[0]?.trim() || request.headers.get("host");
+  if (host) {
+    try {
+      return new URL(`http://${host}`).hostname;
+    } catch {
+      // Fall back to Next's parsed URL when the proxy supplied an invalid host.
+    }
+  }
+  return request.nextUrl.hostname;
 }
 
 function getAllowedCorsOrigins(): string[] {
@@ -57,10 +71,20 @@ function applyPublicModuleCorsHeaders(headers: Headers) {
 }
 
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  if (
+    request.method === "GET" &&
+    !pathname.startsWith("/api/") &&
+    UNSPECIFIED_HOSTNAMES.has(getRequestHostname(request))
+  ) {
+    const canonicalUrl = new URL(request.url);
+    canonicalUrl.hostname = "localhost";
+    return NextResponse.redirect(canonicalUrl);
+  }
+
   const cookieToken = request.cookies.get(getAuthCookieName())?.value;
   const token = cookieToken || extractBearerToken(request.headers.get("authorization"));
   const payload = token ? await verifyToken(token) : null;
-  const pathname = request.nextUrl.pathname;
   // Page redirects must agree with the workbench's database-backed identity
   // check. A signed token can outlive its user (or a local database restore).
   const needsExistingUser = pathname === "/" ||
