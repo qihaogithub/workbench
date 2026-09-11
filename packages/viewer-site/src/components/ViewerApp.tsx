@@ -1167,16 +1167,23 @@ function ProjectPreviewPage({ projectId, requestedPageId, commentThreadId, comme
 
           const pageResults = await Promise.all(
             data.demoPages.map(async (page) => {
+              const pageProjectConfigSchema =
+                page.referenceProjectConfigSchema ?? data.projectConfigSchema;
+              const pageProjectConfigValues =
+                page.referenceProjectConfigValues ?? data.projectConfigValues;
               if (!page.schemaPath) {
                 return {
                   pageId: page.id,
                   schema: undefined,
-                  config: mergeConfigDefaults(
-                    data.projectConfigSchema,
-                    undefined,
-                    data.projectConfigValues,
-                    projectId,
-                  ),
+                  config: {
+                    ...mergeConfigDefaults(
+                      pageProjectConfigSchema,
+                      undefined,
+                      pageProjectConfigValues,
+                      projectId,
+                    ),
+                    ...(page.pageConfigValues ?? {}),
+                  },
                 };
               }
 
@@ -1186,23 +1193,29 @@ function ProjectPreviewPage({ projectId, requestedPageId, commentThreadId, comme
                 return {
                   pageId: page.id,
                   schema: schemaStr,
-                  config: mergeConfigDefaults(
-                    data.projectConfigSchema,
-                    schemaStr,
-                    data.projectConfigValues,
-                    projectId,
-                  ),
+                  config: {
+                    ...mergeConfigDefaults(
+                      pageProjectConfigSchema,
+                      schemaStr,
+                      pageProjectConfigValues,
+                      projectId,
+                    ),
+                    ...(page.pageConfigValues ?? {}),
+                  },
                 };
               } catch {
                 return {
                   pageId: page.id,
                   schema: undefined,
-                  config: mergeConfigDefaults(
-                    data.projectConfigSchema,
-                    undefined,
-                    data.projectConfigValues,
-                    projectId,
-                  ),
+                  config: {
+                    ...mergeConfigDefaults(
+                      pageProjectConfigSchema,
+                      undefined,
+                      pageProjectConfigValues,
+                      projectId,
+                    ),
+                    ...(page.pageConfigValues ?? {}),
+                  },
                 };
               }
             }),
@@ -1740,6 +1753,7 @@ function ProjectPreviewPage({ projectId, requestedPageId, commentThreadId, comme
         order: page.order,
         schema: visiblePageSchemaMap[page.id],
         configData: configDataMap[page.id],
+        projectConfigSchema: page.referenceProjectConfigSchema,
         projectConfigBindings:
           page.runtimeType === "prototype-html-css"
             ? extractPrototypeConfigBindingKeys(page.prototypeHtml)

@@ -67,12 +67,74 @@ import {
   sanitizePublishedMarkdown,
   type PublishedMarkdownReferenceSnapshot,
 } from "@/lib/publish-markdown-references";
+import { resolveActiveReferenceGrant } from "@/lib/page-transfer";
 
 const PUBLISHED_DIR = path.join(getDataDir(), "published");
 const SCREENSHOTS_DIR = path.join(getDataDir(), "screenshots");
 /** sandbox 源码发布到服务端私有目录；绝不位于 /data 静态公开目录。 */
 const PUBLISHED_SANDBOX_DIR = path.join(getDataDir(), "html-sandbox-published");
 const SANDBOX_RENDERER_VERSION = 1;
+
+function readJsonObject(filePath: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function resolvePublishedPageSource(
+  targetWorkspacePath: string,
+  page: DemoPageMeta,
+): {
+  workspacePath: string;
+  page: DemoPageMeta;
+  referenceId?: string;
+  projectConfigSchema?: string;
+  projectConfigValues?: Record<string, unknown>;
+} {
+  if (!page.reference) return { workspacePath: targetWorkspacePath, page };
+  let grant;
+  try {
+    grant = resolveActiveReferenceGrant(page.reference.grantId);
+  } catch {
+    throw new PublishError(
+      "PAGE_REFERENCE_INVALID",
+      `引用页 ${page.id} 的授权不存在或源项目不可用`,
+    );
+  }
+  if (
+    grant.targetPageId !== page.id ||
+    grant.sourceProjectId !== page.reference.sourceProjectId ||
+    grant.sourcePageId !== page.reference.sourcePageId ||
+    !projectExists(grant.sourceProjectId)
+  ) {
+    throw new PublishError("PAGE_REFERENCE_INVALID", `引用页 ${page.id} 的授权绑定不一致`);
+  }
+  const sourceWorkspacePath = path.join(
+    getProjectPath(grant.sourceProjectId),
+    "workspace",
+  );
+  const sourcePage = listDemoPages(sourceWorkspacePath).find(
+    (candidate) => candidate.id === grant.sourcePageId,
+  );
+  if (!sourcePage || sourcePage.reference) {
+    throw new PublishError(
+      "PAGE_REFERENCE_INVALID",
+      `引用页 ${page.id} 的终端源页面不可用`,
+    );
+  }
+  return {
+    workspacePath: sourceWorkspacePath,
+    page: sourcePage,
+    referenceId: page.reference.grantId,
+    projectConfigSchema: getProjectConfigSchema(sourceWorkspacePath) ?? undefined,
+    projectConfigValues: getProjectConfigValues(sourceWorkspacePath),
+  };
+}
 
 /** 读取工作区知识库 manifest，返回可直接发布的元数据 */
 export function readKnowledgeManifestForPublish(
@@ -189,6 +251,10 @@ export interface PublishedDemoPage {
   sandboxExecutionPath?: string;
   htmlImportMeta?: HtmlImportMeta;
   sandboxRendererVersion?: number;
+  referenceId?: string;
+  referenceProjectConfigSchema?: string;
+  referenceProjectConfigValues?: Record<string, unknown>;
+  pageConfigValues?: Record<string, unknown>;
 }
 
 interface ScreenshotMeta {
@@ -275,7 +341,8 @@ export class PublishError extends Error {
       | "PUBLISH_RUNTIME_UNSUPPORTED"
       | "VISIBILITY_RULES_INVALID"
       | "SANDBOX_ORIGIN_NOT_CONFIGURED"
-      | "SANDBOX_MANIFEST_INVALID",
+      | "SANDBOX_MANIFEST_INVALID"
+      | "PAGE_REFERENCE_INVALID",
     message: string,
     public readonly details?: unknown,
   ) {
@@ -797,7 +864,8 @@ export async function publishProject(
 
   for (let i = 0; i < demoPages.length; i++) {
     const page = demoPages[i];
-    const demoDir = getDemoDirPath(workspacePath, page.id);
+    const pageSource = resolvePublishedPageSource(workspacePath, page);
+    const demoDir = getDemoDirPath(pageSource.workspacePath, pageSource.page.id);
     const codePath = path.join(demoDir, "index.tsx");
     const schemaPath = path.join(demoDir, "config.schema.json");
     const prototypeHtmlPath = path.join(demoDir, "prototype.html");
@@ -806,8 +874,22 @@ export async function publishProject(
     const sketchScenePath = path.join(demoDir, "sketch.scene.json");
     const sketchMetaPath = path.join(demoDir, "sketch.meta.json");
     const requirementsPath = path.join(demoDir, "requirements.md");
-    const runtimeType = page.runtimeType;
-    const regionIds = collectDeclaredRegionIds(workspacePath, page);
+    const pageValuesPath = path.join(demoDir, "config.values.json");
+    const runtimeType = pageSource.page.runtimeType;
+    const regionIds = collectDeclaredRegionIds(
+      pageSource.workspacePath,
+      pageSource.page,
+    );
+    const pageConfigValues = fs.existsSync(pageValuesPath)
+      ? readJsonObject(pageValuesPath)
+      : {};
+    const referencePublishFields = pageSource.referenceId
+      ? {
+          referenceId: pageSource.referenceId,
+          referenceProjectConfigSchema: pageSource.projectConfigSchema,
+          referenceProjectConfigValues: pageSource.projectConfigValues,
+        }
+      : {};
 
     try {
       getPageRuntimeCapabilities(runtimeType);
@@ -892,6 +974,7 @@ export async function publishProject(
       }
 
       publishedDemoPages.push({
+        ...referencePublishFields,
         id: page.id,
         name: page.name,
         routeKey: page.routeKey,
@@ -912,6 +995,7 @@ export async function publishProject(
         prototypeMetaPath: prototypeMeta
           ? `demos/${page.id}/prototype.meta.json`
           : undefined,
+        pageConfigValues,
       });
       dryRunPages.push({
         pageId: page.id,
@@ -956,6 +1040,7 @@ export async function publishProject(
       }
 
       publishedDemoPages.push({
+        ...referencePublishFields,
         id: page.id,
         name: page.name,
         routeKey: page.routeKey,
@@ -974,6 +1059,7 @@ export async function publishProject(
         sketchMetaPath: sketchMeta
           ? `demos/${page.id}/sketch.meta.json`
           : undefined,
+        pageConfigValues,
       });
       dryRunPages.push({
         pageId: page.id,
@@ -1016,6 +1102,7 @@ export async function publishProject(
       pendingSandboxPages.push({ pageId: page.id, sourceKey, html, htmlImportMeta });
       const sandboxExecutionPath = `/api/projects/${encodeURIComponent(projectId)}/published-html-execution/${encodeURIComponent(page.id)}?version=${encodeURIComponent("__PUBLISHED_VERSION__")}`;
       publishedDemoPages.push({
+        ...referencePublishFields,
         id: page.id,
         name: page.name,
         routeKey: page.routeKey,
@@ -1031,6 +1118,7 @@ export async function publishProject(
         sandboxExecutionPath,
         htmlImportMeta,
         sandboxRendererVersion: SANDBOX_RENDERER_VERSION,
+        pageConfigValues,
       });
       dryRunPages.push({
         pageId: page.id,
@@ -1079,11 +1167,17 @@ export async function publishProject(
 
     fs.writeFileSync(path.join(demoPublishDir, "compiled.js"), replacedCode);
 
+    const effectiveProjectConfigDefaults = pageSource.projectConfigSchema
+      ? extractSchemaDefaults(pageSource.projectConfigSchema)
+      : projectConfigDefaults;
+    const effectiveProjectConfigValues = pageSource.projectConfigValues
+      ?? projectConfigValues;
     const mergedConfigData = replaceConfigValueAssetUrls(
       {
-        ...projectConfigDefaults,
+        ...effectiveProjectConfigDefaults,
         ...pageConfigData,
-        ...projectConfigValues,
+        ...effectiveProjectConfigValues,
+        ...pageConfigValues,
       },
       urlMap,
     ) as Record<string, unknown>;
@@ -1110,6 +1204,7 @@ export async function publishProject(
     const embedCode = `<iframe\n  src="${iframeSrc}"\n  sandbox="allow-scripts"\n  width="${embedWidth}"\n  height="${embedHeight}"\n  style="width: min(100%, ${embedWidth}px); height: ${embedHeight}px; border: none;"\n/>`;
 
     publishedDemoPages.push({
+      ...referencePublishFields,
       id: page.id,
       name: page.name,
       routeKey: page.routeKey,
@@ -1125,6 +1220,7 @@ export async function publishProject(
       screenshotPath,
       iframeHtmlPath,
       embedCode,
+      pageConfigValues,
     });
 
     const pagePercent =

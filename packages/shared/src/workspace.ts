@@ -185,6 +185,7 @@ export interface DemoPageMeta {
   /** 是否属于模板页；独立于项目类型持久化。历史数据缺失时按 false 处理。 */
   isTemplatePage?: boolean;
   reference?: {
+    grantId: string;           // 页面级持续授权 ID
     sourceProjectId: string;   // 源项目 ID
     sourcePageId: string;      // 源页面 ID
   };

@@ -52,6 +52,10 @@ export interface PublishedDemoPage {
   };
   sandboxRendererVersion?: number;
   requirements?: string;
+  referenceId?: string;
+  referenceProjectConfigSchema?: string;
+  referenceProjectConfigValues?: Record<string, unknown>;
+  pageConfigValues?: Record<string, unknown>;
 }
 
 export interface PublishedHtmlExecution {
@@ -207,7 +211,16 @@ export async function getProjects(): Promise<ProjectsIndex> {
 export async function getProjectData(
   projectId: string,
 ): Promise<PublishedProject> {
-  const project = await fetchJson<PublishedProject>(`/data/${projectId}/project.json`);
+  const published = await fetchJson<PublishedProject>(`/data/${projectId}/project.json`);
+  const hydratedPages = await Promise.all(published.demoPages.map(async (page) => {
+    if (!page.referenceId) return page;
+    const payload = await fetchJson<{ success: boolean; data?: PublishedDemoPage; error?: { message?: string } }>(
+      `/api/projects/${encodeURIComponent(projectId)}/published-reference/${encodeURIComponent(page.referenceId)}?version=${encodeURIComponent(published.publishedVersion)}`,
+    );
+    if (!payload.success || !payload.data) throw new Error(payload.error?.message ?? "引用页面解析失败");
+    return { ...page, ...payload.data, id: page.id, name: page.name, order: page.order, parentId: page.parentId, referenceId: page.referenceId };
+  }));
+  const project = { ...published, demoPages: hydratedPages };
   const reference = project.visibilityRulesRef;
   if (!reference) return project;
   if (reference.path !== "visibility-rules.json" || !/^[a-f0-9]{64}$/i.test(reference.sha256)) {
