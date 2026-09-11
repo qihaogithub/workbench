@@ -35,6 +35,9 @@ function mockImageGenModules(options: {
   jest.doMock("@/lib/agent-providers", () => ({
     pushImageGenConfig,
   }));
+  jest.doMock("@/lib/global-model-secrets", () => ({
+    hydrateImageGen: (value: ImageGenConfig) => value,
+  }));
 
   return {
     readDbConfigWithMeta,

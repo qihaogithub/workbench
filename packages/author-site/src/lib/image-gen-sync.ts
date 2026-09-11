@@ -12,6 +12,7 @@
 import type { ImageGenConfig } from "./agent-providers";
 import { pushImageGenConfig, type PushResult } from "./agent-providers";
 import { readDbConfigWithMeta } from "./db-config";
+import { hydrateImageGen } from "./global-model-secrets";
 
 const CONFIG_ID = "model_config";
 const STARTUP_SYNC_DELAY_MS = 3000;
@@ -49,7 +50,14 @@ function readStoredImageGenConfig(): ImageGenConfig | null {
   const entry = readDbConfigWithMeta(CONFIG_ID);
   const raw = entry?.config?.imageGen;
   if (raw && typeof raw === "object") {
-    return raw as ImageGenConfig;
+    try {
+      return hydrateImageGen(raw) ?? null;
+    } catch (error) {
+      console.warn(
+        "[ImageGen Sync] Stored credentials require reset:",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
   return null;
 }

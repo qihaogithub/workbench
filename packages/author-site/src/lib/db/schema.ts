@@ -68,6 +68,23 @@ export function initializeDatabase(): void {
   `);
 
   db.exec(`
+    CREATE TABLE IF NOT EXISTS figma_oauth_handoffs (
+      ticket_hash TEXT PRIMARY KEY,
+      target_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      session_id TEXT,
+      nonce TEXT NOT NULL,
+      account_label TEXT,
+      expires_at INTEGER NOT NULL,
+      credential_encrypted TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      consumed_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_figma_oauth_handoffs_expiry
+    ON figma_oauth_handoffs(expires_at, consumed_at);
+  `);
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS user_dingtalk_identities (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
