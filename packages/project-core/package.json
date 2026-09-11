@@ -14,7 +14,8 @@
     "./html-import": "./src/html-import.ts",
     "./html-import-bundle": "./src/html-import-bundle.ts",
     "./html-import-asset-store": "./src/html-import-asset-store.ts",
-    "./workspace-resource-registry": "./src/workspace-resource-registry.ts"
+    "./workspace-resource-registry": "./src/workspace-resource-registry.ts",
+    "./project-inventory": "./src/project-inventory.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -23,7 +24,9 @@
   },
   "dependencies": {
     "@workbench/knowledge-service": "workspace:*",
+    "@workbench/runtime-config": "workspace:*",
     "@workbench/preview-contract": "workspace:*",
+    "@workbench/prototype-core": "workspace:*",
     "@workbench/shared": "workspace:*",
     "@workbench/sketch-core": "workspace:*",
     "better-sqlite3": "13.0.3",
@@ -34,8 +37,8 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.11.16",
-    "typescript": "^5.3.3",
+    "typescript": "5.9.3",
     "@types/yauzl": "^2.10.3",
-    "vitest": "^1.6.1"
+    "vitest": "2.1.9"
   }
 }

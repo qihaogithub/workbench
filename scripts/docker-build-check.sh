@@ -55,7 +55,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ ! -f "${ENV_FILE}" ]; then
-    echo "Missing ${ENV_FILE}. Docker build check needs the same env file as compose." >&2
+    echo "Missing ${ENV_FILE}. Copy .env.docker.example to .env.docker; Docker builds use the same private env file as compose." >&2
     exit 1
 fi
 

@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/client.ts",
-    "./sqlite-catalog": "./src/sqlite-catalog.ts"
+    "./sqlite-catalog": "./src/sqlite-catalog.ts",
+    "./inventory-catalog": "./src/inventory-catalog.ts"
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -21,8 +22,9 @@
   },
   "dependencies": {
     "@workbench/knowledge-core": "workspace:*",
+    "@workbench/runtime-config": "workspace:*",
+    "@workbench/shared": "workspace:*",
     "better-sqlite3": "13.0.3",
-    "dotenv": "^17.4.2",
     "fastify": "^4.26.0"
   },
   "devDependencies": {
@@ -30,7 +32,7 @@
     "@types/node": "^20.11.16",
     "esbuild": "^0.20.2",
     "tsx": "^4.0.0",
-    "typescript": "^5.3.3",
-    "vitest": "^1.6.1"
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
   }
 }

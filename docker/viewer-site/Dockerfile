@@ -20,18 +20,10 @@ WORKDIR /app
 ARG NEXT_PUBLIC_DATA_BASE=
 ARG NEXT_PUBLIC_VIEWER_DOCKER_MODE=true
 ARG NEXT_PUBLIC_AUTHOR_SITE_URL=http://localhost:3200
-ARG NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=custom/
-ARG NEXT_PUBLIC_MODEL_BLACKLIST=
-ARG NEXT_PUBLIC_DEFAULT_MODEL_IDS=
-ARG NEXT_PUBLIC_MODEL_NAME_FILTERS=
 
 ENV NEXT_PUBLIC_DATA_BASE=${NEXT_PUBLIC_DATA_BASE}
 ENV NEXT_PUBLIC_VIEWER_DOCKER_MODE=${NEXT_PUBLIC_VIEWER_DOCKER_MODE}
 ENV NEXT_PUBLIC_AUTHOR_SITE_URL=${NEXT_PUBLIC_AUTHOR_SITE_URL}
-ENV NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES}
-ENV NEXT_PUBLIC_MODEL_BLACKLIST=${NEXT_PUBLIC_MODEL_BLACKLIST}
-ENV NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS}
-ENV NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS}
 ENV CI=true
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
@@ -39,9 +31,11 @@ COPY patches/ ./patches/
 COPY packages/agent-client/package.json ./packages/agent-client/
 COPY packages/ai-chat-shared/package.json ./packages/ai-chat-shared/
 COPY packages/demo-ui/package.json ./packages/demo-ui/
+COPY packages/runtime-config/package.json ./packages/runtime-config/
 COPY packages/sketch-core/package.json ./packages/sketch-core/
 COPY packages/sketch-react/package.json ./packages/sketch-react/
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/whiteboard-core/package.json ./packages/whiteboard-core/
 COPY packages/viewer-site/package.json ./packages/viewer-site/
 # The preview runtime generator reads the author site's canonical SDK policy,
 # even though the viewer image only ships the static viewer output.
@@ -54,9 +48,11 @@ RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
 COPY packages/agent-client/ ./packages/agent-client/
 COPY packages/ai-chat-shared/ ./packages/ai-chat-shared/
 COPY packages/demo-ui/ ./packages/demo-ui/
+COPY packages/runtime-config/ ./packages/runtime-config/
 COPY packages/sketch-core/ ./packages/sketch-core/
 COPY packages/sketch-react/ ./packages/sketch-react/
 COPY packages/shared/ ./packages/shared/
+COPY packages/whiteboard-core/ ./packages/whiteboard-core/
 COPY packages/viewer-site/ ./packages/viewer-site/
 COPY scripts/ ./scripts/
 

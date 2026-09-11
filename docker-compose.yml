@@ -1,3 +1,7 @@
+x-app-data-env: &app-data-env DATA_DIR=/app/data
+x-app-data-volume: &app-data-volume ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
+x-docker-cors-env: &docker-cors-env CORS_ORIGINS=${DOCKER_CORS_ORIGINS:-http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}
+
 services:
   knowledge-service:
     build:
@@ -10,13 +14,13 @@ services:
     environment:
       - PORT=3203
       - HOST=0.0.0.0
-      - DATA_DIR=/app/data
+      - *app-data-env
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
       - KNOWLEDGE_RECONCILE_INTERVAL_MS=${KNOWLEDGE_RECONCILE_INTERVAL_MS:-60000}
       - KNOWLEDGE_BACKUP_INTERVAL_MS=${KNOWLEDGE_BACKUP_INTERVAL_MS:-86400000}
       - KNOWLEDGE_BACKUP_RETENTION_DAYS=${KNOWLEDGE_BACKUP_RETENTION_DAYS:-7}
     volumes:
-      - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
+      - *app-data-volume
     cpus: "1.0"
     mem_limit: 1g
     pids_limit: 256
@@ -54,19 +58,18 @@ services:
       - PI_AGENT_WEB_SEARCH_TIMEOUT_MS=${PI_AGENT_WEB_SEARCH_TIMEOUT_MS:-10000}
       - PI_AGENT_WEB_SEARCH_CACHE_TTL_MS=${PI_AGENT_WEB_SEARCH_CACHE_TTL_MS:-600000}
       # Keep Docker origins separate from root .env (pnpm dev uses :4200/:4300).
-      - CORS_ORIGINS=${DOCKER_CORS_ORIGINS:-http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}
-      - DATA_DIR=/app/data
+      - *docker-cors-env
+      - *app-data-env
       - WORKSPACE_AUTHORITY_INSTANCE_MODE=single
       - WORKSPACE_AUTHORITY_REPLICA_COUNT=1
       - SCREENSHOT_SERVICE_URL=http://screenshot-service:3202
-      - NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS:-}
       - FIGMA_MCP_URL=${FIGMA_MCP_URL:-}
       - FIGMA_MCP_REGION=${FIGMA_MCP_REGION:-}
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
       - AUTHOR_SITE_URL=http://author-site:3200
       - KNOWLEDGE_SERVICE_URL=http://knowledge-service:3203
     volumes:
-      - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
+      - *app-data-volume
     depends_on:
       knowledge-service:
         condition: service_healthy
@@ -80,14 +83,9 @@ services:
       context: .
       dockerfile: docker/author-site/Dockerfile
       args:
-        - NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES:-custom/}
-        - NEXT_PUBLIC_MODEL_BLACKLIST=${NEXT_PUBLIC_MODEL_BLACKLIST:-}
-        - NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS:-}
-        - NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS:-}
         - NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://localhost:3202}
         - NEXT_PUBLIC_VIEWER_URL=${NEXT_PUBLIC_VIEWER_URL:-http://localhost:3300}
         - NEXT_PUBLIC_AUTHOR_SITE_URL=${NEXT_PUBLIC_AUTHOR_SITE_URL:-http://localhost:3200}
-        - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
         - DEBIAN_MIRROR=${DEBIAN_MIRROR:-http://mirrors.aliyun.com/debian}
         - NPM_REGISTRY=${NPM_REGISTRY:-https://registry.npmmirror.com}
     ports:
@@ -98,20 +96,28 @@ services:
       - AGENT_SERVICE_URL=http://agent-service:3201
       - KNOWLEDGE_SERVICE_URL=http://knowledge-service:3203
       - SCREENSHOT_SERVICE_URL=http://screenshot-service:3202
-      - NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES:-custom/}
-      - NEXT_PUBLIC_MODEL_BLACKLIST=${NEXT_PUBLIC_MODEL_BLACKLIST:-}
-      - NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS:-}
-      - NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS:-}
       - NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL:-http://localhost:3202}
       - NEXT_PUBLIC_VIEWER_URL=${NEXT_PUBLIC_VIEWER_URL:-http://localhost:3300}
       - NEXT_PUBLIC_AUTHOR_SITE_URL=${NEXT_PUBLIC_AUTHOR_SITE_URL:-http://localhost:3200}
-      - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - MODEL_CONFIG_ENCRYPTION_KEY=${MODEL_CONFIG_ENCRYPTION_KEY:-}
+      - EXTERNAL_AUTH_ENCRYPTION_KEY=${EXTERNAL_AUTH_ENCRYPTION_KEY:-}
       - AUTH_COOKIE_NAME=${AUTH_COOKIE_NAME:-auth_token_docker}
       - USE_SECURE_COOKIE=${USE_SECURE_COOKIE:-false}
       - DINGTALK_LOGIN_ENABLED=${DINGTALK_LOGIN_ENABLED:-false}
       - DINGTALK_CORP_ID=${DINGTALK_CORP_ID:-}
       - DINGTALK_APP_KEY=${DINGTALK_APP_KEY:-}
       - DINGTALK_APP_SECRET=${DINGTALK_APP_SECRET:-}
+      - DINGTALK_LOGIN_REDIRECT_URI=${DINGTALK_LOGIN_REDIRECT_URI:-}
+      - DINGTALK_LOGIN_SCOPE=${DINGTALK_LOGIN_SCOPE:-openid}
+      - DINGTALK_LOGIN_PROMPT=${DINGTALK_LOGIN_PROMPT:-consent}
+      - DINGTALK_LOGIN_TARGET_ID=${DINGTALK_LOGIN_TARGET_ID:-}
+      - DINGTALK_LOGIN_HANDOFF_SECRET=${DINGTALK_LOGIN_HANDOFF_SECRET:-}
+      - DINGTALK_LOGIN_TARGETS_JSON=${DINGTALK_LOGIN_TARGETS_JSON:-}
+      - NODE_USE_ENV_PROXY=${NODE_USE_ENV_PROXY:-}
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - HTTPS_PROXY=${HTTPS_PROXY:-}
+      - NO_PROXY=${NO_PROXY:-}
       - DINGTALK_COMMENT_NOTIFICATIONS_ENABLED=${DINGTALK_COMMENT_NOTIFICATIONS_ENABLED:-false}
       - DINGTALK_AGENT_ID=${DINGTALK_AGENT_ID:-}
       - DINGTALK_COMMENT_VIEWER_BASE_URL=${DINGTALK_COMMENT_VIEWER_BASE_URL:-}
@@ -127,17 +133,20 @@ services:
       - DINGTALK_COMMENT_CIRCUIT_WINDOW_MS=${DINGTALK_COMMENT_CIRCUIT_WINDOW_MS:-300000}
       - DINGTALK_COMMENT_CIRCUIT_OPEN_MS=${DINGTALK_COMMENT_CIRCUIT_OPEN_MS:-600000}
       # Keep Docker origins separate from root .env (pnpm dev uses :4200/:4300).
-      - CORS_ORIGINS=${DOCKER_CORS_ORIGINS:-http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}
-      - DATA_DIR=/app/data
+      - *docker-cors-env
+      - *app-data-env
       - FIGMA_OAUTH_CLIENT_ID=${FIGMA_OAUTH_CLIENT_ID:-}
       - FIGMA_OAUTH_CLIENT_SECRET=${FIGMA_OAUTH_CLIENT_SECRET:-}
       - FIGMA_OAUTH_REDIRECT_URI=${FIGMA_OAUTH_REDIRECT_URI:-}
       - FIGMA_OAUTH_POST_AUTH_ORIGIN=${FIGMA_OAUTH_POST_AUTH_ORIGIN:-}
       - FIGMA_OAUTH_SCOPES=${FIGMA_OAUTH_SCOPES:-}
+      - FIGMA_OAUTH_TARGET_ID=${FIGMA_OAUTH_TARGET_ID:-}
+      - FIGMA_OAUTH_HANDOFF_SECRET=${FIGMA_OAUTH_HANDOFF_SECRET:-}
+      - FIGMA_OAUTH_TARGETS_JSON=${FIGMA_OAUTH_TARGETS_JSON:-}
       - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
       - ADMIN_SECRET=${ADMIN_SECRET:-}
     volumes:
-      - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
+      - *app-data-volume
     depends_on:
       - agent-service
       - knowledge-service
@@ -161,12 +170,12 @@ services:
       - AUTHOR_SITE_URL=http://author-site:3200
       - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
       - PUPPETEER_DISABLE_SANDBOX=${PUPPETEER_DISABLE_SANDBOX:-true}
-      - DATA_DIR=/app/data
+      - *app-data-env
       # Keep Docker origins separate from root .env (pnpm dev uses :4200/:4300).
-      - CORS_ORIGINS=${DOCKER_CORS_ORIGINS:-http://localhost:3200,http://localhost:3300,http://127.0.0.1:3200,http://127.0.0.1:3300}
+      - *docker-cors-env
       - SCREENSHOT_MAX_CONCURRENT_PAGES=${SCREENSHOT_MAX_CONCURRENT_PAGES:-4}
     volumes:
-      - ${APP_DATA_DIR:-/opt/workbench/data}:/app/data
+      - *app-data-volume
     depends_on:
       - author-site
     cpus: "2.5"
@@ -191,10 +200,6 @@ services:
         - NEXT_PUBLIC_DATA_BASE=${DOCKER_NEXT_PUBLIC_DATA_BASE:-}
         - NEXT_PUBLIC_VIEWER_DOCKER_MODE=true
         - NEXT_PUBLIC_AUTHOR_SITE_URL=${NEXT_PUBLIC_AUTHOR_SITE_URL:-http://localhost:3200}
-        - NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES:-custom/}
-        - NEXT_PUBLIC_MODEL_BLACKLIST=${NEXT_PUBLIC_MODEL_BLACKLIST:-}
-        - NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS:-}
-        - NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS:-}
         - NPM_REGISTRY=${NPM_REGISTRY:-https://registry.npmmirror.com}
     ports:
       - "3300:80"

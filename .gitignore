@@ -9,6 +9,7 @@ out
 .env
 .env.local
 .env.*.local
+.env.docker
 .playwright-cli/*
 .worktrees
 .qoder

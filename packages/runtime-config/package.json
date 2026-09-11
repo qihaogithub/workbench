@@ -1,0 +1,25 @@
+{
+  "name": "@workbench/runtime-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./topology": "./src/topology.ts",
+    "./env": "./src/env.ts",
+    "./paths": "./src/paths.ts",
+    "./model": "./src/model.ts",
+    "./secrets": "./src/secrets.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  }
+}

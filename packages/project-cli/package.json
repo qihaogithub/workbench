@@ -22,7 +22,7 @@
     "@workbench/preview-contract": "workspace:*",
     "@workbench/project-core": "workspace:*",
     "@workbench/project-scaffold": "workspace:*",
-    "typescript": "^5.3.3"
+    "typescript": "5.9.3"
   },
   "devDependencies": {
     "@types/node": "^20.11.16",

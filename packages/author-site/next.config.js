@@ -95,6 +95,7 @@ const nextConfig = {
     "@workbench/project-scaffold",
     "@workbench/preview-contract",
     "@workbench/prototype-core",
+    "@workbench/runtime-config",
     "@workbench/sketch-core",
     "@workbench/sketch-react",
     "@workbench/shared",

@@ -1,27 +1,22 @@
-export const DEFAULT_AGENT_SERVICE_URL = "http://localhost:4201";
-/** 浏览器端生产/Docker 自动推导时使用的 agent-service 端口。 */
-export const AGENT_SERVICE_PORT = "3201";
-/** 浏览器端本地开发自动推导时使用的 agent-service 端口。 */
-export const DEV_AGENT_SERVICE_PORT = "4201";
-export const DEFAULT_SCREENSHOT_SERVICE_URL = "http://localhost:4202";
-export const DEFAULT_SCREENSHOT_PROXY_TIMEOUT_MS = 30000;
+import { getLocalhostUrl } from "@workbench/runtime-config/topology";
 
-export interface ModelEnvConfig {
-  allowedPrefixes: string[];
-  nameFilters: string[];
-  defaultModelIds: string[];
-  blacklist: string[];
-}
+export const DEFAULT_AGENT_SERVICE_URL = getLocalhostUrl("local", "agent");
+/** 浏览器端生产/Docker 自动推导时使用的 agent-service 端口。 */
+export const AGENT_SERVICE_PORT = String(
+  new URL(getLocalhostUrl("docker", "agent")).port,
+);
+/** 浏览器端本地开发自动推导时使用的 agent-service 端口。 */
+export const DEV_AGENT_SERVICE_PORT = String(
+  new URL(getLocalhostUrl("local", "agent")).port,
+);
+export const DEFAULT_SCREENSHOT_SERVICE_URL = getLocalhostUrl(
+  "local",
+  "screenshot",
+);
+export const DEFAULT_SCREENSHOT_PROXY_TIMEOUT_MS = 30000;
 
 function trimTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, "");
-}
-
-function parseCsvEnv(value: string | undefined): string[] {
-  return (value || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
 }
 
 function parseIntegerEnv(value: string | undefined, fallback: number): number {
@@ -125,13 +120,4 @@ export function getScreenshotProxyTimeoutMs(): number {
     process.env.SCREENSHOT_PROXY_TIMEOUT_MS,
     DEFAULT_SCREENSHOT_PROXY_TIMEOUT_MS,
   );
-}
-
-export function getModelEnvConfig(): ModelEnvConfig {
-  return {
-    allowedPrefixes: parseCsvEnv(process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES),
-    nameFilters: parseCsvEnv(process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS),
-    defaultModelIds: parseCsvEnv(process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS),
-    blacklist: parseCsvEnv(process.env.NEXT_PUBLIC_MODEL_BLACKLIST),
-  };
 }

@@ -45,6 +45,7 @@
     "@milkdown/crepe": "^7.22.0",
     "@milkdown/kit": "^7.22.0",
     "@workbench/color-picker": "workspace:*",
+    "@workbench/runtime-config": "workspace:*",
     "@workbench/sketch-react": "workspace:*",
     "@workbench/shared": "workspace:*",
     "clsx": "^2.1.0",
@@ -66,6 +67,6 @@
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "jsdom": "^26.1.0",
-    "vitest": "^2.1.9"
+    "vitest": "2.1.9"
   }
 }

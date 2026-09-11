@@ -19,11 +19,14 @@
     "./demo/visibility-rules": "./src/demo/visibility-rules.ts",
     "./demo/preview-observation": "./src/demo/preview-observation.ts",
     "./markdown-reference": "./src/markdown-reference/index.ts",
+    "./page-transfer": "./src/page-transfer.ts",
     "./document": "./src/document/contracts.ts",
     "./workspace-path": "./src/workspace-path.ts"
   },
   "dependencies": {
-    "@workbench/sketch-core": "workspace:*"
+    "@workbench/sketch-core": "workspace:*",
+    "@workbench/runtime-config": "workspace:*",
+    "@workbench/whiteboard-core": "workspace:*"
   },
   "scripts": {
     "lint": "eslint src --ext .ts"

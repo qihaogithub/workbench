@@ -28,12 +28,14 @@ WORKDIR /app
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY patches/ ./patches/
 COPY packages/knowledge-core/package.json ./packages/knowledge-core/
+COPY packages/runtime-config/package.json ./packages/runtime-config/
 COPY packages/knowledge-service/package.json ./packages/knowledge-service/
 
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
     pnpm install --store-dir /pnpm/store --frozen-lockfile
 
 COPY packages/knowledge-core/ ./packages/knowledge-core/
+COPY packages/runtime-config/ ./packages/runtime-config/
 COPY packages/knowledge-service/ ./packages/knowledge-service/
 
 RUN pnpm --filter @workbench/knowledge-service build:docker
@@ -64,7 +66,7 @@ RUN if [ -n "$DEBIAN_MIRROR" ]; then \
 WORKDIR /app
 
 RUN npm init -y \
-    && npm install --registry="$NPM_REGISTRY" --omit=dev fastify@4.29.1 better-sqlite3@13.0.3 dotenv@17.4.2 \
+    && npm install --registry="$NPM_REGISTRY" --omit=dev fastify@4.29.1 better-sqlite3@13.0.3 \
     && npm cache clean --force
 
 FROM node:24-bookworm-slim

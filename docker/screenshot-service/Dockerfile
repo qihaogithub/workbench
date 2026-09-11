@@ -33,8 +33,10 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY patches/ ./patches/
 COPY packages/sketch-core/package.json ./packages/sketch-core/
 COPY packages/project-core/package.json ./packages/project-core/
+COPY packages/runtime-config/package.json ./packages/runtime-config/
 COPY packages/preview-contract/package.json ./packages/preview-contract/
 COPY packages/shared/package.json ./packages/shared/
+COPY packages/whiteboard-core/package.json ./packages/whiteboard-core/
 COPY packages/screenshot-service/package.json ./packages/screenshot-service/
 
 RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
@@ -42,8 +44,10 @@ RUN --mount=type=cache,id=workbench-pnpm-store,target=/pnpm/store \
 
 COPY packages/sketch-core/ ./packages/sketch-core/
 COPY packages/project-core/ ./packages/project-core/
+COPY packages/runtime-config/ ./packages/runtime-config/
 COPY packages/preview-contract/ ./packages/preview-contract/
 COPY packages/shared/ ./packages/shared/
+COPY packages/whiteboard-core/ ./packages/whiteboard-core/
 COPY packages/screenshot-service/ ./packages/screenshot-service/
 
 RUN pnpm --filter @workbench/screenshot-service build:docker

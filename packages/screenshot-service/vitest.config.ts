@@ -1,8 +1,11 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
+import { workbenchVitestNode } from '../../vitest.node';
 
 export default defineConfig({
+  ...workbenchVitestNode,
   test: {
+    ...workbenchVitestNode.test,
     globals: true,
     testTimeout: 10000,
     include: ['tests/**/*.test.ts'],

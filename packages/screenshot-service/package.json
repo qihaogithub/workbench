@@ -18,9 +18,9 @@
     "@fastify/cors": "^9.0.0",
     "@fastify/rate-limit": "^9.0.0",
     "@workbench/project-core": "workspace:*",
+    "@workbench/runtime-config": "workspace:*",
     "@workbench/shared": "workspace:*",
     "@workbench/sketch-core": "workspace:*",
-    "dotenv": "^17.4.2",
     "fastify": "^4.26.0",
     "pino": "^8.0.0",
     "pino-pretty": "^10.0.0",
@@ -30,11 +30,11 @@
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
-    "@vitest/coverage-v8": "^2.0.0",
+    "@vitest/coverage-v8": "2.1.9",
     "esbuild": "^0.20.0",
     "eslint": "^8.0.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.0.0",
-    "vitest": "^2.0.0"
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
   }
 }

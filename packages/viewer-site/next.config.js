@@ -31,6 +31,7 @@ const nextConfig = {
     "@workbench/agent-client",
     "@workbench/ai-chat-shared",
     "@workbench/demo-ui",
+    "@workbench/runtime-config",
     "@workbench/sketch-core",
     "@workbench/sketch-react",
     "@workbench/shared",

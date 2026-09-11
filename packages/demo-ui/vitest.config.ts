@@ -1,7 +1,9 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
+import { workbenchVitestBrowser } from "../../vitest.browser";
 
 export default defineConfig({
+  ...workbenchVitestBrowser,
   esbuild: {
     jsx: "automatic",
   },
@@ -12,9 +14,8 @@ export default defineConfig({
     },
   },
   test: {
-    environment: "jsdom",
+    ...workbenchVitestBrowser.test,
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["./vitest.setup.ts"],
   },
 });
-

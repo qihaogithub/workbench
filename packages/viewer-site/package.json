@@ -36,6 +36,7 @@
     "@workbench/agent-client": "workspace:*",
     "@workbench/ai-chat-shared": "workspace:*",
     "@workbench/demo-ui": "workspace:*",
+    "@workbench/runtime-config": "workspace:*",
     "@workbench/shared": "workspace:*",
     "@workbench/sketch-core": "workspace:*",
     "@workbench/sketch-react": "workspace:*",
@@ -60,7 +61,7 @@
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
     "tailwindcss-animate": "^1.0.7",
-    "typescript": "^5.3.3",
-    "vitest": "^1.6.1"
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
   }
 }

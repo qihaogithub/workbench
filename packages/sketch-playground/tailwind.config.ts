@@ -1,6 +1,8 @@
 import type { Config } from "tailwindcss";
+import workbenchTailwindPreset from "../../tailwind.preset";
 
 const config: Config = {
+  presets: [workbenchTailwindPreset],
   content: [
     "./src/**/*.{ts,tsx}",
     "../sketch-react/src/**/*.{ts,tsx}",
@@ -8,11 +10,6 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
         card: "hsl(var(--card))",
         "card-foreground": "hsl(var(--card-foreground))",
         muted: "hsl(var(--muted))",

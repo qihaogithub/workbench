@@ -32,6 +32,7 @@ COPY packages/knowledge-core/package.json ./packages/knowledge-core/
 COPY packages/knowledge-service/package.json ./packages/knowledge-service/
 COPY packages/preview-contract/package.json ./packages/preview-contract/
 COPY packages/project-core/package.json ./packages/project-core/
+COPY packages/runtime-config/package.json ./packages/runtime-config/
 COPY packages/sketch-core/package.json ./packages/sketch-core/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/whiteboard-core/package.json ./packages/whiteboard-core/
@@ -44,6 +45,7 @@ COPY packages/knowledge-core/ ./packages/knowledge-core/
 COPY packages/knowledge-service/ ./packages/knowledge-service/
 COPY packages/preview-contract/ ./packages/preview-contract/
 COPY packages/project-core/ ./packages/project-core/
+COPY packages/runtime-config/ ./packages/runtime-config/
 COPY packages/sketch-core/ ./packages/sketch-core/
 COPY packages/shared/ ./packages/shared/
 COPY packages/whiteboard-core/ ./packages/whiteboard-core/

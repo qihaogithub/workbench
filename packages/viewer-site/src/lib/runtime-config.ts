@@ -1,5 +1,9 @@
+import { getLocalhostUrl } from "@workbench/runtime-config/topology";
+
 /** 浏览器端自动推导时使用的 agent-service 端口（Docker 部署标准端口） */
-const AGENT_SERVICE_PORT = "3201";
+const AGENT_SERVICE_PORT = new URL(
+  getLocalhostUrl("docker", "agent"),
+).port;
 
 function trimTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, "");

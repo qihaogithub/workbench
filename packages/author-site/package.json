@@ -62,6 +62,7 @@
     "@workbench/prototype-core": "workspace:*",
     "@workbench/project-core": "workspace:*",
     "@workbench/project-scaffold": "workspace:*",
+    "@workbench/runtime-config": "workspace:*",
     "@workbench/shared": "workspace:*",
     "@workbench/whiteboard-core": "workspace:*",
     "@workbench/sketch-core": "workspace:*",
@@ -121,7 +122,7 @@
     "tailwindcss-animate": "^1.0.7",
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3",
+    "typescript": "5.9.3",
     "undici": "6.24.1"
   }
 }

@@ -10,6 +10,16 @@ let cleanupInterval: NodeJS.Timeout | null = null;
 export async function register() {
   // 仅在 Node.js 运行时注册（非 Edge Runtime）
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { resolveSecrets } = await import('@workbench/runtime-config/secrets');
+    resolveSecrets({
+      required: [
+        'JWT_SECRET',
+        'MODEL_CONFIG_ENCRYPTION_KEY',
+        'EXTERNAL_AUTH_ENCRYPTION_KEY',
+        'INTERNAL_API_TOKEN',
+        'ADMIN_SECRET',
+      ],
+    });
     const { cleanupAllExpiredSessions } = await import('@/lib/session-manager');
     const { cleanupOrphanWorkspaces } = await import('@/lib/workspace-manager');
     const { getProjectAdminService } = await import('@/lib/project-admin-service');

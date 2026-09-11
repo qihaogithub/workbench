@@ -26,25 +26,16 @@ RUN corepack enable \
 
 WORKDIR /app
 
-# 构建时参数：前端模型白名单前缀（逗号分隔，如 "custom/,deepseek/"）
-ARG NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=custom/
-ARG NEXT_PUBLIC_MODEL_BLACKLIST=
-ARG NEXT_PUBLIC_DEFAULT_MODEL_IDS=
-ARG NEXT_PUBLIC_MODEL_NAME_FILTERS=
 ARG NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=http://localhost:3202
 ARG NEXT_PUBLIC_AUTHOR_SITE_URL=http://localhost:3200
-ARG JWT_SECRET
 
-ENV NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES=${NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES}
-ENV NEXT_PUBLIC_MODEL_BLACKLIST=${NEXT_PUBLIC_MODEL_BLACKLIST}
-ENV NEXT_PUBLIC_DEFAULT_MODEL_IDS=${NEXT_PUBLIC_DEFAULT_MODEL_IDS}
-ENV NEXT_PUBLIC_MODEL_NAME_FILTERS=${NEXT_PUBLIC_MODEL_NAME_FILTERS}
 ENV NEXT_PUBLIC_SCREENSHOT_SERVICE_URL=${NEXT_PUBLIC_SCREENSHOT_SERVICE_URL}
 ENV NEXT_PUBLIC_AUTHOR_SITE_URL=${NEXT_PUBLIC_AUTHOR_SITE_URL}
-ENV JWT_SECRET=${JWT_SECRET}
 ENV CI=true
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY tsconfig.base.json tsconfig.browser.json tsconfig.next.json ./
+COPY tailwind.preset.ts ./
 COPY patches/ ./patches/
 COPY packages/agent-client/package.json ./packages/agent-client/
 COPY packages/ai-chat-shared/package.json ./packages/ai-chat-shared/
@@ -56,6 +47,7 @@ COPY packages/preview-contract/package.json ./packages/preview-contract/
 COPY packages/project-core/package.json ./packages/project-core/
 COPY packages/project-scaffold/package.json ./packages/project-scaffold/
 COPY packages/prototype-core/package.json ./packages/prototype-core/
+COPY packages/runtime-config/package.json ./packages/runtime-config/
 COPY packages/sketch-core/package.json ./packages/sketch-core/
 COPY packages/sketch-react/package.json ./packages/sketch-react/
 COPY packages/shared/package.json ./packages/shared/
@@ -77,6 +69,7 @@ COPY packages/preview-contract/ ./packages/preview-contract/
 COPY packages/project-core/ ./packages/project-core/
 COPY packages/project-scaffold/ ./packages/project-scaffold/
 COPY packages/prototype-core/ ./packages/prototype-core/
+COPY packages/runtime-config/ ./packages/runtime-config/
 COPY packages/sketch-core/ ./packages/sketch-core/
 COPY packages/sketch-react/ ./packages/sketch-react/
 COPY packages/shared/ ./packages/shared/

@@ -1,23 +1,26 @@
-import path from "path";
+import { parseBoolean, parseInteger } from "@workbench/runtime-config/env";
+import { resolveDataDir } from "@workbench/runtime-config/paths";
+import {
+  DEFAULT_CDN_BASE_URL,
+  getLocalhostUrl,
+} from "@workbench/runtime-config/topology";
 
 export const config = {
-  port: parseInt(process.env.PORT || "4202", 10),
+  port: parseInteger(process.env.PORT, { defaultValue: 4202, min: 1, max: 65535 })!,
   host: process.env.HOST || "0.0.0.0",
   logLevel: process.env.LOG_LEVEL || "info",
 
   authorSiteUrl:
-    process.env.AUTHOR_SITE_URL || "http://localhost:4200",
+    process.env.AUTHOR_SITE_URL || getLocalhostUrl("local", "author"),
   screenshotDiagnosticsToken: process.env.SCREENSHOT_DIAGNOSTICS_TOKEN || "",
-  cdnBaseUrl: process.env.CDN_BASE_URL || "https://esm.sh",
+  cdnBaseUrl: process.env.CDN_BASE_URL || DEFAULT_CDN_BASE_URL,
   previewRuntimeSource: process.env.PREVIEW_RUNTIME_SOURCE || "local",
 
-  dataDir:
-    process.env.DATA_DIR ||
-    path.resolve(__dirname, "../../../data"),
+  dataDir: resolveDataDir(),
 
   // Puppeteer
   puppeteerExecutablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "",
-  puppeteerDisableSandbox: process.env.PUPPETEER_DISABLE_SANDBOX === "true",
+  puppeteerDisableSandbox: parseBoolean(process.env.PUPPETEER_DISABLE_SANDBOX, { defaultValue: false })!,
   viewport: {
     width: 375,
     height: 812,

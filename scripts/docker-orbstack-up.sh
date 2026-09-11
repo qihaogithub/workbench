@@ -60,7 +60,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ ! -f "${ENV_FILE}" ]; then
-    echo "Missing ${ENV_FILE}. Copy or create .env.docker before starting Docker services." >&2
+    echo "Missing ${ENV_FILE}. Copy .env.docker.example to .env.docker and fill private values before starting Docker services." >&2
     exit 1
 fi
 
@@ -104,6 +104,10 @@ if [ "${without_viewer}" = false ]; then
     services+=(viewer-site)
 fi
 compose_args=(--env-file "${ENV_FILE}")
+LOCAL_ENV_FILE="${ENV_FILE}.local"
+if [ -f "${LOCAL_ENV_FILE}" ]; then
+    compose_args+=(--env-file "${LOCAL_ENV_FILE}")
+fi
 
 if [ "${with_screenshot}" = true ]; then
     export COMPOSE_PROFILES="${COMPOSE_PROFILES:-screenshot}"

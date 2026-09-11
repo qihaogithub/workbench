@@ -31,6 +31,10 @@
     "typecheck": "corepack pnpm --filter @workbench/author-site typecheck",
     "typecheck:viewer": "corepack pnpm --filter @workbench/viewer-site typecheck",
     "check:author": "corepack pnpm --filter @workbench/author-site typecheck && corepack pnpm --filter @workbench/author-site test",
+    "check:runtime-config": "corepack pnpm --filter @workbench/runtime-config typecheck && corepack pnpm --filter @workbench/runtime-config test",
+    "check:config-drift": "node scripts/check-config-drift.mjs",
+    "test:config-drift": "node --test scripts/check-config-drift.test.mjs",
+    "credentials:preflight": "node scripts/reset-encrypted-credentials.mjs",
     "check:agent": "corepack pnpm --filter @workbench/agent-service typecheck && corepack pnpm --filter @workbench/agent-service test",
     "check:screenshot": "corepack pnpm --filter @workbench/screenshot-service typecheck && corepack pnpm --filter @workbench/screenshot-service test",
     "check:project-core": "corepack pnpm --filter @workbench/project-core typecheck && corepack pnpm --filter @workbench/project-core test",
@@ -60,7 +64,7 @@
     "check:docker-build": "scripts/docker-build-check.sh",
     "check:repo": "node scripts/check-repo.mjs",
     "check:automation": "node OPS/automations/bin/automation.mjs check-tools",
-    "check:all": "corepack pnpm --filter @workbench/preview-contract typecheck && corepack pnpm --filter @workbench/preview-contract test && corepack pnpm check:workspace-authority && corepack pnpm check:prototype-core && corepack pnpm check:editable-snapshot && corepack pnpm check:page-export-extension && corepack pnpm check:sketch-core && corepack pnpm check:whiteboard-core && corepack pnpm check:sketch-react && corepack pnpm check:sketch-playground && corepack pnpm check:knowledge-core && corepack pnpm check:knowledge-service && corepack pnpm check:project-core && corepack pnpm check:project-scaffold && corepack pnpm check:project-cli && corepack pnpm check:agent && corepack pnpm check:screenshot && corepack pnpm check:author && corepack pnpm check:viewer && corepack pnpm check:demo-ui && corepack pnpm check:agent-client && corepack pnpm check:ai-chat-shared",
+    "check:all": "corepack pnpm check:repo && corepack pnpm test:config-drift && corepack pnpm check:config-drift && corepack pnpm check:runtime-config && corepack pnpm --filter @workbench/preview-contract typecheck && corepack pnpm --filter @workbench/preview-contract test && corepack pnpm check:workspace-authority && corepack pnpm check:prototype-core && corepack pnpm check:editable-snapshot && corepack pnpm check:page-export-extension && corepack pnpm check:sketch-core && corepack pnpm check:whiteboard-core && corepack pnpm check:sketch-react && corepack pnpm check:sketch-playground && corepack pnpm check:knowledge-core && corepack pnpm check:knowledge-service && corepack pnpm check:project-core && corepack pnpm check:project-scaffold && corepack pnpm check:project-cli && corepack pnpm check:agent && corepack pnpm check:screenshot && corepack pnpm check:author && corepack pnpm check:viewer && corepack pnpm check:demo-ui && corepack pnpm check:agent-client && corepack pnpm check:ai-chat-shared",
     "ops:automation": "node OPS/automations/bin/automation.mjs",
     "diagnostics:recent": "corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts diagnostics recent",
     "diagnostics:session": "corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts diagnostics session",
@@ -102,7 +106,7 @@
     "test:legacy-template-migration": "node --test scripts/migrate-legacy-template-projects.test.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.42.0",
+    "@playwright/test": "1.59.1",
     "concurrently": "^9.2.1",
     "esbuild": "^0.20.2",
     "framer-motion": "^12.38.0",
@@ -111,8 +115,9 @@
     "react-dom": "19.2.3",
     "single-file-cli": "2.0.83",
     "svgaplayerweb": "2.3.1",
+    "tailwindcss": "^3.4.1",
     "tailwindcss-cdn": "3.4.10",
-    "typescript": "^5.3.3"
+    "typescript": "5.9.3"
   },
   "pnpm": {
     "overrides": {

@@ -1,0 +1,100 @@
+{
+  "directUsage": {
+    "DATA_DIR": [
+      "OPS/CLI/src/commands/diagnostics.ts",
+      "packages/author-site/scripts/init-db.js",
+      "scripts/archive-legacy-conversation-data.mjs",
+      "scripts/backfill-image-dimensions.mjs",
+      "scripts/batch-generate-image-alt.mjs",
+      "scripts/check-viewer-contracts.mjs",
+      "scripts/check-workspace-deploy-preflight.mjs",
+      "scripts/dev-restart.mjs",
+      "scripts/inventory-legacy-conversations.mjs",
+      "scripts/migrate-config-notes-to-page-requirements.mjs",
+      "scripts/migrate-legacy-template-projects.mjs",
+      "scripts/verify-legacy-conversation-archive.mjs"
+    ],
+    "dotenv": [],
+    "CDN": [
+      "packages/author-site/next.config.js",
+      "packages/author-site/src/lib/cdn-config.ts",
+      "packages/screenshot-service/src/config.ts",
+      "packages/viewer-site/next.config.js",
+      "packages/viewer-site/src/app/api/preview-runtime/shell/route.ts"
+    ]
+  },
+  "configFiles": {
+    "tsconfig": [
+      "tsconfig.base.json",
+      "tsconfig.browser.json",
+      "tsconfig.next.json",
+      "tsconfig.node.json",
+      "OPS/CLI/tsconfig.json",
+      "packages/agent-client/tsconfig.json",
+      "packages/agent-service/tsconfig.json",
+      "packages/ai-chat-shared/tsconfig.json",
+      "packages/author-site/tsconfig.json",
+      "packages/color-picker/tsconfig.json",
+      "packages/demo-ui/tsconfig.json",
+      "packages/editable-snapshot-core/tsconfig.json",
+      "packages/knowledge-core/tsconfig.json",
+      "packages/knowledge-service/tsconfig.json",
+      "packages/preview-contract/tsconfig.json",
+      "packages/project-cli/tsconfig.json",
+      "packages/project-core/tsconfig.json",
+      "packages/project-scaffold/tsconfig.json",
+      "packages/prototype-core/tsconfig.json",
+      "packages/runtime-config/tsconfig.json",
+      "packages/screenshot-service/tsconfig.json",
+      "packages/shared/tsconfig.json",
+      "packages/sketch-core/tsconfig.json",
+      "packages/sketch-playground/tsconfig.json",
+      "packages/sketch-react/tsconfig.json",
+      "packages/viewer-site/tsconfig.json",
+      "packages/whiteboard-core/tsconfig.json",
+      "tools/page-export-extension/tsconfig.json"
+    ],
+    "vitest": [
+      "packages/agent-service/vitest.config.ts",
+      "packages/color-picker/vitest.config.ts",
+      "packages/demo-ui/vitest.config.ts",
+      "packages/editable-snapshot-core/vitest.config.ts",
+      "packages/project-core/vitest.config.ts",
+      "packages/prototype-core/vitest.config.ts",
+      "packages/runtime-config/vitest.config.ts",
+      "packages/screenshot-service/vitest.config.ts",
+      "packages/sketch-core/vitest.config.ts",
+      "packages/sketch-react/vitest.config.ts",
+      "packages/viewer-site/vitest.config.ts",
+      "packages/whiteboard-core/vitest.config.ts",
+      "tools/page-export-extension/vitest.config.ts"
+    ],
+    "tailwind": [
+      "packages/author-site/tailwind.config.ts",
+      "packages/sketch-playground/tailwind.config.ts",
+      "packages/viewer-site/tailwind.config.ts"
+    ],
+    "eslint": [
+      ".eslintrc.base.json",
+      "packages/agent-client/.eslintrc.json",
+      "packages/agent-service/.eslintrc.json",
+      "packages/ai-chat-shared/.eslintrc.json",
+      "packages/demo-ui/.eslintrc.json",
+      "packages/knowledge-core/.eslintrc.json",
+      "packages/knowledge-service/.eslintrc.json",
+      "packages/preview-contract/.eslintrc.json",
+      "packages/project-cli/.eslintrc.json",
+      "packages/project-core/.eslintrc.json",
+      "packages/project-scaffold/.eslintrc.json",
+      "packages/prototype-core/.eslintrc.json",
+      "packages/screenshot-service/.eslintrc.json",
+      "packages/shared/.eslintrc.json",
+      "packages/sketch-core/.eslintrc.json",
+      "packages/sketch-playground/.eslintrc.json",
+      "packages/sketch-react/.eslintrc.json",
+      "packages/viewer-site/eslint.config.mjs",
+      "packages/author-site/eslint.config.mjs",
+      "packages/whiteboard-core/.eslintrc.json"
+    ]
+  }
+}
