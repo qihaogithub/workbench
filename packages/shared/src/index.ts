@@ -6,6 +6,8 @@ import type {
 } from "./workspace";
 
 export * from "./markdown-reference";
+export * from "./project-inventory";
+export * from "./page-transfer";
 export * from "./document/contracts";
 export * from "./config-field-capabilities";
 export {

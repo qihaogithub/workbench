@@ -16,6 +16,7 @@ export type {
 } from "./project-transfer";
 export {
   WorkspaceResourceRegistry,
+  compareWorkspaceResourcePaths,
   createWorkspaceResourceRegistry,
   hashWorkspaceContent,
   normalizeWorkspaceResourcePath,
@@ -71,6 +72,14 @@ export {
 } from "./whiteboard-transaction";
 export type { WhiteboardTransactionDelete, WhiteboardTransactionWrite } from "./whiteboard-transaction";
 export type * from "./types";
+export {
+  PagePackageBuilder,
+  PagePackageBuilderError,
+  PageTransferService,
+  PageTransferStore,
+  PageTransferStoreError,
+} from "./page-transfer/index.js";
+export type * from "./page-transfer/types.js";
 export {
   EntityResolver,
   ResourceDirectory,
@@ -146,3 +155,10 @@ export {
   WorkspaceDocumentRepository,
 } from "./documents/index.js";
 export type * from "./documents/types.js";
+export {
+  InventoryOverridesError,
+  buildProjectInventory,
+  hashInventoryValue,
+  validateInventoryOverrides,
+} from "./project-inventory.js";
+export type * from "./project-inventory.js";

@@ -24,6 +24,7 @@ import { createReadUserImageTool } from "./read-user-image-tool";
 import { createKnowledgeReportTool } from "./knowledge-report-tool";
 import { createReadKnowledgeSourceTool } from "./read-knowledge-source-tool";
 import { createReadProjectReferenceTool } from "./markdown-reference-tool";
+import { createSearchProjectInventoryTool } from "./search-project-inventory-tool";
 import { createGenerateReferenceImageTool } from "./generate-reference-image-tool";
 import { createReadPreinstalledSkillTool } from "./read-preinstalled-skill-tool";
 import { createArrangeCanvasPagesTool } from "./canvas-layout-tool";
@@ -57,6 +58,13 @@ import {
   type PermissionHandler,
 } from "./delete-page-tool";
 import { createCreatePageTool } from "./create-page-tool";
+import {
+  createGetPageTransferStatusTool,
+  createListTransferSourcePagesTool,
+  createResolvePageTransferConflictsTool,
+  createRevokePageReferenceTool,
+  createTransferPagesTool,
+} from "./page-transfer-tools";
 import { createDelegateTaskTool, type SubagentRunner } from "./subagent-tool";
 import { createGenerateImageTool } from "./generate-image-tool";
 import { createExtractImageElementTool } from "./extract-image-element-tool";
@@ -88,7 +96,7 @@ import {
 } from "./visibility-tools";
 import type { ConfigVisibilityApprovalHandler } from "./visibility-tools";
 
-export const WORKBENCH_TOOL_VERSION = 35;
+export const WORKBENCH_TOOL_VERSION = 36;
 
 const SKETCH_SCENE_TOOLS_ENABLED =
   process.env.PI_AGENT_SKETCH_TOOLS_ENABLED === "true";
@@ -116,6 +124,7 @@ export interface WorkbenchToolsOptions {
 
 const CONTROL_TOOL_NAMES = new Set([
   "readProjectReference",
+  "searchProjectInventory",
   "readPreinstalledSkill",
   "requestPlanApproval",
   "requestUserChoice",
@@ -145,6 +154,7 @@ const CAPABILITY_TOOL_NAMES: Record<
     "commitConfigVisibilityDraft",
     "knowledgeReport",
     "readKnowledgeSource",
+    "searchProjectInventory",
     "getConsoleLogs",
     "observePreview",
     "captureScreenshot",
@@ -163,6 +173,11 @@ const CAPABILITY_TOOL_NAMES: Record<
     "executeDeletePagePlan",
     "deletePage",
     "deletePages",
+    "listTransferSourcePages",
+    "transferPages",
+    "getPageTransferStatus",
+    "resolvePageTransferConflicts",
+    "revokePageReference",
   ]),
   comments: new Set([
     "readComments",
@@ -186,6 +201,7 @@ const CAPABILITY_TOOL_NAMES: Record<
 
 const INITIAL_TOOL_NAMES = new Set([
   "readProjectReference",
+  "searchProjectInventory",
   "readFile",
   "readUploadedFile",
   "listFiles",
@@ -272,6 +288,7 @@ export function createWorkbenchTools(
   const deletionPlanStore = createDeletionPlanStore();
   const tools: AgentTool[] = [
     createReadProjectReferenceTool(config),
+    createSearchProjectInventoryTool(config),
     ...(getImageGenConfig().enabled
       ? [createGenerateReferenceImageTool(config)]
       : []),
@@ -347,6 +364,11 @@ export function createWorkbenchTools(
     ),
     createDeletePageTool(config, permissionHandler),
     createDeletePagesTool(config, permissionHandler),
+    createListTransferSourcePagesTool(config),
+    createTransferPagesTool(config),
+    createGetPageTransferStatusTool(config),
+    createResolvePageTransferConflictsTool(config),
+    createRevokePageReferenceTool(config),
     createReadCommentsTool(config),
     createInspectElementTool(config),
     createReplyCommentTool(config),

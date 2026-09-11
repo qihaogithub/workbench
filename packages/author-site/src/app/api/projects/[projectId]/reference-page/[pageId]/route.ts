@@ -13,6 +13,8 @@ import {
 } from "@/lib/fs-utils";
 import { getAuthCookie, verifyToken } from "@/lib/auth/jwt";
 import { listDesignSpecDocs, readDesignSpecDoc } from "@/lib/design-specs";
+import { resolveActiveReferenceGrant } from "@/lib/page-transfer";
+import { buildGrantedPagePackage } from "@/lib/page-transfer/adapters";
 import {
   type DemoFolderMeta,
   type DemoPageMeta,
@@ -164,7 +166,27 @@ export async function GET(
       );
     }
 
-    const { sourceProjectId, sourcePageId } = referencePage.reference;
+    let grant;
+    try {
+      grant = resolveActiveReferenceGrant(referencePage.reference.grantId);
+    } catch {
+      return NextResponse.json(
+        createApiError("FORBIDDEN", "引用授权已撤销或失效"),
+        { status: 403 },
+      );
+    }
+    if (
+      grant.targetProjectId !== projectId ||
+      grant.targetPageId !== pageId ||
+      grant.sourceProjectId !== referencePage.reference.sourceProjectId ||
+      grant.sourcePageId !== referencePage.reference.sourcePageId
+    ) {
+      return NextResponse.json(
+        createApiError("FORBIDDEN", "引用授权与目标页面绑定不一致"),
+        { status: 403 },
+      );
+    }
+    const { sourceProjectId, sourcePageId } = grant;
 
     // 读取源项目 workspace-tree
     const sourceProjectPath = getProjectPath(sourceProjectId);
@@ -187,9 +209,11 @@ export async function GET(
 
     // 读取源页面文件内容
     const demoDir = path.join(sourceWorkspacePath, "demos", sourcePageId);
+    const pagePackage = buildGrantedPagePackage(grant);
+    const packageText = new Map(pagePackage.resources.flatMap((resource) => typeof resource.content === "string" ? [[resource.path, resource.content] as const] : []));
     const designSpecs = listDesignSpecDocs(sourceWorkspacePath)
       .map((meta) => readDesignSpecDoc(sourceWorkspacePath, meta.id))
-      .filter((doc): doc is NonNullable<typeof doc> => doc !== null);
+      .filter((doc): doc is NonNullable<typeof doc> => Boolean(doc && doc.entries.some((entry) => entry.target.type === "page" ? entry.target.pageIds.includes(sourcePageId) : entry.target.refs.some((ref) => ref.scope === "project" || ref.pageId === sourcePageId))));
     const designSpecEntries = designSpecs.flatMap((doc) =>
       doc.entries.flatMap((entry) =>
         (entry.target.type === "config" ? entry.target.refs : [])
@@ -225,17 +249,19 @@ export async function GET(
       createApiSuccess({
         code: readFileIfExists(path.join(demoDir, "index.tsx")),
         schema: readFileIfExists(path.join(demoDir, "config.schema.json")),
-        projectConfigSchema: readFileIfExists(
-          path.join(sourceWorkspacePath, "project.config.schema.json"),
-        ),
-        configData: readJsonIfExists(
-          path.join(sourceWorkspacePath, "project.config.values.json"),
-        ),
+        projectConfigSchema: packageText.get("project.config.schema.json"),
+        configData: packageText.get("project.config.values.json")
+          ? JSON.parse(packageText.get("project.config.values.json") as string) as Record<string, unknown>
+          : {},
         runtimeType: sourcePage.runtimeType,
         prototypeHtml: readFileIfExists(path.join(demoDir, "prototype.html")),
         prototypeCss: readFileIfExists(path.join(demoDir, "prototype.css")),
         prototypeMeta: readJsonIfExists(
           path.join(demoDir, "prototype.meta.json"),
+        ),
+        sandboxHtml: readFileIfExists(path.join(demoDir, "sandbox.html")),
+        htmlImportMeta: readJsonIfExists(
+          path.join(demoDir, "html-import.meta.json"),
         ),
         sketchScene: readFileIfExists(
           path.join(demoDir, "sketch.scene.json"),

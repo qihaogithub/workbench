@@ -10,6 +10,9 @@ import type {
   MultiDemoFiles,
   PrototypePageMeta,
   ResourceVersion,
+  PageTransferJob,
+  PageTransferRequest,
+  PageTransferResolution,
 } from "@workbench/shared";
 import type {
   RuntimeValidationResult,
@@ -418,26 +421,70 @@ export class ProjectApiClient {
     return response.data ?? {};
   }
 
-  /**
-   * 批量创建引用页
-   */
-  async createReferencePages(
-    projectId: string,
-    sourceProjectId: string,
-    sourcePageIds: string[],
+  /** Prepare a first-class cross-project page transfer without mutating either project. */
+  async preparePageTransfer(
+    targetProjectId: string,
     sessionId: string,
-  ): Promise<DemoPageMeta[]> {
-    const response = await this.localRequest<DemoPageMeta[]>(
-      `/api/projects/${projectId}/reference-pages`,
+    request: PageTransferRequest,
+  ): Promise<PageTransferJob> {
+    const response = await this.localRequest<PageTransferJob>(
+      `/api/projects/${targetProjectId}/page-transfers/prepare`,
       {
         method: "POST",
-        body: JSON.stringify({ sourceProjectId, sourcePageIds, sessionId }),
+        body: JSON.stringify({ ...request, sessionId }),
       },
     );
     if (!response.success || !response.data) {
-      throw new Error(response.error?.message || "创建引用页失败");
+      throw new Error(response.error?.message || "页面转移预检失败");
     }
     return response.data;
+  }
+
+  /** Execute all currently resolvable items in a prepared page-transfer job. */
+  async executePageTransfer(
+    targetProjectId: string,
+    jobId: string,
+    sessionId: string,
+    resolutions: PageTransferResolution[] = [],
+  ): Promise<PageTransferJob> {
+    const response = await this.localRequest<PageTransferJob>(
+      `/api/projects/${targetProjectId}/page-transfers/${jobId}/execute`,
+      {
+        method: "POST",
+        body: JSON.stringify({ sessionId, resolutions }),
+      },
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || "页面转移执行失败");
+    }
+    return response.data;
+  }
+
+  async getPageTransfer(
+    targetProjectId: string,
+    jobId: string,
+  ): Promise<PageTransferJob> {
+    const response = await this.localRequest<PageTransferJob>(
+      `/api/projects/${targetProjectId}/page-transfers/${jobId}`,
+      { method: "GET" },
+    );
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || "读取页面转移状态失败");
+    }
+    return response.data;
+  }
+
+  async revokePageReference(
+    targetProjectId: string,
+    grantId: string,
+  ): Promise<void> {
+    const response = await this.localRequest(
+      `/api/projects/${targetProjectId}/page-references/${encodeURIComponent(grantId)}/revoke`,
+      { method: "POST", body: JSON.stringify({}) },
+    );
+    if (!response.success) {
+      throw new Error(response.error?.message || "撤销页面引用失败");
+    }
   }
 
   /**
@@ -455,6 +502,8 @@ export class ProjectApiClient {
     prototypeHtml?: string;
     prototypeCss?: string;
     prototypeMeta?: Record<string, unknown>;
+    sandboxHtml?: string;
+    htmlImportMeta?: Record<string, unknown>;
     sketchScene?: string;
     sketchMeta?: Record<string, unknown>;
   }> {
@@ -466,6 +515,8 @@ export class ProjectApiClient {
       prototypeHtml?: string;
       prototypeCss?: string;
       prototypeMeta?: Record<string, unknown>;
+      sandboxHtml?: string;
+      htmlImportMeta?: Record<string, unknown>;
       sketchScene?: string;
       sketchMeta?: Record<string, unknown>;
     }>(

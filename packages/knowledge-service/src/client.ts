@@ -2,6 +2,8 @@ import type {
   KnowledgeSearchHit,
   KnowledgeSource,
 } from "./sqlite-catalog.js";
+import { getLocalhostUrl } from "@workbench/runtime-config/topology";
+import { PROJECT_INVENTORY_GENERATOR_VERSION, type InventoryQuery, type InventoryQueryResult, type InventorySnapshot } from "@workbench/shared";
 
 export type { KnowledgeSearchHit, KnowledgeSource } from "./sqlite-catalog.js";
 
@@ -20,7 +22,7 @@ export class KnowledgeServiceClient {
     this.baseUrl = (
       options.baseUrl ??
       process.env.KNOWLEDGE_SERVICE_URL ??
-      "http://localhost:3203"
+      getLocalhostUrl("local", "knowledge")
     ).replace(/\/+$/, "");
     this.internalToken =
       options.internalToken ?? process.env.INTERNAL_API_TOKEN ?? undefined;
@@ -65,6 +67,49 @@ export class KnowledgeServiceClient {
       method: "POST",
       body: "{}",
     });
+  }
+
+  async searchInventory(input: InventoryQuery & { projectId: string }): Promise<InventoryQueryResult> {
+    const response = await this.request("/api/inventory/search", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    const payload = (await response.json()) as { success?: boolean; data?: InventoryQueryResult };
+    return payload.success && payload.data
+      ? payload.data
+      : { entries: [], freshness: "unavailable", total: 0, nextCursor: null, truncated: false };
+  }
+
+  async getInventory(projectId: string, limit = 100): Promise<InventoryQueryResult> {
+    return this.searchInventory({ projectId, limit });
+  }
+
+  async getInventorySnapshot(projectId: string): Promise<InventorySnapshot | null> {
+    const response = await this.request(`/api/inventory/snapshot?projectId=${encodeURIComponent(projectId)}`, { method: "GET" });
+    if (response.status === 404) return null;
+    const payload = await response.json() as { success?: boolean; data?: InventorySnapshot };
+    return payload.success && payload.data ? payload.data : null;
+  }
+
+  async publishInventory(snapshot: InventorySnapshot): Promise<{ generationId: number }> {
+    const response = await this.request("/api/inventory/publish", {
+      method: "POST",
+      body: JSON.stringify({ snapshot }),
+    });
+    const payload = (await response.json()) as { success?: boolean; data?: { generationId?: number } };
+    if (!payload.success || typeof payload.data?.generationId !== "number") {
+      throw new Error("INVENTORY_PUBLISH_FAILED");
+    }
+    return { generationId: payload.data.generationId };
+  }
+
+  async createInventoryJobs(projectId: string, requests: unknown[], generatorVersion: string = PROJECT_INVENTORY_GENERATOR_VERSION): Promise<number> {
+    const response = await this.request("/api/inventory/jobs", {
+      method: "POST",
+      body: JSON.stringify({ projectId, requests, generatorVersion }),
+    });
+    const payload = (await response.json()) as { success?: boolean; data?: { inserted?: number } };
+    return payload.success && typeof payload.data?.inserted === "number" ? payload.data.inserted : 0;
   }
 
   private async request(

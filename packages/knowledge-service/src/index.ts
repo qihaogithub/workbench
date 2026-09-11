@@ -1,6 +1,23 @@
 import fs from "node:fs";
 import path from "node:path";
 
+export { SqliteInventoryCatalog, hashInventorySnapshot } from "./inventory-catalog.js";
+export { runInventoryGeneration } from "./inventory-generation.js";
+export type {
+  InventoryAnnotationInput,
+  InventoryCatalogStats,
+  InventoryGenerationRequest,
+  InventorySearchOptions,
+  SqliteInventoryCatalogOptions,
+  InventoryGenerationJob,
+} from "./inventory-catalog.js";
+export type {
+  InventoryEvidenceProvider,
+  InventoryGenerationRunResult,
+  InventorySummaryDraft,
+  InventorySummaryGenerator,
+} from "./inventory-generation.js";
+
 import {
   buildKnowledgeReport,
   canAccessKnowledgeItem,

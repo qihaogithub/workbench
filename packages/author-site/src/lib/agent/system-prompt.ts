@@ -13,6 +13,9 @@ export interface SystemPromptContext {
   /** Compact project-scope config and visibility facts for creator AI. */
   projectConfigSummary?: string;
   visibilityRulesSummary?: string;
+  /** Unified resource inventory projection, already bounded and permission-filtered. */
+  inventoryPrefix?: string;
+  inventoryStatus?: "available" | "unavailable";
 }
 
 function render(template: string, vars: Record<string, string>): string {
@@ -46,9 +49,15 @@ export function buildDynamicContextPrefix(context: SystemPromptContext): string 
     PROJECT_CONFIG_STATUS: context.projectConfigStatus,
     WORKSPACE_PATH: context.workspacePath,
     PAGE_COUNT: String(context.pageCount),
-    PAGE_LIST: context.pageList || '（暂无页面）',
+    PAGE_LIST: context.inventoryPrefix ? '（页面目录已由项目清单统一注入）' : context.pageList || '（暂无页面）',
+    PROJECT_INVENTORY: context.inventoryPrefix || `
+
+## 项目清单（系统自动注入）
+
+- inventoryStatus: ${context.inventoryStatus ?? "unavailable"}
+- 资源清单不可用时，不要静默递归扫描工作区；需要正文时使用受权限控制的读取工具。`,
     CANVAS_TEXT_SUMMARY: context.canvasTextSummary || '（暂无画布文本节点）',
-    PROJECT_CONFIG_SUMMARY: context.projectConfigSummary || '（未提供项目级字段摘要）',
+    PROJECT_CONFIG_SUMMARY: context.inventoryPrefix ? '（项目字段已由项目清单统一注入）' : context.projectConfigSummary || '（未提供项目级字段摘要）',
     VISIBILITY_RULES_SUMMARY: context.visibilityRulesSummary || '（未声明页面可见性规则）',
   });
 }

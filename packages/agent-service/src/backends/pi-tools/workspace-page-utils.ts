@@ -7,6 +7,7 @@ export const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
 export interface WorkspacePage {
   id: string;
   name: string;
+  routeKey?: string;
   order: number;
   parentId: string | null;
   runtimeType?: string;
@@ -88,6 +89,50 @@ export function getPageDir(workingDir: string, pageId: string): string {
 
 export function isSafePageId(pageId: string): boolean {
   return validateWorkspacePathSegment(pageId).ok;
+}
+
+function generatePageSlug(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 20)
+    .replace(/-$/, "");
+  return slug || "page";
+}
+
+function isValidRouteKey(routeKey: string): boolean {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(routeKey);
+}
+
+function makeUniqueRouteKey(base: string, used: Set<string>): string {
+  const normalizedBase = isValidRouteKey(base) ? base : generatePageSlug(base);
+  let candidate = normalizedBase || "page";
+  let suffix = 2;
+  while (used.has(candidate)) {
+    candidate = `${normalizedBase || "page"}-${suffix}`;
+    suffix += 1;
+  }
+  used.add(candidate);
+  return candidate;
+}
+
+/** Normalize page route keys before writing the page tree through Authority. */
+export function normalizeWorkspacePageRouteKeys<T extends WorkspacePage>(pages: T[]): T[] {
+  const used = new Set<string>();
+  return pages.map((page) => {
+    const current = typeof page.routeKey === "string" ? page.routeKey.trim() : "";
+    if (current && isValidRouteKey(current) && !used.has(current)) {
+      used.add(current);
+      return page;
+    }
+    return {
+      ...page,
+      routeKey: makeUniqueRouteKey(current || page.name || page.id, used),
+    };
+  });
 }
 
 export function isCompletePageDir(
