@@ -179,7 +179,6 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 
 | 变量                                 | 示例值                                                            | 说明                                                |
 | ------------------------------------ | ----------------------------------------------------------------- | --------------------------------------------------- |
-| `NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES` | `xjjj/,jojo/`                                                     | 前端模型白名单                                      |
 | `APP_DATA_DIR`                       | `/var/lib/workbench/data`                                         | 仓库外宿主机持久数据目录，绑定到写服务容器 `/app/data` |
 | `VIEWER_PUBLISHED_DIR`               | `/var/lib/workbench/data/published`                               | 仓库外发布产物目录，只读绑定到 viewer-site `/app/data/published` |
 | `NEXT_PUBLIC_SCREENSHOT_SERVICE_URL` | `http://10.130.33.131:3202`                                       | **局域网 IP**，浏览器端使用                         |
@@ -189,11 +188,16 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 | `DOCKER_CORS_ORIGINS`                | `http://10.130.33.131:3200,...`                                   | 包含局域网 IP                                       |
 | `PREVIEW_RUNTIME_SOURCE`             | `local`                                                           | preview runtime 来源；仅诊断时改为 `cdn`            |
 | `JWT_SECRET`                         | `change-this-to-a-random-string`                                  | JWT 签名密钥                                        |
+| `MODEL_CONFIG_ENCRYPTION_KEY`        | 随机长字符串                                                      | 用户与全局模型、绘图凭据加密                    |
+| `EXTERNAL_AUTH_ENCRYPTION_KEY`       | 随机长字符串                                                      | Figma、钉钉等用户级外部授权凭据加密              |
 | `USE_SECURE_COOKIE`                  | `false`                                                           | HTTP 内网部署时设为 false                           |
 | `INTERNAL_API_TOKEN`                 | 随机长字符串                                                      | 管理后台模型配置同步到 agent-service 的内部接口密钥 |
 | `FIGMA_OAUTH_CLIENT_ID`              | Figma OAuth app client id                                         | 启用聊天内 Figma MCP 用户授权                       |
 | `FIGMA_OAUTH_CLIENT_SECRET`          | Figma OAuth app client secret                                     | 用于交换和刷新用户 Figma token                      |
-| `FIGMA_OAUTH_REDIRECT_URI`           | `http://10.130.33.131:3200/api/user/external-auth/figma/callback` | Figma OAuth 回调地址，必须与 Figma app 配置一致     |
+| `FIGMA_OAUTH_REDIRECT_URI`           | `http://10.131.75.39:3200/api/user/external-auth/figma/callback` | 固定 Figma OAuth 回调地址，必须与 Figma app 配置完全一致 |
+| `FIGMA_OAUTH_TARGET_ID`              | `dev`                                                             | 当前开发/测试环境的 handoff 目标 ID                  |
+| `FIGMA_OAUTH_HANDOFF_SECRET`         | 随机长字符串                                                     | 固定回调与各目标环境共享的服务端密钥，至少 32 字节     |
+| `FIGMA_OAUTH_TARGETS_JSON`           | `{"dev":"http://10.131.75.39:3200"}`                         | 固定回调环境允许跳转的目标 origin 白名单              |
 | `FIGMA_OAUTH_SCOPES`                 | `file_content:read`                                               | 必须与 Figma OAuth scopes 页已选择权限匹配          |
 
 ### 3.3 局域网访问关键点
@@ -204,6 +208,9 @@ agent-service 采用 **Pi Agent 单后端架构**（`@earendil-works/pi-agent-co
 - `SCREENSHOT_SERVICE_URL` 在容器内使用 `http://screenshot-service:3202`
 - `INTERNAL_API_TOKEN` 必须在 author-site 和 agent-service 中保持同一个非空值，否则管理后台保存的后端供应商配置只能写入数据库，无法同步到 agent-service 运行时。
 - Figma MCP 用户授权必须先配置 Figma OAuth app；OAuth scopes 页至少选择 `file_content:read`，Embed API 的 allowed origins 不影响 OAuth 授权。
+- 开发/测试环境可复用同一个已登记的固定回调地址：固定回调环境交换 Figma code 并保存短时一次性 handoff，目标环境通过服务端兑换后完成本地登录；所有环境需共享 `FIGMA_OAUTH_HANDOFF_SECRET`，固定回调环境需把各目标 origin 加入 `FIGMA_OAUTH_TARGETS_JSON`。
+- Figma 回调是浏览器重定向，局域网 IP 只有在浏览器和固定回调服务均可达、且 Figma OAuth App 登记了完全相同的 URL 时才可用。
+- `FIGMA_OAUTH_POST_AUTH_ORIGIN` 是浏览器完成授权后的最终访问地址，必须使用实际可访问的 `localhost`、局域网 IP 或域名；`0.0.0.0` 和 `[::]` 仅用于容器监听，不能填入该变量或目标 origin 白名单。
 - `DOCKER_CORS_ORIGINS` 必须同时包含创作端、使用端的真实访问来源和必要的 localhost 来源；容器内服务读取的仍是由 Compose 注入的 `CORS_ORIGINS`
 - `author-site` 的 CORS 中间件会读取 `CORS_ORIGINS`，并在认证逻辑之前响应 API/viewer 路由的 OPTIONS 预检
 - `docker-compose.yml` 默认 `USE_SECURE_COOKIE=false`，匹配 `http://<IP>:3200` 的内网访问方式；若改为 HTTPS 域名访问，应显式设置为 `true`。

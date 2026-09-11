@@ -299,6 +299,11 @@ corepack pnpm diagnostics:export -- --project <projectId> --since 24h
 | `@workbench/cli-tools`          | `OPS/CLI/`                     | CLI 测试工具，ESM                                      | -    | Node/tsx 命令            |
 | `@workbench/page-export-extension` | `tools/page-export-extension/` | Editable Snapshot Chrome/Edge 扩展原型                | -    | Vitest + E2E             |
 
+## 创作端测试账号
+
+- 用户名：`test`
+- 密码：`123456`
+
 端口说明：本地 dev 端口是 4200-4300 段（author 4200 / agent 4201 / screenshot 4202 / knowledge 4203 / viewer 4300），全部默认绑定 `0.0.0.0` 支持局域网访问；Docker 部署使用 3200-3300 段，见 `docker-compose.yml`，不要混用。
 
 viewer-site dev 端口注意：`next dev` 在加载 `.env` 之前解析端口，`.env` 里的 `PORT=4300` 不生效，必须显式 `-p 4300`（已写在 dev 脚本中）；`.env` 的 PORT 仅作约定记录。

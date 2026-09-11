@@ -3,6 +3,10 @@ covers:
   - packages/demo-ui/src/DocumentEditor.tsx
   - packages/demo-ui/src/DocumentEditor.test.tsx
   - packages/demo-ui/src/markdown/crepe-config.ts
+  - packages/demo-ui/src/markdown/document-block-menu.ts
+  - packages/demo-ui/src/markdown/document-insert-menu.ts
+  - packages/demo-ui/src/markdown/lucide-icons.ts
+  - packages/demo-ui/src/markdown/document-block-edit.integration.test.tsx
   - packages/demo-ui/src/markdown/heading-style-toolbar.ts
   - patches/@milkdown__crepe@7.22.0.patch
   - packages/demo-ui/src/markdown/crepe-theme.css
@@ -33,6 +37,10 @@ Latex 与 Crepe AI 明确关闭。标题菜单统一使用“正文、一级标�
 TopBar 相对 `.milkdown` 正文滚动容器吸顶。通过 pnpm 管理的 Crepe 7.22.0 补丁在原生 Vue 渲染层实现单行收纳，工具继续使用原生配置、命令与选中态。ResizeObserver 测量容器和不可交互的测量行，为 `···` 预留位置后按原顺序划分可见项和溢出项；容器恢复宽度后自动还原。
 
 更多菜单由同一原生组件承载，定位在工具栏右下方，限制高度并内部滚动。测量行使用 inert 和 aria-hidden 排除交互与可访问树。按钮阻止指针按下改变选区，点击直接执行原命令；Escape 关闭并返回更多按钮，方向键切换菜单项。卸载时清理尺寸观察器和外部点击监听；升级 Crepe 时需同时检查源码及 ESM/CJS 两种入口的补丁与真实编辑器回归。
+
+插入工具由共享目录模型和独立的 TopBar feature 组成。模型按「基础、通用、引用」提供统一图标、搜索词和能力过滤；块句柄菜单继续把同一模型映射为原有的分组/替换界面。编辑器动作统一使用 `lucide-icons.ts` 将 `lucide-react` 的 `IconNode` 渲染为 SVG 字符串，供 Milkdown TopBar、插入面板、标题选择器、选区工具栏和块句柄共用；Lucide 的描边图标通过 `currentColor` 适配 Crepe 明暗主题，H1 至 H6 使用带级别标识的专用图标。TopBar 将插入放在首项，链接和块引用保留为直达命令，同时继续出现在插入面板中；基础分类采用仅图标网格，名称仍保留在辅助信息和搜索模型中。TopBar 菜单使用单面板布局，输入框、最近使用、基础网格和通用/引用列表共用一个浮层，并在打开时保存当前编辑选区。
+
+基础块和通用块的 TopBar 操作以一个 ProseMirror transaction 完成：先在光标或选区起点拆分当前文本块，再把新节点插入拆分边界，最后把焦点移入新块。非空选区不执行删除，因此原文字保留；失败、取消和只打开项目引用选择器不写入最近使用，项目引用只有现有异步引用事务成功后才记账。最近使用是菜单实例内的最多四项内存状态，不进入 Markdown 或宿主接口。
 
 ## 四、主题与滚动
 
