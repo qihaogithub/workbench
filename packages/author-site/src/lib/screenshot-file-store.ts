@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-import { findProjectRoot } from "@/lib/fs-utils";
+import { getDataDir } from "@/lib/paths";
 
 const MIN_MEANINGFUL_SCREENSHOT_BYTES = 8 * 1024;
 const LARGE_RENDER_AREA = 160_000;
@@ -34,9 +34,7 @@ export interface LocalScreenshotFile {
 }
 
 function getScreenshotsDir(): string {
-  const dataDir =
-    process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
-  return path.join(dataDir, "screenshots");
+  return path.join(getDataDir(), "screenshots");
 }
 
 export function isSafeScreenshotIdentifier(value: unknown): value is string {

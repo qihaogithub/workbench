@@ -1,10 +1,12 @@
-import fs from "node:fs";
 import path from "node:path";
+
+import { resolveDataDir } from "@workbench/runtime-config/paths";
+import { getLocalhostUrl } from "@workbench/runtime-config/topology";
 
 import type { ProjectAdminActor } from "./types.js";
 
-export const DEFAULT_AGENT_SERVICE_URL = "http://localhost:4201";
-export const DEFAULT_SCREENSHOT_SERVICE_URL = "http://localhost:4202";
+export const DEFAULT_AGENT_SERVICE_URL = getLocalhostUrl("local", "agent");
+export const DEFAULT_SCREENSHOT_SERVICE_URL = getLocalhostUrl("local", "screenshot");
 export const DEFAULT_PROJECT_ADMIN_MAX_BATCH_SIZE = 20;
 
 function trimTrailingSlashes(value: string): string {
@@ -18,19 +20,8 @@ function parseCsvEnv(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
-function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, "pnpm-workspace.yaml"))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
-}
-
 export function getProjectAdminDataDir(cwd = process.cwd()): string {
-  return process.env.DATA_DIR ?? path.join(findProjectRoot(cwd), "data");
+  return resolveDataDir({ cwd });
 }
 
 export function getProjectAdminAuditDir(dataDir: string): string {

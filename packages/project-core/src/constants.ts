@@ -83,8 +83,10 @@ export const DEFAULT_SKETCH_META: Record<string, unknown> = {
   updatedAt: 0,
 };
 
-export const MAX_PROTOTYPE_HTML_LENGTH = 2_000_000;
-export const MAX_PROTOTYPE_CSS_LENGTH = 120_000;
+export {
+  MAX_PROTOTYPE_CSS_LENGTH,
+  MAX_PROTOTYPE_HTML_LENGTH,
+} from "@workbench/prototype-core";
 export const PROTOTYPE_GLOBAL_SELECTOR_RE = /(^|[,{;]\s*)(html|body|:root)\b/i;
 
 export const WORKSPACE_TREE_FILENAME = "workspace-tree.json";
@@ -93,7 +95,7 @@ export const PROJECT_CONFIG_FILENAME = "project.config.schema.json";
 export const PROJECT_CONFIG_VALUES_FILENAME = "project.config.values.json";
 export const PROJECT_IMAGE_MANIFEST_FILENAME = "images.json";
 export const EDIT_TTL_MS = 2 * 60 * 60 * 1000;
-export const MAX_VERSIONS_KEEP = 50;
+export { MAX_VERSIONS_KEEP } from "./shared-runtime.js";
 export const MAX_ASSET_SIZE = 10 * 1024 * 1024;
 export const ALLOWED_ASSET_MIME_TYPES = new Set([
   "image/jpeg",

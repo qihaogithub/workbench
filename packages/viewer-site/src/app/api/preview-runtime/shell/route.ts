@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateIframeHtml } from "@workbench/demo-ui/iframe-template";
+import { DEFAULT_CDN_BASE_URL } from "@workbench/runtime-config/topology";
 
 // 该 shell 只读取构建时环境变量；viewer 的静态导出必须把这一点显式告知 Next。
 export const dynamic = "force-static";
@@ -15,7 +16,7 @@ export async function GET() {
   const useCdnRuntime = shouldUsePreviewRuntimeCdn();
   const html = generateIframeHtml({
     supportUrlMode: true,
-    cdnBaseUrl: process.env.CDN_BASE_URL || "https://esm.sh",
+    cdnBaseUrl: process.env.CDN_BASE_URL || DEFAULT_CDN_BASE_URL,
     useCdnRuntime,
   });
 

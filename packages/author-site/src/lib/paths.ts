@@ -1,19 +1,10 @@
 import path from "path";
 import fs from "fs";
+import { resolveDataDir, findWorkspaceRoot } from "@workbench/runtime-config/paths";
 
-export function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, "pnpm-workspace.yaml"))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
-}
+export const findProjectRoot = findWorkspaceRoot;
 
-export const DATA_DIR =
-  process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), "data");
+export const DATA_DIR = resolveDataDir();
 export const PROJECTS_DIR =
   process.env.PROJECTS_DIR || path.join(DATA_DIR, "projects");
 export const TEMPLATES_DIR =

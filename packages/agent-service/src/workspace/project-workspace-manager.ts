@@ -12,27 +12,10 @@ import type {
   ProjectDetailResponse,
 } from '@workbench/shared/contracts';
 import { MAX_VERSIONS_KEEP } from '@workbench/shared/contracts';
+import { getDataDir } from '../config/data-paths';
 import { logger } from '../utils/logger';
 
-function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
-}
-
-const BASE_DIR = path.resolve(
-  process.env.DATA_DIR ||
-  process.env.PROJECTS_BASE_DIR ||
-  path.join(findProjectRoot(process.cwd()), 'data')
-);
-if (process.env.PROJECTS_BASE_DIR && !process.env.DATA_DIR) {
-  logger.warn('PROJECTS_BASE_DIR 已废弃，请使用 DATA_DIR 代替');
-}
+const BASE_DIR = getDataDir();
 const PROJECTS_DIR = path.join(BASE_DIR, 'projects');
 const SESSIONS_DIR = path.join(BASE_DIR, 'sessions');
 const SNAPSHOTS_DIR = path.join(BASE_DIR, 'snapshots');

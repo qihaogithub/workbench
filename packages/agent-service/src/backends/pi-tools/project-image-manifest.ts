@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { getDataDir } from '../../config/data-paths';
 import type { AgentConfig } from '../../core/types';
 
 export interface ProjectImageEntry {
@@ -24,25 +25,11 @@ export interface ProjectImageManifest {
   images: ProjectImageEntry[];
 }
 
-function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
-}
-
 let projectsDirCache: string | null = null;
 
 function getProjectsDir(): string {
   if (!projectsDirCache) {
-    const dataDir = path.resolve(
-      process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data'),
-    );
-    projectsDirCache = path.join(dataDir, 'projects');
+    projectsDirCache = path.join(getDataDir(), 'projects');
   }
   return projectsDirCache;
 }

@@ -4,7 +4,6 @@ import {
   DEFAULT_SCREENSHOT_SERVICE_URL,
   getBrowserAgentServiceUrl,
   getInternalApiToken,
-  getModelEnvConfig,
   getScreenshotProxyTimeoutMs,
   getScreenshotServiceUrl,
   getServerAgentServiceUrl,
@@ -21,10 +20,6 @@ describe("runtime-config", () => {
     delete process.env.SCREENSHOT_SERVICE_URL;
     delete process.env.NEXT_PUBLIC_SCREENSHOT_SERVICE_URL;
     delete process.env.SCREENSHOT_PROXY_TIMEOUT_MS;
-    delete process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES;
-    delete process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS;
-    delete process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS;
-    delete process.env.NEXT_PUBLIC_MODEL_BLACKLIST;
   });
 
   afterAll(() => {
@@ -128,17 +123,4 @@ describe("runtime-config", () => {
     expect(getScreenshotProxyTimeoutMs()).toBe(5000);
   });
 
-  it("集中解析模型相关浏览器公开环境变量", () => {
-    process.env.NEXT_PUBLIC_ALLOWED_MODEL_PREFIXES = "foo/, bar/ ";
-    process.env.NEXT_PUBLIC_MODEL_NAME_FILTERS = "foo:pro,bar:free";
-    process.env.NEXT_PUBLIC_DEFAULT_MODEL_IDS = "foo/a, bar/b";
-    process.env.NEXT_PUBLIC_MODEL_BLACKLIST = "foo/old,bar/test";
-
-    expect(getModelEnvConfig()).toEqual({
-      allowedPrefixes: ["foo/", "bar/"],
-      nameFilters: ["foo:pro", "bar:free"],
-      defaultModelIds: ["foo/a", "bar/b"],
-      blacklist: ["foo/old", "bar/test"],
-    });
-  });
 });

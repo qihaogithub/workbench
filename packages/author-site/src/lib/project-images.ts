@@ -1,25 +1,12 @@
 import * as path from 'path';
 import * as fs from 'fs';
-
-function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
-}
+import { getDataDir } from './paths';
 
 let _projectsDir: string | null = null;
 
 function getProjectsDir(): string {
   if (!_projectsDir) {
-    const dataDir = process.env.DATA_DIR
-      ? path.resolve(process.env.DATA_DIR)
-      : path.join(findProjectRoot(process.cwd()), 'data');
-    _projectsDir = path.join(dataDir, 'projects');
+    _projectsDir = path.join(getDataDir(), 'projects');
   }
   return _projectsDir;
 }

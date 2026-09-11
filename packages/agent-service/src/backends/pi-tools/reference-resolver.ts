@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 import type { KnowledgeItem } from "@workbench/knowledge-core";
+import { getDataDir } from "../../config/data-paths";
 
 /**
  * 引用项目（跨项目读取）解析器。
@@ -73,21 +74,7 @@ export function buildReferenceSourceRef(
  * 解析 agent-service 的 data/ 根目录（与其它工具一致：DATA_DIR 优先，否则找仓库根 data）。
  */
 export function resolveDataDir(cwd: string = process.cwd()): string {
-  if (process.env.DATA_DIR) {
-    return path.resolve(process.env.DATA_DIR);
-  }
-  return path.join(findProjectRoot(cwd), "data");
-}
-
-function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, "pnpm-workspace.yaml"))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
+  return getDataDir(cwd);
 }
 
 /**

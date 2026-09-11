@@ -1,8 +1,5 @@
-import dotenv from "dotenv";
-import path from "path";
-
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
-dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+import "./bootstrap-env";
+import { resolveSecrets } from "@workbench/runtime-config/secrets";
 
 import Fastify from "fastify";
 import websocket from "@fastify/websocket";
@@ -35,6 +32,7 @@ import {
 } from "./session/runtime-log-retention";
 import { getConversationLedgerClient } from "./services/conversation-ledger-client";
 
+resolveSecrets({ required: ["INTERNAL_API_TOKEN"] });
 const config = loadConfig();
 const logger = getLogger();
 

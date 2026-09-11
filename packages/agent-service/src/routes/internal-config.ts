@@ -16,6 +16,7 @@ import path from "path";
 import { promisify } from "util";
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { getDataDir } from "../config/data-paths";
 
 import { getBackendProvidersManager } from "../config/backend-providers";
 import { getSessionModelConfigs } from "../config/session-model-configs";
@@ -42,7 +43,7 @@ const TOKEN_HEADER = "x-internal-token";
 const execFileAsync = promisify(execFile);
 
 function getDwsConfigRoot(): string {
-  return path.join(process.env.DATA_DIR || path.join(process.cwd(), "data"), "dws-auth");
+  return path.join(getDataDir(), "dws-auth");
 }
 
 function getDwsConfigDir(userId: string): string {

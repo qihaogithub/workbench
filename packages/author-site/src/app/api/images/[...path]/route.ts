@@ -1,21 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'path';
 import * as fs from 'fs';
+import { getDataDir } from '@/lib/paths';
 
-const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : (() => {
-      let current = path.resolve(process.cwd());
-      while (current !== path.dirname(current)) {
-        if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
-          return path.join(current, 'data');
-        }
-        current = path.dirname(current);
-      }
-      return path.join(process.cwd(), 'data');
-    })();
-
-const IMAGES_DIR = path.join(DATA_DIR, 'images');
+const IMAGES_DIR = path.join(getDataDir(), 'images');
 
 const MIME_TYPES: Record<string, string> = {
   '.png': 'image/png',

@@ -28,6 +28,7 @@ const workspacePath = unwrap(
 ) as typeof import("@workbench/shared/workspace-path");
 
 export const {
+  MAX_VERSIONS_KEEP,
   WHITEBOARD_DOCUMENT_MAX_BYTES,
   applyPagePresentationToSchema,
   isWhiteboardBinding,
