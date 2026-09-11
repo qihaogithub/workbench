@@ -10,6 +10,7 @@ import {
   FileText,
   FolderOpen,
   History,
+  ListTree,
   Loader2,
   MoreVertical,
   Plus,
@@ -32,6 +33,8 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -56,7 +59,6 @@ import {
 import { createAuthorReferenceProvider, navigateToMarkdownMention, type AuthorDocumentReference } from "./markdown-reference-navigation";
 import { DocumentProposalReviewDialog } from "./DocumentProposalReviewDialog";
 import type { DesignSpecMeta, DesignSpecRef } from "@/lib/design-specs";
-import type { UserRole } from "@/lib/user";
 import { cn } from "@/lib/utils";
 import {
   getKnowledgeUploadTitle,
@@ -75,6 +77,10 @@ import {
   type OfflineDraftStore,
 } from "@/lib/workspace-offline-drafts";
 import { DocumentSaveStatusBar } from "./DocumentSaveStatusBar";
+import {
+  ProjectInventoryView,
+  type ProjectInventoryUserRole,
+} from "./ProjectInventoryView";
 
 export interface PageItem {
   id: string;
@@ -87,13 +93,14 @@ function isWithinDropdownMenu(target: EventTarget | null): target is Element {
   return target instanceof Element && Boolean(target.closest('[role="menu"]'));
 }
 
-/** 右侧编辑区当前打开的目标：知识库文档 / AI 记忆 / 项目公约 / 页面公约 / 设计规范 */
+/** 右侧内容区当前打开的目标：Markdown 文档 / 设计规范 / 项目清单 */
 type ActiveTarget =
   | { kind: "knowledge"; item: KnowledgeItem }
   | { kind: "memory" }
   | { kind: "convention" }
   | { kind: "pageConvention"; page: PageItem }
-  | { kind: "designSpec"; doc: DesignSpecMeta };
+  | { kind: "designSpec"; doc: DesignSpecMeta }
+  | { kind: "inventory" };
 
 /** 解析 workspace files 接口中的路径（memory/convention/pageConvention） */
 function resolveWorkspaceFilePath(target: ActiveTarget): string | null {
@@ -132,6 +139,7 @@ function getContentCacheKey(target: ActiveTarget): string {
   if (target.kind === "pageConvention") {
     return `workspace:demos/${target.page.id}/convention.md`;
   }
+  if (target.kind === "inventory") return "virtual:project-inventory";
   return `design-spec:${target.doc.id}`;
 }
 
@@ -152,7 +160,7 @@ export interface DocumentViewProps {
   onEditConfigDefinition?: (target: DesignSpecRef) => void;
   onCommentTargetChange?: (target: CommentTarget | null) => void;
   onDocumentCommentSelection?: (anchor: DocumentCommentAnchor) => void;
-  userRole?: UserRole | "";
+  userRole?: ProjectInventoryUserRole;
   onReferenceClick?: MarkdownReferenceClickHandler;
 }
 
@@ -185,6 +193,8 @@ export function DocumentView({
   const canManageGovernance = userRole === "admin";
   const [loading, setLoading] = useState(false);
   const [activeTarget, setActiveTarget] = useState<ActiveTarget | null>(null);
+  const [inventoryDirty, setInventoryDirty] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<{ target: ActiveTarget | null } | null>(null);
   const [content, setContent] = useState("");
   const [contentLoading, setContentLoading] = useState(false);
   const [contentReloadRevision, setContentReloadRevision] = useState(0);
@@ -198,6 +208,18 @@ export function DocumentView({
   });
   const activeTargetRef = useRef<ActiveTarget | null>(null);
   activeTargetRef.current = activeTarget;
+  const selectTarget = useCallback((next: ActiveTarget | null) => {
+    const current = activeTargetRef.current;
+    if ((current === null && next === null) || (current !== null && next !== null && getContentCacheKey(current) === getContentCacheKey(next))) {
+      return true;
+    }
+    if (current?.kind === "inventory" && inventoryDirty) {
+      setPendingNavigation({ target: next });
+      return false;
+    }
+    setActiveTarget(next);
+    return true;
+  }, [inventoryDirty]);
   const activeDocumentReadOnly = Boolean(
     activeTarget &&
       (activeTarget.kind === "convention" || activeTarget.kind === "pageConvention") &&
@@ -256,13 +278,13 @@ export function DocumentView({
       }
     }
     if (!next) return;
+    if (!selectTarget(next)) return;
     consumedReferenceFocusRef.current = referenceFocus;
-    setActiveTarget(next);
     setUserExpanded(true);
     setConventionExpanded(true);
     setDesignSpecExpanded(true);
     onReferenceFocusConsumed?.();
-  }, [referenceFocus, projectId, items, pages, designSpecs, onReferenceFocusConsumed]);
+  }, [referenceFocus, projectId, items, pages, designSpecs, onReferenceFocusConsumed, selectTarget]);
 
   const referenceProvider = useMemo<MarkdownReferenceProvider | undefined>(
     () => projectId ? createAuthorReferenceProvider(projectId, sessionId) : undefined,
@@ -384,9 +406,9 @@ export function DocumentView({
     const doc = designSpecs.find((item) => item.id === designSpecFocus.docId);
     if (!doc) return;
     setDesignSpecExpanded(true);
-    setActiveTarget({ kind: "designSpec", doc });
+    selectTarget({ kind: "designSpec", doc });
     setFocusedEntryId(designSpecFocus.entryId);
-  }, [designSpecFocus, designSpecs]);
+  }, [designSpecFocus, designSpecs, selectTarget]);
 
   const fetchExistingConventions = useCallback(async () => {
     if (!sessionId) {
@@ -472,13 +494,18 @@ export function DocumentView({
   // 默认选中第一个用户文档
   useEffect(() => {
     if (!referenceFocus && !activeTarget && userItems.length > 0 && !loading) {
-      setActiveTarget({ kind: "knowledge", item: userItems[0] });
+      selectTarget({ kind: "knowledge", item: userItems[0] });
     }
-  }, [activeTarget, userItems, loading, referenceFocus]);
+  }, [activeTarget, userItems, loading, referenceFocus, selectTarget]);
 
   /** 把指定目标的 markdown 内容写回服务端 */
   const saveTarget = useCallback(
     async (target: ActiveTarget, markdown: string) => {
+      if (target.kind === "inventory") {
+        throw new DocumentSaveError("项目清单不是可保存的 Markdown 文档。", {
+          code: "VALIDATION_FAILED",
+        });
+      }
       if ((target.kind === "convention" || target.kind === "pageConvention") && !canManageGovernance) {
         throw new DocumentSaveError("当前没有保存此公约的权限。", {
           code: "PERMISSION_DENIED",
@@ -571,7 +598,7 @@ export function DocumentView({
       const filePath = resolveWorkspaceFilePath(target);
       if (!filePath) return;
       if (existingConventionPaths.has(filePath)) {
-        setActiveTarget(target);
+        selectTarget(target);
         setConventionExpanded(true);
         return;
       }
@@ -589,10 +616,10 @@ export function DocumentView({
       setExistingConventionPaths((current) => new Set(current).add(filePath));
       contentCacheRef.current.set(getContentCacheKey(target), initialContent);
       setContent(initialContent);
-      setActiveTarget(target);
+      selectTarget(target);
       setConventionExpanded(true);
     },
-    [existingConventionPaths, saveTarget, canManageGovernance, toast],
+    [existingConventionPaths, saveTarget, canManageGovernance, selectTarget, toast],
   );
 
   const deleteConvention = useCallback(
@@ -632,7 +659,9 @@ export function DocumentView({
   // ── 文档保存协调器：编辑、切换目标和卸载共用同一条提交链路 ──────────
   // 目标对象可能因为重命名而重新创建，所以保存回调始终从 ref 读取最新目标；
   // 协调器本身只按稳定 cache key 重建，避免重命名或列表刷新丢失未提交内容。
-  const activeTargetKey = activeTarget ? getContentCacheKey(activeTarget) : null;
+  const activeTargetKey = activeTarget && activeTarget.kind !== "inventory"
+    ? getContentCacheKey(activeTarget)
+    : null;
   const coordinatorRef = useRef<DocumentSaveCoordinator<string> | null>(null);
 
   const coordinator = useMemo<DocumentSaveCoordinator<string> | null>(() => {
@@ -738,6 +767,11 @@ export function DocumentView({
   useEffect(() => {
     if (!activeTarget) {
       setContent("");
+      return;
+    }
+    if (activeTarget.kind === "inventory") {
+      setContent("");
+      setContentLoading(false);
       return;
     }
 
@@ -851,7 +885,7 @@ export function DocumentView({
         setItems((current) => [...current.filter((entry) => entry.id !== item.id), item]);
         setUserExpanded(true);
         contentCacheRef.current.set(`knowledge:${item.id}`, markdown);
-        setActiveTarget({ kind: "knowledge", item });
+        selectTarget({ kind: "knowledge", item });
         setContent(markdown);
         const nextItems = [
           ...itemsRef.current.filter((entry) => entry.id !== item.id),
@@ -868,7 +902,7 @@ export function DocumentView({
         return null;
       }
     },
-    [documentApiMode, projectId, sessionId, toast, workingDir],
+    [documentApiMode, projectId, selectTarget, sessionId, toast, workingDir],
   );
 
   const handleCreate = useCallback(async () => {
@@ -1022,7 +1056,7 @@ export function DocumentView({
         designSpecMutationVersionRef.current += 1;
         toast({ title: "已创建设计规范" });
         setDesignSpecExpanded(true);
-        setActiveTarget({ kind: "designSpec", doc: data.data });
+        selectTarget({ kind: "designSpec", doc: data.data });
         fetchDesignSpecs();
         window.dispatchEvent(new Event("design-spec-updated"));
       } else {
@@ -1031,7 +1065,7 @@ export function DocumentView({
     } catch {
       toast({ title: "创建失败", variant: "destructive" });
     }
-  }, [workingDir, sessionId, projectId, designSpecs.length, toast, fetchDesignSpecs]);
+  }, [workingDir, sessionId, projectId, designSpecs.length, toast, fetchDesignSpecs, selectTarget]);
 
   const handleDeleteDesignSpec = useCallback(
     async (doc: DesignSpecMeta) => {
@@ -1117,7 +1151,7 @@ export function DocumentView({
         activeTarget.doc.id === target.doc.id));
 
   useEffect(() => {
-    if (!activeTarget || activeTarget.kind === "designSpec") {
+    if (!activeTarget || activeTarget.kind === "designSpec" || activeTarget.kind === "inventory") {
       onCommentTargetChange?.(null);
       return;
     }
@@ -1148,10 +1182,10 @@ export function DocumentView({
   const handleReferenceSourceClick = useCallback((source: MarkdownReferenceSource) => {
     if (source.kind !== "knowledge-document") return;
     const item = items.find((candidate) => candidate.id === source.docId);
-    if (item) setActiveTarget({ kind: "knowledge", item });
-  }, [items]);
+    if (item) selectTarget({ kind: "knowledge", item });
+  }, [items, selectTarget]);
   const handleUnlinkedMentionClick = useCallback((mention: { target: import("@workbench/shared/markdown-reference").MarkdownReferenceTarget; label: string; start: number; end: number }) => {
-    if (!activeTarget || activeTarget.kind === "designSpec") return;
+    if (!activeTarget || activeTarget.kind === "designSpec" || activeTarget.kind === "inventory") return;
     if (!window.confirm(`将「${mention.label}」转换为项目引用？`)) return;
     if (content.slice(mention.start, mention.end) !== mention.label) return;
     const next = `${content.slice(0, mention.start)}${serializeMarkdownReference(mention.target, mention.label)}${content.slice(mention.end)}`;
@@ -1168,6 +1202,16 @@ export function DocumentView({
     referenceDirectoryRef.current?.querySelector<HTMLElement>(".bg-accent.text-accent-foreground")
       ?.scrollIntoView?.({ block: "nearest" });
   }, [activeTarget, existingConventionPaths, designSpecExpanded, conventionExpanded, userExpanded]);
+
+  useEffect(() => {
+    if (!inventoryDirty) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [inventoryDirty]);
 
   return (
     <div className="flex h-full min-h-0">
@@ -1190,7 +1234,7 @@ export function DocumentView({
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
               )}
-              onClick={() => setActiveTarget({ kind: "memory" })}
+              onClick={() => selectTarget({ kind: "memory" })}
             >
               <Brain className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1 truncate">AI 记忆</span>
@@ -1247,6 +1291,19 @@ export function DocumentView({
               </div>
               {conventionExpanded && (
                 <div className="space-y-0">
+                  {projectId && <div
+                    className={cn(
+                      "group flex cursor-pointer items-center gap-1.5 rounded-sm py-1 pr-2 text-sm transition-colors hover:bg-accent/50",
+                      isActive({ kind: "inventory" })
+                        ? "bg-accent text-accent-foreground"
+                        : "text-foreground",
+                    )}
+                    style={{ paddingLeft: 24 + 8 }}
+                    onClick={() => selectTarget({ kind: "inventory" })}
+                  >
+                    <ListTree className="h-4 w-4 shrink-0 text-violet-500" />
+                    <span className="min-w-0 flex-1 truncate">项目清单</span>
+                  </div>}
                   {/* 已创建的项目公约（根） */}
                   {existingConventionPaths.has("convention.md") && <div
                     className={cn(
@@ -1256,7 +1313,7 @@ export function DocumentView({
                         : "text-foreground",
                     )}
                     style={{ paddingLeft: 24 + 8 }}
-                    onClick={() => setActiveTarget({ kind: "convention" })}
+                    onClick={() => selectTarget({ kind: "convention" })}
                   >
                     <ScrollText className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate">项目公约</span>
@@ -1278,7 +1335,7 @@ export function DocumentView({
                       )}
                       style={{ paddingLeft: 24 + 8 }}
                       onClick={() =>
-                        setActiveTarget({ kind: "pageConvention", page })
+                        selectTarget({ kind: "pageConvention", page })
                       }
                     >
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -1378,7 +1435,7 @@ export function DocumentView({
                           activeTarget.item.id === item.id
                         }
                         onSelect={() =>
-                          setActiveTarget({ kind: "knowledge", item })
+                          selectTarget({ kind: "knowledge", item })
                         }
                         onDelete={() => handleDelete(item)}
                         onRename={() => {
@@ -1458,7 +1515,7 @@ export function DocumentView({
                             : "text-foreground",
                         )}
                         style={{ paddingLeft: 24 + 8 }}
-                        onClick={() => setActiveTarget({ kind: "designSpec", doc })}
+                        onClick={() => selectTarget({ kind: "designSpec", doc })}
                       >
                         <FileText className="h-4 w-4 shrink-0 text-cyan-500" />
                         {renamingDesignSpecId === doc.id ? (
@@ -1532,7 +1589,7 @@ export function DocumentView({
 
       {/* 文档编辑区 */}
       <div ref={referenceEditorContainerRef} className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        <DocumentSaveStatusBar
+        {activeTarget?.kind !== "inventory" && <DocumentSaveStatusBar
           snapshot={saveSnapshot}
           testId={workspaceSaveBlocked ? "workspace-save-blocked" : undefined}
           onRetry={() => {
@@ -1544,8 +1601,8 @@ export function DocumentView({
           onDiscardDraft={() => {
             void discardLocalDraft();
           }}
-        />
-        {proposalId && !proposalReviewOpen && (
+        />}
+        {activeTarget?.kind !== "inventory" && proposalId && !proposalReviewOpen && (
           <div className="flex items-center justify-between border-b bg-violet-500/5 px-3 py-2 text-xs">
             <span className="text-muted-foreground">有一项 AI 文档修改待审核</span>
             <Button variant="outline" size="sm" className="h-7" onClick={() => setProposalReviewOpen(true)}>
@@ -1553,7 +1610,14 @@ export function DocumentView({
             </Button>
           </div>
         )}
-        {activeTarget?.kind === "designSpec" ? (
+        {activeTarget?.kind === "inventory" && projectId ? (
+          <ProjectInventoryView
+            projectId={projectId}
+            sessionId={sessionId}
+            userRole={userRole}
+            onDirtyChange={setInventoryDirty}
+          />
+        ) : activeTarget?.kind === "designSpec" ? (
           <DesignSpecEditor
             docId={activeTarget.doc.id}
             focusEntryId={focusedEntryId ?? undefined}
@@ -1595,7 +1659,7 @@ export function DocumentView({
             </div>
           </>
         )}
-        {projectId && (
+        {projectId && activeTarget?.kind !== "inventory" && (
           <MarkdownReferenceLinksPanel
             projectId={projectId}
             sessionId={sessionId}
@@ -1608,6 +1672,37 @@ export function DocumentView({
           />
         )}
       </div>
+
+      <Dialog
+        open={pendingNavigation !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingNavigation(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>资源清单有未保存修改</DialogTitle>
+            <DialogDescription>
+              当前语义补充还没有保存。离开后这些修改会丢失，是否先回到资源清单继续编辑？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingNavigation(null)}>
+              继续编辑
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                const target = pendingNavigation?.target ?? null;
+                setPendingNavigation(null);
+                setActiveTarget(target);
+              }}
+            >
+              放弃并离开
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 选择页面（用于新建页面公约） */}
       <Dialog open={pagePickerOpen} onOpenChange={setPagePickerOpen}>

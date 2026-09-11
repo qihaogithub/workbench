@@ -46,6 +46,9 @@ describe("Crepe 宿主主题契约", () => {
     expect(theme).toMatch(
       /\.document-selection-toolbar-heading\s*\{[^}]*min-width:\s*64px;/s,
     );
+    expect(theme).toMatch(
+      /\.top-bar-item:has\(\[data-document-insert-trigger\]\)\s*\{[^}]*min-width:\s*72px;/s,
+    );
   });
 
   it("标题下拉复用本地浮层，不再维护原生下拉的另一套定位样式", () => {
@@ -129,8 +132,30 @@ describe("Crepe 宿主主题契约", () => {
     expect(theme).toMatch(
       /\.document-block-menu-groups\s*\{[^}]*overflow-y:\s*auto;[^}]*min-height:\s*0;/s,
     );
+    expect(theme).toMatch(/--document-editor-block-menu-max-height:\s*360px;/);
+  });
+
+  it("为 TopBar 插入面板提供搜索、网格、列表和窄屏滚动样式", () => {
     expect(theme).toMatch(
-      /--document-editor-block-menu-max-height:\s*360px;/,
+      /\.document-topbar-insert-menu\s*\{[^}]*max-height:\s*min\(72vh,\s*560px\);[^}]*overflow-y:\s*auto;/s,
+    );
+    expect(theme).toMatch(
+      /\.document-insert-grid\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(7,/s,
+    );
+    expect(theme).toMatch(
+      /@media\s*\(max-width:\s*640px\)[\s\S]*?\.document-insert-grid\s*\{[^}]*repeat\(4,/s,
+    );
+    expect(theme).toMatch(
+      /\.document-insert-item\s*\{[^}]*cursor:\s*pointer;/s,
+    );
+    expect(theme).toMatch(
+      /\.document-insert-grid\s+\.document-insert-item\s*\{[^}]*min-height:\s*40px;/s,
+    );
+  });
+
+  it("将 TopBar 的 Lucide 直达图标收敛到统一尺寸", () => {
+    expect(theme).toMatch(
+      /\.milkdown-top-bar\s+\.top-bar-item\s+svg\[data-lucide\]\s*\{[^}]*width:\s*var\(--document-editor-icon-size\);[^}]*height:\s*var\(--document-editor-icon-size\);/s,
     );
   });
 
@@ -143,6 +168,12 @@ describe("Crepe 宿主主题契约", () => {
     );
     expect(theme).toMatch(
       /\.top-bar-item\.active[^}]*\.toolbar-item\.active[^}]*\{[^}]*background:\s*var\(--crepe-color-selected\)/s,
+    );
+  });
+
+  it("让 Lucide 图标保持描边渲染并继承当前主题颜色", () => {
+    expect(theme).toMatch(
+      /\.document-editor-crepe\s+svg\[data-lucide\]\s*\{[^}]*fill:\s*none\s*!important;[^}]*stroke:\s*currentColor\s*!important;/s,
     );
   });
 

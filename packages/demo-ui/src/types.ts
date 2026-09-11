@@ -526,6 +526,15 @@ export interface CanvasPageData {
   snapshotRejectionReasons?: SnapshotRejectionReason[];
 }
 
+/** Stable page identity stored in the canvas clipboard. Page bytes are
+ * resolved by the server-side transfer service from a committed source. */
+export interface CanvasTransferPageIdentity {
+  id: string;
+  name: string;
+  runtimeType?: CanvasPageRuntimeType;
+  sourcePageVersionId?: string;
+}
+
 export interface CanvasPageGroupEntry {
   id: string;
   pageId: string;
@@ -774,15 +783,16 @@ export interface PreviewCanvasProps {
   ) => Promise<string>;
   /** 粘贴页面时触发，由父组件调用 API 创建页面并返回 ID 映射 */
   onRequestPastePages?: (input: {
-    pages: CanvasPageData[];
+    pages: CanvasTransferPageIdentity[];
     pageLayouts: Record<string, CanvasPageLayout>;
     pageGroups: CanvasPageGroup[];
+    sourceProjectId?: string;
   }) => Promise<{ pageIdMapping: Map<string, string> }>;
   /** 画布粘贴 HTML 代码时触发，由父组件解析并创建页面 */
   onRequestPasteHtmlContent?: (html: string) => void | Promise<void>;
   /** 跨项目粘贴时创建引用页 */
   onRequestCreateReferences?: (input: {
-    pages: CanvasPageData[];
+    pages: CanvasTransferPageIdentity[];
     pageLayouts: Record<string, CanvasPageLayout>;
     pageGroups: CanvasPageGroup[];
     sourceProjectId: string;

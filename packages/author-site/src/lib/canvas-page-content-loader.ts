@@ -167,11 +167,14 @@ export async function loadCanvasPageContent(input: {
 
   // sandboxed-html 页面只能通过服务端签发的一次性执行票据运行。
   // 原始 HTML 永远不作为 iframe src 或客户端执行输入传递。
-  if (input.page.runtimeType === "sandboxed-html" && !input.page.reference) {
+  if (input.page.runtimeType === "sandboxed-html") {
+    const executionEndpoint = input.page.reference
+      ? `/api/projects/${encodeURIComponent(input.projectId)}/reference-page/${encodeURIComponent(input.page.id)}/html-execution`
+      : `/api/projects/${encodeURIComponent(input.projectId)}/demos/${encodeURIComponent(input.page.id)}/html-execution`;
     const { response: executionResponse, payload: executionPayload } =
       await requestJsonWithTransientRetry(
         request,
-        `/api/projects/${encodeURIComponent(input.projectId)}/demos/${encodeURIComponent(input.page.id)}/html-execution`,
+        executionEndpoint,
         {
           method: "POST",
           headers: { "content-type": "application/json" },

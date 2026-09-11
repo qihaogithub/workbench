@@ -14,6 +14,10 @@ import {
 } from "./markdown/crepe-config";
 import { documentBlockEdit } from "./markdown/document-block-edit";
 import { documentHeadingMenu } from "./markdown/document-heading-menu";
+import {
+  documentInsertMenu,
+  documentInsertMenuApi,
+} from "./markdown/document-insert-menu";
 import { documentSelectionToolbar } from "./markdown/document-selection-toolbar";
 import { ProjectReferencePicker } from "./markdown/ProjectReferencePicker";
 import { projectReferencePresentation } from "./markdown/project-reference-presentation";
@@ -145,11 +149,12 @@ function escapeMarkdownLabel(label: string): string {
   return label.replace(/\[/g, "\\[").replace(/\]/g, "\\]");
 }
 
-function insertMarkdown(crepe: Crepe, markdown: string) {
+function insertMarkdown(crepe: Crepe, markdown: string): boolean {
   const view = getEditorView(crepe);
-  if (!view) return;
+  if (!view) return false;
   crepe.editor.action(insert(markdown));
   view.focus();
+  return true;
 }
 
 function getEditorView(crepe: Crepe): EditorView | null {
@@ -496,12 +501,19 @@ function DocumentEditorInstance({
           kind === "video"
             ? `\n<video controls src="${result.url}"></video>\n`
             : `\n[${name}](${result.url})\n`;
-        insertMarkdown(crepe, markdown);
+        const inserted = insertMarkdown(crepe, markdown);
+        if (inserted && showTopBar) {
+          crepe.editor.action((ctx) =>
+            ctx.get(documentInsertMenuApi.key).recordRecent(
+              kind === "video" ? "upload-video" : "upload-file",
+            ),
+          );
+        }
       } catch (error) {
         reportUploadError(error);
       }
     },
-    [reportUploadError],
+    [reportUploadError, showTopBar],
   );
 
   useEffect(() => {
@@ -537,7 +549,7 @@ function DocumentEditorInstance({
       insertReference: (candidate) => {
         const crepe = crepeRef.current;
         if (!crepe) return;
-        insertMarkdown(
+        return insertMarkdown(
           crepe,
           `@[${escapeMarkdownLabel(candidate.label)}](${candidate.key})`,
         );
@@ -561,8 +573,18 @@ function DocumentEditorInstance({
       getResolvedProjectIds: () =>
         new Set(referenceDirectoriesRef.current.keys()),
     });
-    if (showTopBar)
+    if (showTopBar) {
       crepe.addFeature(documentHeadingMenu, { root: overlayRoot, actions });
+      crepe.addFeature(documentInsertMenu, {
+        root: overlayRoot,
+        actions,
+        referenceCandidates: referenceCandidatesRef.current,
+        enableUploads: uploadsEnabled,
+        enableProjectReferences: Boolean(
+          referenceProviderRef.current && referenceContextRef.current,
+        ),
+      });
+    }
 
     const reportCommentSelection = (view: EditorView) => {
       const selection = view.state.selection;
@@ -1000,6 +1022,13 @@ function DocumentEditorInstance({
       view.dispatch(transaction.scrollIntoView());
       closeReferenceMenu();
       view.focus();
+      if (showTopBar) {
+        crepe.editor.action((ctx) =>
+          ctx.get(documentInsertMenuApi.key).recordRecent(
+            "insert-project-reference",
+          ),
+        );
+      }
       onReferenceInsertedRef.current?.(candidate);
     };
     insertReferenceCandidateRef.current = insertReferenceCandidate;

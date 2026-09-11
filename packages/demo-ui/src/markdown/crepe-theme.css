@@ -97,6 +97,13 @@
   overflow-x: hidden;
 }
 
+/* Lucide icons are stroke-based; keep Crepe surface tokens for their color
+   without allowing the generic filled-icon rules below to fill their paths. */
+.document-editor-crepe svg[data-lucide] {
+  fill: none !important;
+  stroke: currentColor !important;
+}
+
 .document-editor-crepe > .crepe,
 .document-editor-crepe .milkdown {
   min-height: 0;
@@ -358,6 +365,37 @@
   height: auto;
   white-space: nowrap;
   font: inherit;
+}
+
+.document-editor-crepe .top-bar-item:has([data-document-insert-trigger]) {
+  width: auto;
+  min-width: 72px;
+  gap: 5px;
+  padding-inline: 8px;
+}
+
+.document-editor-crepe .milkdown-icon:has([data-document-insert-trigger]) {
+  display: inline-flex;
+  width: auto;
+  height: auto;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font: inherit;
+}
+
+.document-editor-crepe .milkdown-icon:has([data-document-insert-trigger]) svg {
+  width: var(--document-editor-icon-size);
+  height: var(--document-editor-icon-size);
+}
+
+.document-editor-crepe
+  .milkdown
+  .milkdown-top-bar
+  .top-bar-item
+  svg[data-lucide] {
+  width: var(--document-editor-icon-size);
+  height: var(--document-editor-icon-size);
 }
 
 .document-editor-crepe .milkdown .milkdown-top-bar .top-bar-item svg,
@@ -694,6 +732,124 @@
   background: var(--crepe-color-selected);
 }
 
+.document-editor-crepe .document-topbar-insert-menu {
+  width: min(368px, calc(100vw - 16px));
+  max-width: min(368px, calc(100vw - 16px));
+  max-height: min(72vh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px;
+}
+
+.document-editor-crepe .document-topbar-insert-menu > .document-insert-search {
+  box-sizing: border-box;
+  width: 100%;
+  height: 38px;
+  margin-bottom: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--crepe-color-surface-low);
+  color: var(--crepe-color-on-surface);
+  padding: 0 11px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.document-editor-crepe .document-insert-section + .document-insert-section {
+  margin-top: 10px;
+  border-top: 1px solid var(--crepe-color-surface-low);
+  padding-top: 10px;
+}
+
+.document-editor-crepe .document-insert-section-title {
+  margin: 0 4px 6px;
+  color: var(--crepe-color-on-surface-variant);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.document-editor-crepe .document-insert-section ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.document-editor-crepe .document-insert-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.document-editor-crepe .document-insert-list {
+  display: grid;
+  gap: 2px;
+}
+
+.document-editor-crepe .document-insert-item {
+  display: flex;
+  cursor: pointer;
+  min-width: 0;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--crepe-color-on-surface);
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: left;
+}
+
+.document-editor-crepe .document-insert-grid .document-insert-item {
+  flex-direction: column;
+  justify-content: center;
+  min-height: 40px;
+  gap: 2px;
+  padding-inline: 4px;
+  text-align: center;
+}
+
+.document-editor-crepe .document-insert-item:hover,
+.document-editor-crepe .document-insert-item.selected,
+.document-editor-crepe .document-insert-item:focus-visible {
+  background: var(--crepe-color-hover);
+}
+
+.document-editor-crepe .document-insert-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.document-editor-crepe .document-insert-item-icon,
+.document-editor-crepe .document-insert-item-icon svg {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  align-items: center;
+  justify-content: center;
+  color: var(--crepe-color-on-surface);
+  fill: var(--crepe-color-on-surface);
+}
+
+.document-editor-crepe .document-insert-item-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-editor-crepe .document-insert-empty {
+  margin: 16px 4px 8px;
+  color: var(--crepe-color-on-surface-variant);
+  font-size: 13px;
+  text-align: center;
+}
+
 .document-editor-crepe .document-selection-toolbar-item {
   display: inline-flex;
   width: 32px;
@@ -856,6 +1012,14 @@
     padding: var(--document-editor-padding-top)
       var(--document-editor-mobile-gutter) var(--document-editor-padding-bottom);
     font-size: 14px;
+  }
+
+  .document-editor-crepe .document-topbar-insert-menu {
+    max-height: min(70vh, 480px);
+  }
+
+  .document-editor-crepe .document-insert-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

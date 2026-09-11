@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { Crepe } from "@milkdown/crepe";
 
 import { buildCrepeConfig, type CrepeProjectActions } from "./crepe-config";
-import { buildDocumentBlockMenuGroups } from "./document-block-menu";
+import {
+  buildDocumentBlockMenuGroups,
+  buildDocumentInsertGroups,
+} from "./document-block-menu";
+import { LUCIDE_ICONS } from "./lucide-icons";
 
 function createActions(): CrepeProjectActions {
   return {
@@ -109,5 +113,128 @@ describe("buildCrepeConfig", () => {
         { label: "H3", level: 3 },
       ],
     });
+  });
+
+  it("为 TopBar 提供基础、通用、引用三类插入项，并按能力过滤", () => {
+    const actions = createActions();
+    const groups = buildDocumentInsertGroups({} as never, {
+      actions,
+      enableUploads: true,
+      enableProjectReferences: true,
+      referenceCandidates: [{ key: "theme.primary", label: "主题色" }],
+    });
+
+    expect(groups.map((group) => group.label)).toEqual([
+      "基础",
+      "通用",
+      "引用",
+    ]);
+    expect(groups[0]?.items.map((item) => item.key)).toEqual([
+      "text",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "link",
+      "bullet-list",
+      "ordered-list",
+      "task-list",
+      "quote",
+      "divider",
+    ]);
+    expect(groups[0]?.items[0]?.icon).toBe(LUCIDE_ICONS.text);
+    expect(groups[0]?.items.find((item) => item.key === "h1")?.icon).toBe(
+      LUCIDE_ICONS.h1,
+    );
+    expect(groups[1]?.items.find((item) => item.key === "code")?.icon).toBe(
+      LUCIDE_ICONS.codeBlock,
+    );
+    expect(groups[2]?.items[0]?.icon).toBe(LUCIDE_ICONS.link);
+    expect(groups[1]?.items.map((item) => item.key)).toEqual([
+      "image",
+      "table",
+      "code",
+      "upload-video",
+      "upload-file",
+    ]);
+    expect(groups[2]?.items.map((item) => item.key)).toEqual([
+      "reference-theme.primary",
+      "insert-project-reference",
+    ]);
+
+    const noUploadGroups = buildDocumentInsertGroups({} as never, {
+      actions,
+      referenceCandidates: [{ key: "theme.primary", label: "主题色" }],
+    });
+    expect(noUploadGroups[1]?.items.map((item) => item.key)).toEqual([
+      "image",
+      "table",
+      "code",
+    ]);
+    expect(
+      buildDocumentInsertGroups({} as never, { actions }, "不存在"),
+    ).toEqual([]);
+    const referenceFiltered = buildDocumentInsertGroups(
+      {} as never,
+      {
+        actions,
+        referenceCandidates: [{ key: "theme.primary", label: "主题色" }],
+      },
+      "配置项",
+    );
+    expect(referenceFiltered).toHaveLength(1);
+    expect(referenceFiltered[0]?.items.map((item) => item.label)).toEqual([
+      "主题色",
+    ]);
+  });
+
+  it("把插入置于 TopBar 首项，并保留链接和块引用直达项", () => {
+    type TestGroup = {
+      clear: () => TestGroup;
+      addItem: (key: string, item?: unknown) => TestGroup;
+    };
+    type TestBuilder = {
+      getGroup: (key: string) => TestGroup;
+    };
+    const itemGroups = new Map(
+      ["heading", "insert", "block", "more"].map((key) => [
+        key,
+        [] as string[],
+      ]),
+    );
+    const builder: TestBuilder = {
+      getGroup(key) {
+        const items = itemGroups.get(key)!;
+        const group: TestGroup = {
+          clear() {
+            items.length = 0;
+            return group;
+          },
+          addItem(itemKey) {
+            items.push(itemKey);
+            return group;
+          },
+        };
+        return group;
+      },
+    };
+    const config = buildCrepeConfig({
+      placeholder: "输入内容...",
+      actions: createActions(),
+    });
+    const topBar = config.featureConfigs?.[Crepe.Feature.TopBar] as unknown as {
+      buildTopBar?: (builder: TestBuilder) => void;
+    };
+    topBar.buildTopBar?.(builder);
+
+    expect(itemGroups.get("heading")).toEqual([
+      "document-insert",
+      "document-heading",
+    ]);
+    expect(itemGroups.get("insert")).toEqual(["link"]);
+    expect(itemGroups.get("block")).toEqual([]);
+    expect(itemGroups.get("more")).toEqual(["quote"]);
   });
 });

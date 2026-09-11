@@ -12,6 +12,7 @@ describe("loadCanvasPageContent", () => {
     parentId: null,
     runtimeType: "prototype-html-css",
     reference: {
+      grantId: "grant-1",
       sourceProjectId: "source-project",
       sourcePageId: "source-page",
     },
@@ -94,6 +95,33 @@ describe("loadCanvasPageContent", () => {
 
     expect(request).toHaveBeenCalledWith(
       "/api/sessions/session-1/files/local-page",
+    );
+  });
+
+  it("引用 sandbox 页面通过目标作用域端点签发执行票据", async () => {
+    const request = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: { runtimeType: "sandboxed-html", sandboxHtml: "<button>go</button>" } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: { executionUrl: "https://sandbox.test/execution", channelId: "channel" } }),
+      });
+
+    await expect(loadCanvasPageContent({
+      page: { ...referencePage, runtimeType: "sandboxed-html" },
+      projectId: "target-project",
+      sessionId: "session-1",
+      request,
+    })).resolves.toMatchObject({
+      sandboxExecutionUrl: "https://sandbox.test/execution",
+      sandboxChannelId: "channel",
+    });
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      "/api/projects/target-project/reference-page/reference-page/html-execution",
+      expect.objectContaining({ method: "POST" }),
     );
   });
 

@@ -4,14 +4,21 @@ import type {
   ConfigReferenceCandidate,
   DocumentUploadHandler,
 } from "../DocumentEditor";
+import {
+  isDocumentLinkActive,
+  runDocumentLink,
+  wrapDocumentQuote,
+} from "./document-block-menu";
+import { LUCIDE_ICONS } from "./lucide-icons";
 import { PRIMARY_HEADING_STYLE_OPTIONS } from "./heading-style-toolbar";
 import { documentHeadingMenuApi } from "./document-heading-menu";
+import { documentInsertMenuApi } from "./document-insert-menu";
 
 export interface CrepeProjectActions {
   uploadImage: (file: File) => Promise<string>;
   uploadVideo: () => void;
   uploadFile: () => void;
-  insertReference: (candidate: ConfigReferenceCandidate) => void;
+  insertReference: (candidate: ConfigReferenceCandidate) => void | boolean;
   /** Opens the typed project/page/document reference picker at the cursor. */
   openProjectReference?: () => void;
 }
@@ -62,10 +69,29 @@ export function buildCrepeConfig({
           builder
             .getGroup("heading")
             .clear()
+            .addItem("document-insert", {
+              icon: `${LUCIDE_ICONS.plus}<span data-document-insert-trigger>插入</span>`,
+              active: () => false,
+              onRun: (ctx: Ctx) => ctx.get(documentInsertMenuApi.key).toggle(),
+            })
             .addItem("document-heading", {
               icon: "<span data-document-heading-trigger>正文 ▾</span>",
               active: () => false,
               onRun: (ctx: Ctx) => ctx.get(documentHeadingMenuApi.key).toggle(),
+            });
+          builder.getGroup("insert").clear().addItem("link", {
+            icon: LUCIDE_ICONS.link,
+            active: isDocumentLinkActive,
+            onRun: runDocumentLink,
+          });
+          builder.getGroup("block").clear();
+          builder
+            .getGroup("more")
+            .clear()
+            .addItem("quote", {
+              icon: LUCIDE_ICONS.quote,
+              active: () => false,
+              onRun: wrapDocumentQuote,
             });
         },
       },

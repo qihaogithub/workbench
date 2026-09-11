@@ -1,5 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { computeBounds, remapCanvasSectionsForPaste } from "./canvas-clipboard";
+import {
+  computeBounds,
+  readCanvasClipboard,
+  remapCanvasSectionsForPaste,
+  writeCanvasClipboard,
+} from "./canvas-clipboard";
+
+describe("canvas clipboard v2", () => {
+  it("persists page identities without page source bytes", () => {
+    writeCanvasClipboard({
+      version: 2,
+      copiedAt: 1,
+      sourceProjectId: "source",
+      nodes: [],
+      pages: [{ id: "home", name: "Home", runtimeType: "high-fidelity-react" }],
+      pageLayouts: {},
+      pageGroups: [],
+      sections: [],
+      bounds: null,
+    });
+
+    const stored = window.localStorage.getItem("workbench:canvas-clipboard") ?? "";
+    expect(stored).not.toContain("index.tsx");
+    expect(stored).not.toContain("prototypeHtml");
+    expect(readCanvasClipboard()?.pages).toEqual([
+      { id: "home", name: "Home", runtimeType: "high-fidelity-react" },
+    ]);
+  });
+});
 
 describe("Section clipboard remapping", () => {
   it("rewrites Section, page, node and nested Section references", () => {

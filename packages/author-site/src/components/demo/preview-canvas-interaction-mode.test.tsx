@@ -2586,11 +2586,11 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       window.localStorage.setItem(
         "workbench:canvas-clipboard",
         JSON.stringify({
-          version: 1,
+          version: 2,
           copiedAt: Date.now(),
           sourceProjectId: "source-project",
           nodes: [],
-          pages: [{ id: "source-page", name: "来源页面", order: 0 }],
+          pages: [{ id: "source-page", name: "来源页面", sourcePageVersionId: "source-version" }],
           pageLayouts: {
             "source-page": { x: 0, y: 0, width: 375, height: 812 },
           },
@@ -2636,15 +2636,14 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
       window.localStorage.setItem(
         "workbench:canvas-clipboard",
         JSON.stringify({
-          version: 1,
+          version: 2,
           copiedAt: Date.now(),
           nodes: [],
           pages: [
             {
               id: "copied-page",
               name: "已复制页面",
-              order: 0,
-              code: "export default function Demo(){return null}",
+              sourcePageVersionId: "source-version",
             },
           ],
           pageLayouts: {

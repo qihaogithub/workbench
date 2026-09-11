@@ -2,6 +2,7 @@ import type { Ctx } from "@milkdown/kit/ctx";
 import type { Node, NodeType } from "@milkdown/kit/prose/model";
 
 import { imageBlockSchema } from "@milkdown/kit/component/image-block";
+import { toggleLinkCommand } from "@milkdown/kit/component/link-tooltip";
 import {
   commandsCtx,
   editorViewCtx,
@@ -15,7 +16,9 @@ import {
   codeBlockSchema,
   headingSchema,
   hrSchema,
+  isMarkSelectedCommand,
   listItemSchema,
+  linkSchema,
   orderedListSchema,
   paragraphSchema,
   selectTextNearPosCommand,
@@ -23,34 +26,12 @@ import {
   wrapInBlockTypeCommand,
 } from "@milkdown/kit/preset/commonmark";
 import { createTable } from "@milkdown/kit/preset/gfm";
+import { TextSelection } from "@milkdown/kit/prose/state";
 
 import type { ConfigReferenceCandidate } from "../DocumentEditor";
 import type { CrepeProjectActions } from "./crepe-config";
+import { LUCIDE_ICONS, lucideHeadingIcon } from "./lucide-icons";
 import { HEADING_STYLE_OPTIONS } from "./heading-style-toolbar";
-
-const ICONS = {
-  text: '<svg viewBox="0 0 24 24"><path d="M5 5h14v2h-6v12h-2V7H5V5Z"/></svg>',
-  heading:
-    '<svg viewBox="0 0 24 24"><path d="M5 5h2v6h10V5h2v14h-2v-6H7v6H5V5Z"/></svg>',
-  quote:
-    '<svg viewBox="0 0 24 24"><path d="M7.2 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h5v6.2A2.8 2.8 0 0 1 7.2 17ZM17.2 17H15a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h5v6.2a2.8 2.8 0 0 1-2.8 2.8Z"/></svg>',
-  divider: '<svg viewBox="0 0 24 24"><path d="M4 11h16v2H4v-2Z"/></svg>',
-  bullet:
-    '<svg viewBox="0 0 24 24"><path d="M4 5.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM8 6h12v2H8V6Zm-4 5.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM8 12h12v2H8v-2Zm-4 5.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0-3 0ZM8 18h12v2H8v-2Z"/></svg>',
-  ordered:
-    '<svg viewBox="0 0 24 24"><path d="M3 5h2v6H3V5Zm0 8h2v6H3v-6ZM8 6h12v2H8V6Zm0 5h12v2H8v-2Zm0 5h12v2H8v-2Z"/></svg>',
-  task: '<svg viewBox="0 0 24 24"><path d="m4 6 1.5 1.5L8 5l1.4 1.4-3.9 3.9L4 8.8 2.6 7.4 4 6Zm7-1h9v2h-9V5Zm-7 7 1.5 1.5L8 11l1.4 1.4-3.9 3.9L4 14.8 2.6 13.4 4 12Zm7-1h9v2h-9v-2Z"/></svg>',
-  image:
-    '<svg viewBox="0 0 24 24"><path d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm1 2v9.2l3.3-3.3 2.8 2.8 2.7-3.4 3.2 4V6H6Zm3 2a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/></svg>',
-  code: '<svg viewBox="0 0 24 24"><path d="m8.7 7.3-4.7 4.7 4.7 4.7 1.4-1.4L6.8 12l3.3-3.3-1.4-1.4Zm6.6 0-1.4 1.4 3.3 3.3-3.3 3.3 1.4 1.4 4.7-4.7-4.7-4.7Z"/></svg>',
-  table:
-    '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4V4Zm2 2v4h5V6H6Zm7 0v4h5V6h-5Zm-7 6v4h5v-4H6Zm7 0v4h5v-4h-5Z"/></svg>',
-  reference:
-    '<svg viewBox="0 0 24 24"><path d="M7 5h10v2H7a3 3 0 1 0 0 6h7v2H7A5 5 0 1 1 7 5Zm3 6h7a5 5 0 1 1 0 10H7v-2h10a3 3 0 1 0 0-6h-7v-2Z"/></svg>',
-  upload:
-    '<svg viewBox="0 0 24 24"><path d="M12 3 7 8l1.4 1.4L11 6.8V16h2V6.8l2.6 2.6L17 8l-5-5ZM5 18h14v2H5v-2Z"/></svg>',
-};
-
 export interface DocumentBlockMenuItem {
   key: string;
   label: string;
@@ -58,7 +39,10 @@ export interface DocumentBlockMenuItem {
   disabled?: boolean;
   checked?: boolean;
   description?: string;
-  run: (ctx: Ctx) => void;
+  /** When selected from the TopBar, create this block instead of formatting the current block. */
+  insertBlockKey?: string;
+  searchTerms?: string[];
+  run: (ctx: Ctx) => void | boolean;
 }
 
 export interface DocumentBlockMenuGroup {
@@ -75,6 +59,18 @@ export interface DocumentBlockMenuOptions {
   referenceCandidates?: ConfigReferenceCandidate[];
   enableUploads?: boolean;
   enableProjectReferences?: boolean;
+}
+
+export type DocumentInsertCategory = "basic" | "general" | "reference";
+
+export interface DocumentInsertMenuItem extends DocumentBlockMenuItem {
+  category: DocumentInsertCategory;
+}
+
+export interface DocumentInsertMenuGroup {
+  key: string;
+  label: string;
+  items: DocumentInsertMenuItem[];
 }
 
 type DocumentMenuRenderOptions = Pick<
@@ -128,180 +124,330 @@ function addBlock(ctx: Ctx, nodeType: NodeType | Node) {
   });
 }
 
+function insertableBlockItem(
+  item: Omit<DocumentInsertMenuItem, "category" | "run"> & {
+    run: (ctx: Ctx) => void | boolean;
+  },
+): DocumentInsertMenuItem {
+  return { ...item, category: "basic" };
+}
+
+export function runDocumentLink(ctx: Ctx) {
+  const view = ctx.get(editorViewCtx);
+  const markType = linkSchema.type(ctx);
+  if (view.state.selection.empty && isDocumentLinkActive(ctx)) {
+    view.dispatch(view.state.tr.removeStoredMark(markType));
+    return;
+  }
+  ctx.get(commandsCtx).call(toggleLinkCommand.key);
+}
+
+export function isDocumentLinkActive(ctx: Ctx): boolean {
+  const markType = linkSchema.type(ctx);
+  const commands = ctx.get(commandsCtx);
+  if (commands.call(isMarkSelectedCommand.key, markType)) return true;
+
+  const view = ctx.get(editorViewCtx);
+  const { state } = view;
+  if (state.storedMarks?.some((mark) => mark.type === markType)) return true;
+  if (state.selection instanceof TextSelection) {
+    const { $cursor } = state.selection;
+    if ($cursor) return $cursor.marks().some((mark) => mark.type === markType);
+  }
+  return false;
+}
+
+export function wrapDocumentQuote(ctx: Ctx) {
+  wrapBlock(ctx, blockquoteSchema.type(ctx));
+}
+
+/**
+ * The canonical insert catalog shared by the TopBar and the block-handle menu.
+ * The `run` handlers keep the old slash-menu behavior; TopBar consumers use
+ * `insertBlockKey` to apply the new split-and-insert behavior.
+ */
+export function buildDocumentInsertGroups(
+  ctx: Ctx,
+  options: Pick<
+    DocumentBlockMenuOptions,
+    | "actions"
+    | "referenceCandidates"
+    | "enableUploads"
+    | "enableProjectReferences"
+  >,
+  filter = "",
+): DocumentInsertMenuGroup[] {
+  const headingItems = HEADING_STYLE_OPTIONS.map((option) => {
+    const level = option.level;
+    return insertableBlockItem({
+      key: level === null ? "text" : `h${level}`,
+      label: level === null ? "正文" : `H${level}`,
+      icon: lucideHeadingIcon(level),
+      insertBlockKey: level === null ? "text" : `h${level}`,
+      searchTerms: level === null ? ["段落", "paragraph"] : ["标题", "heading"],
+      run: (currentCtx) => {
+        clearCurrentBlock(currentCtx);
+        if (level === null) {
+          setBlock(currentCtx, paragraphSchema.type(currentCtx));
+        } else {
+          setBlock(currentCtx, headingSchema.type(currentCtx), { level });
+        }
+      },
+    });
+  });
+
+  const basicItems: DocumentInsertMenuItem[] = [
+    ...headingItems,
+    {
+      category: "basic",
+      key: "link",
+      label: "链接",
+      icon: LUCIDE_ICONS.link,
+      searchTerms: ["超链接", "link"],
+      run: runDocumentLink,
+    },
+    {
+      ...insertableBlockItem({
+        key: "bullet-list",
+        label: "无序列表",
+        icon: LUCIDE_ICONS.bulletList,
+        insertBlockKey: "bullet-list",
+        searchTerms: ["列表", "bullet"],
+        run: (currentCtx) => {
+          clearCurrentBlock(currentCtx);
+          wrapBlock(currentCtx, bulletListSchema.type(currentCtx));
+        },
+      }),
+    },
+    {
+      ...insertableBlockItem({
+        key: "ordered-list",
+        label: "有序列表",
+        icon: LUCIDE_ICONS.orderedList,
+        insertBlockKey: "ordered-list",
+        searchTerms: ["列表", "ordered"],
+        run: (currentCtx) => {
+          clearCurrentBlock(currentCtx);
+          wrapBlock(currentCtx, orderedListSchema.type(currentCtx));
+        },
+      }),
+    },
+    {
+      ...insertableBlockItem({
+        key: "task-list",
+        label: "任务列表",
+        icon: LUCIDE_ICONS.todoList,
+        insertBlockKey: "task-list",
+        searchTerms: ["列表", "待办", "task"],
+        run: (currentCtx) => {
+          clearCurrentBlock(currentCtx);
+          wrapBlock(currentCtx, listItemSchema.type(currentCtx), {
+            checked: false,
+          });
+        },
+      }),
+    },
+    {
+      ...insertableBlockItem({
+        key: "quote",
+        label: "引用",
+        icon: LUCIDE_ICONS.quote,
+        insertBlockKey: "quote",
+        searchTerms: ["blockquote", "quote"],
+        run: (currentCtx) => {
+          clearCurrentBlock(currentCtx);
+          wrapDocumentQuote(currentCtx);
+        },
+      }),
+    },
+    {
+      ...insertableBlockItem({
+        key: "divider",
+        label: "分隔线",
+        icon: LUCIDE_ICONS.divider,
+        insertBlockKey: "divider",
+        searchTerms: ["水平线", "hr", "divider"],
+        run: (currentCtx) => {
+          clearCurrentBlock(currentCtx);
+          addBlock(currentCtx, hrSchema.type(currentCtx));
+        },
+      }),
+    },
+  ];
+
+  const generalItems: DocumentInsertMenuItem[] = [
+    {
+      category: "general",
+      key: "image",
+      label: "图片",
+      icon: LUCIDE_ICONS.image,
+      insertBlockKey: "image",
+      searchTerms: ["image", "图片"],
+      run: (currentCtx) => {
+        clearCurrentBlock(currentCtx);
+        addBlock(currentCtx, imageBlockSchema.type(currentCtx));
+      },
+    },
+    {
+      category: "general",
+      key: "table",
+      label: "表格",
+      icon: LUCIDE_ICONS.table,
+      insertBlockKey: "table",
+      searchTerms: ["table"],
+      run: (currentCtx) => {
+        clearCurrentBlock(currentCtx);
+        const commands = currentCtx.get(commandsCtx);
+        const view = currentCtx.get(editorViewCtx);
+        const { from } = view.state.selection;
+        commands.call(addBlockTypeCommand.key, {
+          nodeType: createTable(currentCtx, 3, 3),
+        });
+        commands.call(selectTextNearPosCommand.key, { pos: from });
+      },
+    },
+    {
+      category: "general",
+      key: "code",
+      label: "代码块",
+      icon: LUCIDE_ICONS.codeBlock,
+      insertBlockKey: "code",
+      searchTerms: ["代码", "code", "code-block"],
+      run: (currentCtx) => {
+        clearCurrentBlock(currentCtx);
+        setBlock(currentCtx, codeBlockSchema.type(currentCtx));
+      },
+    },
+  ];
+
+  if (options.enableUploads) {
+    generalItems.push(
+      {
+        category: "general",
+        key: "upload-video",
+        label: "上传视频",
+        icon: LUCIDE_ICONS.plus,
+        searchTerms: ["视频", "video"],
+        run: () => options.actions.uploadVideo(),
+      },
+      {
+        category: "general",
+        key: "upload-file",
+        label: "上传附件",
+        icon: LUCIDE_ICONS.plus,
+        searchTerms: ["附件", "文件", "file"],
+        run: () => options.actions.uploadFile(),
+      },
+    );
+  }
+
+  const referenceItems: DocumentInsertMenuItem[] = [
+    ...(options.referenceCandidates ?? []).map((candidate) => ({
+      category: "reference" as const,
+      key: `reference-${candidate.key}`,
+      label: candidate.label,
+      icon: LUCIDE_ICONS.link,
+      searchTerms: ["配置项", "引用", candidate.key],
+      run: () => options.actions.insertReference(candidate),
+    })),
+  ];
+  if (options.enableProjectReferences && options.actions.openProjectReference) {
+    referenceItems.push({
+      category: "reference",
+      key: "insert-project-reference",
+      label: "选择页面 / 配置项 / 文档",
+      icon: LUCIDE_ICONS.link,
+      searchTerms: ["项目", "页面", "文档", "配置项", "wb://"],
+      run: () => options.actions.openProjectReference?.(),
+    });
+  }
+
+  const groups: DocumentInsertMenuGroup[] = [
+    { key: "basic", label: "基础", items: basicItems },
+    { key: "general", label: "通用", items: generalItems },
+  ];
+  if (referenceItems.length) {
+    groups.push({ key: "reference", label: "引用", items: referenceItems });
+  }
+
+  const normalizedFilter = filter.trim().toLocaleLowerCase();
+  if (!normalizedFilter) return groups;
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        [item.label, ...(item.searchTerms ?? [])]
+          .join(" ")
+          .toLocaleLowerCase()
+          .includes(normalizedFilter),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
 export function buildDocumentBlockMenuGroups(
   ctx: Ctx,
   options: DocumentBlockMenuOptions,
   filter = "",
 ): DocumentBlockMenuGroup[] {
-  const headingItems: DocumentBlockMenuItem[] = HEADING_STYLE_OPTIONS.filter(
-    (option) => option.level !== null,
-  ).map((option) => {
-    const level = option.level!;
-    return {
-      key: `h${level}`,
-      label: `H${level}`,
-      icon: ICONS.heading,
-      run: (currentCtx: Ctx) => {
-        clearCurrentBlock(currentCtx);
-        setBlock(currentCtx, headingSchema.type(currentCtx), { level });
-      },
-    };
-  });
-
-  const textItems: DocumentBlockMenuItem[] = [
+  const shared = buildDocumentInsertGroups(ctx, options);
+  const basic = shared.find((group) => group.key === "basic")?.items ?? [];
+  const general = shared.find((group) => group.key === "general")?.items ?? [];
+  const references =
+    shared.find((group) => group.key === "reference")?.items ?? [];
+  const headingItems = basic.filter((item) => /^h[1-6]$/.test(item.key));
+  const groups: DocumentBlockMenuGroup[] = [
     {
       key: "text",
-      label: "正文",
-      icon: ICONS.text,
-      run: (currentCtx) => {
-        clearCurrentBlock(currentCtx);
-        setBlock(currentCtx, paragraphSchema.type(currentCtx));
-      },
+      label: "文本",
+      items: basic.filter((item) =>
+        ["text", "h1", "h2", "h3", "quote", "divider"].includes(item.key),
+      ),
     },
-    ...headingItems.slice(0, 3),
-    {
-      key: "quote",
-      label: "引用",
-      icon: ICONS.quote,
-      run: (currentCtx) => {
-        clearCurrentBlock(currentCtx);
-        wrapBlock(currentCtx, blockquoteSchema.type(currentCtx));
-      },
-    },
-    {
-      key: "divider",
-      label: "分隔线",
-      icon: ICONS.divider,
-      run: (currentCtx) => {
-        clearCurrentBlock(currentCtx);
-        addBlock(currentCtx, hrSchema.type(currentCtx));
-      },
-    },
-  ];
-
-  const groups: DocumentBlockMenuGroup[] = [
-    { key: "text", label: "文本", items: textItems },
     {
       key: "list",
       label: "列表",
-      items: [
-        {
-          key: "bullet-list",
-          label: "无序列表",
-          icon: ICONS.bullet,
-          run: (currentCtx) => {
-            clearCurrentBlock(currentCtx);
-            wrapBlock(currentCtx, bulletListSchema.type(currentCtx));
-          },
-        },
-        {
-          key: "ordered-list",
-          label: "有序列表",
-          icon: ICONS.ordered,
-          run: (currentCtx) => {
-            clearCurrentBlock(currentCtx);
-            wrapBlock(currentCtx, orderedListSchema.type(currentCtx));
-          },
-        },
-        {
-          key: "task-list",
-          label: "任务列表",
-          icon: ICONS.task,
-          run: (currentCtx) => {
-            clearCurrentBlock(currentCtx);
-            wrapBlock(currentCtx, listItemSchema.type(currentCtx), {
-              checked: false,
-            });
-          },
-        },
-      ],
+      items: basic.filter((item) =>
+        ["bullet-list", "ordered-list", "task-list"].includes(item.key),
+      ),
     },
     {
       key: "advanced",
       label: "插入",
-      items: [
-        {
-          key: "image",
-          label: "图片",
-          icon: ICONS.image,
-          run: (currentCtx) => {
-            clearCurrentBlock(currentCtx);
-            addBlock(currentCtx, imageBlockSchema.type(currentCtx));
-          },
-        },
-        {
-          key: "code",
-          label: "代码块",
-          icon: ICONS.code,
-          run: (currentCtx) => {
-            clearCurrentBlock(currentCtx);
-            setBlock(currentCtx, codeBlockSchema.type(currentCtx));
-          },
-        },
-        {
-          key: "table",
-          label: "表格",
-          icon: ICONS.table,
-          run: (currentCtx) => {
-            clearCurrentBlock(currentCtx);
-            const commands = currentCtx.get(commandsCtx);
-            const view = currentCtx.get(editorViewCtx);
-            const { from } = view.state.selection;
-            commands.call(addBlockTypeCommand.key, {
-              nodeType: createTable(currentCtx, 3, 3),
-            });
-            commands.call(selectTextNearPosCommand.key, { pos: from });
-          },
-        },
-      ],
+      items: general.filter((item) =>
+        ["image", "code", "table"].includes(item.key),
+      ),
     },
   ];
 
-  if (options.referenceCandidates?.length) {
+  const staticReferences = references.filter((item) =>
+    item.key.startsWith("reference-"),
+  );
+  if (staticReferences.length) {
     groups.push({
       key: "project-references",
       label: "引用配置项",
-      items: options.referenceCandidates.map((candidate) => ({
-        key: `reference-${candidate.key}`,
-        label: candidate.label,
-        icon: ICONS.reference,
-        run: () => options.actions.insertReference(candidate),
-      })),
+      items: staticReferences,
     });
   }
 
-  if (options.enableProjectReferences && options.actions.openProjectReference) {
+  const projectReference = references.find(
+    (item) => item.key === "insert-project-reference",
+  );
+  if (projectReference) {
     groups.push({
       key: "entity-references",
       label: "插入项目引用",
-      items: [
-        {
-          key: "insert-project-reference",
-          label: "选择页面 / 配置项 / 文档",
-          icon: ICONS.reference,
-          run: () => options.actions.openProjectReference?.(),
-        },
-      ],
+      items: [projectReference],
     });
   }
 
-  const moreItems = [...headingItems.slice(3)];
-  if (options.enableUploads) {
-    moreItems.push(
-      {
-        key: "upload-video",
-        label: "上传视频",
-        icon: ICONS.upload,
-        run: () => options.actions.uploadVideo(),
-      },
-      {
-        key: "upload-file",
-        label: "上传附件",
-        icon: ICONS.upload,
-        run: () => options.actions.uploadFile(),
-      },
-    );
-  }
+  const moreItems = [
+    ...headingItems.slice(3),
+    ...general.filter((item) =>
+      ["upload-video", "upload-file"].includes(item.key),
+    ),
+  ];
   if (moreItems.length) {
     groups.push({
       key: "more",
@@ -316,7 +462,10 @@ export function buildDocumentBlockMenuGroups(
     .map((group) => ({
       ...group,
       items: group.items.filter((item) =>
-        item.label.toLocaleLowerCase().includes(normalizedFilter),
+        [item.label, ...(item.searchTerms ?? [])]
+          .join(" ")
+          .toLocaleLowerCase()
+          .includes(normalizedFilter),
       ),
     }))
     .filter((group) => group.items.length > 0);

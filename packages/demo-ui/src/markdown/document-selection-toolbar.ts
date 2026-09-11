@@ -30,18 +30,16 @@ import { $prose } from "@milkdown/kit/utils";
 
 import { getHeadingSelection } from "./document-heading-command";
 import { DocumentHeadingPicker } from "./document-heading-picker";
+import { LUCIDE_ICONS } from "./lucide-icons";
 import { mountDocumentOverlayPositioner } from "./document-overlay-positioning";
 
 const ICONS = {
-  bold: '<svg viewBox="0 0 24 24"><path d="M8 5h4.5a4 4 0 0 1 2.7 7A4.4 4.4 0 0 1 12.5 19H8a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm2 2v4h2.2a2 2 0 1 0 0-4H10Zm0 6v4h2.5a2.2 2.2 0 1 0 0-4H10Z"/></svg>',
-  italic:
-    '<svg viewBox="0 0 24 24"><path d="M10 5h8v2h-3l-4 10h3v2H6v-2h3l4-10h-3V5Z"/></svg>',
-  strike:
-    '<svg viewBox="0 0 24 24"><path d="M5 11h14v2H5v-2Zm3.3-2.1c.1-1.2 1.1-2 2.9-2 1.7 0 2.8.6 3.8 1.6l1.4-1.4C15.1 5.7 13.4 5 11.2 5 8.1 5 6.2 6.5 6.2 9c0 .2 0 .5.1.7h2.1c-.1-.3-.1-.6-.1-.8Zm6.3 6.2h-2.2c.2.4.3.8.3 1.2 0 1.1-.9 1.8-2.6 1.8-1.5 0-2.8-.6-3.7-1.7l-1.5 1.4c1.2 1.5 3 2.2 5.2 2.2 3.1 0 5-1.5 5-3.9 0-.4-.2-.7-.5-1Z"/></svg>',
-  code: '<svg viewBox="0 0 24 24"><path d="m8.7 7.3-4.7 4.7 4.7 4.7 1.4-1.4L6.8 12l3.3-3.3-1.4-1.4Zm6.6 0-1.4 1.4 3.3 3.3-3.3 3.3 1.4 1.4 4.7-4.7-4.7-4.7Z"/></svg>',
-  link: '<svg viewBox="0 0 24 24"><path d="M10.6 13.4a1 1 0 0 0 1.4 0l2.8-2.8a3 3 0 0 0-4.2-4.2L9 8l1.4 1.4 1.6-1.6a1 1 0 1 1 1.4 1.4l-2.8 2.8a1 1 0 0 1-1.4 0L10.6 13.4ZM13.4 10.6a1 1 0 0 0-1.4 0l-2.8 2.8a3 3 0 0 0 4.2 4.2L15 16l-1.4-1.4-1.6 1.6a1 1 0 1 1-1.4-1.4l2.8-2.8a1 1 0 0 1 1.4 0l-1.4-1.4Z"/></svg>',
-  comment:
-    '<svg viewBox="0 0 24 24"><path d="M20 4H4a2 2 0 0 0-2 2v13l4-3h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 10H5.3L4 15V6h16v8Z"/></svg>',
+  bold: LUCIDE_ICONS.bold,
+  italic: LUCIDE_ICONS.italic,
+  strike: LUCIDE_ICONS.strikethrough,
+  code: LUCIDE_ICONS.code,
+  link: LUCIDE_ICONS.link,
+  comment: LUCIDE_ICONS.comment,
 };
 
 interface ToolbarAction {

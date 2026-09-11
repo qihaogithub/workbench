@@ -33,7 +33,7 @@ describe("document block menu", () => {
     ).toHaveLength(1);
     expect(
       menu.element.querySelector('[data-menu-key="text"]')?.textContent,
-    ).toBe("正文");
+    ).toContain("正文");
 
     const moreTab = Array.from(
       menu.element.querySelectorAll<HTMLButtonElement>(
@@ -46,11 +46,11 @@ describe("document block menu", () => {
     ).toHaveLength(3);
     expect(
       menu.element.querySelector('[data-menu-key="h4"]')?.textContent,
-    ).toBe("H4");
+    ).toContain("H4");
     expect(
-      menu.element.querySelector('[role="tabpanel"]')?.getAttribute(
-        "aria-labelledby",
-      ),
+      menu.element
+        .querySelector('[role="tabpanel"]')
+        ?.getAttribute("aria-labelledby"),
     ).toContain("-tab-more");
 
     menu.setVisible(true);

@@ -7,6 +7,7 @@ import React, {
   useCallback,
   useReducer,
 } from "react";
+import { DEFAULT_CDN_BASE_URL } from "@workbench/runtime-config/topology";
 import type {
   PreviewDiagnostic,
   PreviewDiagnosticError,
@@ -31,7 +32,7 @@ import {
   isPreviewRequestPending,
   previewRequestReducer,
 } from "./preview-lifecycle";
-const DEFAULT_PREVIEW_CDN_BASE = "https://esm.sh";
+const DEFAULT_PREVIEW_CDN_BASE = DEFAULT_CDN_BASE_URL;
 const NO_ACTIVE_PREVIEW_REQUEST_ID = -1;
 const COMPILE_DEADLINE_MS = 15_000;
 const COMPILE_DEBOUNCE_MS = 250;

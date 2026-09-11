@@ -267,6 +267,11 @@ import {
 } from "./single-preview-history";
 import { buildSinglePreviewNavigation } from "./single-preview-navigation";
 import {
+  filterPendingDeletedPages,
+  mergePendingDeletedPages,
+} from "./page-delete-state";
+import { buildEditSessionRequestBody } from "./session-bootstrap";
+import {
   getAnnotationsFromCanvasState,
   getCanvasDocumentEntries,
   withCanvasAnnotationNodes,
@@ -280,7 +285,7 @@ import type {
   CanvasKnowledgeDocument,
   CanvasKnowledgeDocumentCreateInput,
   CanvasKnowledgeDocumentUpdateInput,
-  CanvasPageData,
+  CanvasTransferPageIdentity,
   CanvasPageLayout,
   CanvasPageGroup,
   PreviewDiagnosticError,
@@ -1094,6 +1099,7 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
     recordCommand,
     redo,
     reset: resetCommandHistory,
+    running: commandHistoryRunning,
     undo,
   } = commandHistory;
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1409,6 +1415,35 @@ export default function DemoEditPage({ params }: DemoEditPageProps) {
   const [demoPages, setDemoPages] = useState<DemoPage[]>([]);
   const demoPagesRef = useRef<DemoPage[]>([]);
   demoPagesRef.current = demoPages;
+  const [pendingPageDeletionIds, setPendingPageDeletionIds] = useState<
+    Set<string>
+  >(new Set());
+  const pendingPageDeletionIdsRef = useRef<ReadonlySet<string>>(new Set());
+  const updatePendingPageDeletionIds = useCallback(
+    (pageIds: readonly string[], pending: boolean) => {
+      const next = new Set(pendingPageDeletionIdsRef.current);
+      pageIds.forEach((pageId) => {
+        if (pending) next.add(pageId);
+        else next.delete(pageId);
+      });
+      pendingPageDeletionIdsRef.current = next;
+      setPendingPageDeletionIds(next);
+    },
+    [],
+  );
+  const visibleDemoPages = useMemo(
+    () => filterPendingDeletedPages(demoPages, pendingPageDeletionIds),
+    [demoPages, pendingPageDeletionIds],
+  );
+  const handleVisiblePagesChange = useCallback((nextPages: DemoPage[]) => {
+    setDemoPages((currentPages) =>
+      mergePendingDeletedPages(
+        currentPages,
+        nextPages,
+        pendingPageDeletionIdsRef.current,
+      ),
+    );
+  }, []);
   const [demoFolders, setDemoFolders] = useState<DemoFolderMeta[]>([]);
   const [activeDemoId, setActiveDemoId] = useState<string>("");
   const [runtimeConversions, setRuntimeConversions] = useState<
@@ -4641,7 +4676,7 @@ ${context.details}
         const sessionRes = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ demoId }),
+          body: JSON.stringify(buildEditSessionRequestBody(demoId)),
         });
 
         if (!sessionRes.ok) {
@@ -4655,8 +4690,8 @@ ${context.details}
         }
 
         // The agent session is also the stable conversation id for this editor.
-        // Establish/load the canonical ledger before rendering the chat so a
-        // reused editor never starts from an empty browser-only message array.
+        // Establish/load the canonical ledger before rendering the chat so the
+        // new editor session starts from its authoritative message state.
         const canonicalConversationId = sessionData.data.sessionId as string;
         const conversationEnsureRes = await fetch("/api/conversations", {
           method: "POST",
@@ -6492,9 +6527,28 @@ ${context.details}
     [demoId, sessionId],
   );
 
+  const restoreDeletedPageSnapshots = useCallback(
+    async (snapshots: DeletedDemoPageSnapshot[]) => {
+      const restoredPages: DemoPageMeta[] = [];
+      for (const snapshot of [...snapshots].sort(
+        (a, b) => (a.page.order ?? 0) - (b.page.order ?? 0),
+      )) {
+        restoredPages.push(await restoreDeletedPageSnapshot(snapshot));
+      }
+      return restoredPages;
+    },
+    [restoreDeletedPageSnapshot],
+  );
+
   const requestDeletePages = useCallback(
     async (pageIds: string[]) => {
-      const uniquePageIds = Array.from(new Set(pageIds)).filter(Boolean);
+      if (commandHistoryRunning || pendingPageDeletionIdsRef.current.size > 0)
+        return;
+      const uniquePageIds = Array.from(new Set(pageIds)).filter(
+        (pageId) =>
+          Boolean(pageId) &&
+          !pendingPageDeletionIdsRef.current.has(pageId),
+      );
       if (uniquePageIds.length === 0) return;
       const pagesToDelete = uniquePageIds
         .map((pageId) =>
@@ -6502,6 +6556,7 @@ ${context.details}
         )
         .filter((page): page is DemoPageMeta => Boolean(page));
       if (pagesToDelete.length === 0) return;
+      const pageIdsToDelete = pagesToDelete.map((page) => page.id);
 
       const confirmed = confirm(
         pagesToDelete.length === 1
@@ -6510,30 +6565,49 @@ ${context.details}
       );
       if (!confirmed) return;
 
+      // 页面先从所有面向用户的页面列表中隐藏，避免等待 Docker/Authority
+      // 往返；canonical demoPages 保持不变，失败时清除 tombstone 即可恢复。
+      updatePendingPageDeletionIds(pageIdsToDelete, true);
       let snapshots: DeletedDemoPageSnapshot[] = [];
       await executeCommand({
         label: pagesToDelete.length === 1 ? "删除页面" : "删除多个页面",
         redo: async () => {
+          updatePendingPageDeletionIds(pageIdsToDelete, true);
           const nextSnapshots: DeletedDemoPageSnapshot[] = [];
-          for (const pageId of uniquePageIds) {
-            nextSnapshots.push(await deletePageWithSnapshot(pageId));
+          try {
+            for (const pageId of pageIdsToDelete) {
+              nextSnapshots.push(await deletePageWithSnapshot(pageId));
+            }
+            snapshots = nextSnapshots;
+            await applyDeletedPagesLocally(pageIdsToDelete);
+            updatePendingPageDeletionIds(pageIdsToDelete, false);
+            toast({
+              title: pagesToDelete.length === 1 ? "页面已删除" : "页面已批量删除",
+            });
+          } catch (error) {
+            // 批量删除仍通过现有逐页快照接口完成时，前面的请求可能已经
+            // 成功。补偿恢复这些快照，避免清除 tombstone 后前后端分叉。
+            if (nextSnapshots.length > 0) {
+              try {
+                await restoreDeletedPageSnapshots(nextSnapshots);
+              } catch (restoreError) {
+                updatePendingPageDeletionIds(pageIdsToDelete, false);
+                const message =
+                  restoreError instanceof Error
+                    ? restoreError.message
+                    : "恢复已删除页面失败";
+                throw new Error(`删除页面失败，部分页面恢复失败：${message}`);
+              }
+            }
+            updatePendingPageDeletionIds(pageIdsToDelete, false);
+            throw error;
           }
-          snapshots = nextSnapshots;
-          await applyDeletedPagesLocally(uniquePageIds);
-          toast({
-            title: pagesToDelete.length === 1 ? "页面已删除" : "页面已批量删除",
-          });
         },
         undo: async () => {
           if (snapshots.length === 0) {
             throw new Error("缺少页面删除快照，无法撤回");
           }
-          const restoredPages: DemoPageMeta[] = [];
-          for (const snapshot of [...snapshots].sort(
-            (a, b) => (a.page.order ?? 0) - (b.page.order ?? 0),
-          )) {
-            restoredPages.push(await restoreDeletedPageSnapshot(snapshot));
-          }
+          const restoredPages = await restoreDeletedPageSnapshots(snapshots);
           setDemoPages((current) =>
             [
               ...current.filter(
@@ -6557,84 +6631,74 @@ ${context.details}
     },
     [
       applyDeletedPagesLocally,
+      commandHistoryRunning,
       executeCommand,
       deletePageWithSnapshot,
       handleWorkspaceTreeChanged,
-      restoreDeletedPageSnapshot,
+      restoreDeletedPageSnapshots,
       toast,
+      updatePendingPageDeletionIds,
     ],
   );
 
   // 跨项目粘贴页面回调
   const handlePastePages = useCallback(
     async (input: {
-      pages: CanvasPageData[];
+      pages: CanvasTransferPageIdentity[];
       pageLayouts: Record<string, CanvasPageLayout>;
       pageGroups: CanvasPageGroup[];
+      sourceProjectId?: string;
     }): Promise<{ pageIdMapping: Map<string, string> }> => {
       const pageIdMapping = new Map<string, string>();
       if (!sessionId) return { pageIdMapping };
 
-      const createdPages: DemoPageMeta[] = [];
-      for (const srcPage of input.pages) {
-        try {
-          const runtimeType = srcPage.runtimeType ?? undefined;
-          const newPage = await projectApiClient.createDemoPage(
-            demoId,
-            srcPage.name,
-            sessionId,
-            null,
-            runtimeType,
-          );
-          pageIdMapping.set(srcPage.id, newPage.id);
-          createdPages.push(newPage);
-
-          // 写入页面内容
-          const files: {
-            code?: string;
-            schema?: string;
-            prototypeHtml?: string;
-            prototypeCss?: string;
-            prototypeMeta?: Record<string, unknown>;
-          } = {};
-          if (srcPage.code) files.code = srcPage.code;
-          if (srcPage.prototypeHtml)
-            files.prototypeHtml = srcPage.prototypeHtml;
-          if (srcPage.prototypeCss) files.prototypeCss = srcPage.prototypeCss;
-          if (srcPage.prototypeMeta)
-            files.prototypeMeta = srcPage.prototypeMeta;
-          // schema 从源页面的 config.schema.json 原始内容写入
-          if (srcPage.schema) {
-            files.schema = srcPage.schema;
-          }
-          // 如果源页面没有 code 但有 sketchScene，通过文件更新接口写入
-          if (srcPage.sketchScene) {
-            files.code = srcPage.sketchScene;
-          }
-          if (Object.keys(files).length > 0) {
-            await projectApiClient.updateDemoPageFiles(
-              demoId,
-              newPage.id,
-              sessionId,
-              files,
-            );
-          }
-        } catch (err) {
-          console.error(`粘贴页面 "${srcPage.name}" 失败:`, err);
-        }
-      }
-
-      if (createdPages.length > 0) {
-        setDemoPages((current) =>
-          [...current, ...createdPages].sort((a, b) => a.order - b.order),
+      try {
+        const layouts = Object.values(input.pageLayouts);
+        const placement = layouts.length > 0
+          ? {
+              anchorX: Math.min(...layouts.map((layout) => layout.x)),
+              anchorY: Math.min(...layouts.map((layout) => layout.y)),
+            }
+          : undefined;
+        const prepared = await projectApiClient.preparePageTransfer(
+          demoId,
+          sessionId,
+          {
+            sourceProjectId: input.sourceProjectId ?? demoId,
+            sourcePageIds: input.pages.map((page) => page.id),
+            mode: "copy",
+            targetFolderId: null,
+            placement,
+            pagePlacements: Object.fromEntries(Object.entries(input.pageLayouts).map(([pageId, layout]) => [pageId, { x: layout.x, y: layout.y }])),
+            idempotencyKey: crypto.randomUUID(),
+          },
         );
+        const result = prepared.status === "needs_resolution"
+          ? prepared
+          : await projectApiClient.executePageTransfer(
+              demoId,
+              prepared.id,
+              sessionId,
+            );
+        for (const item of result.items) {
+          if (item.status === "completed") {
+            pageIdMapping.set(item.sourcePageId, item.targetPageId);
+          }
+        }
         handleWorkspaceTreeChanged();
+        const failedCount = result.items.length - pageIdMapping.size;
         toast({
-          title:
-            createdPages.length === 1
-              ? `已粘贴页面「${createdPages[0].name}」`
-              : `已粘贴 ${createdPages.length} 个页面`,
+          title: pageIdMapping.size === 1
+            ? "已复制 1 个页面"
+            : `已复制 ${pageIdMapping.size} 个页面`,
+          description: failedCount > 0
+            ? `${failedCount} 个页面需要处理冲突，可稍后重试该转移任务。`
+            : undefined,
+          variant: pageIdMapping.size === 0 ? "destructive" : undefined,
         });
+      } catch (error) {
+        console.error("复制页面失败:", error);
+        toast({ title: "复制页面失败", variant: "destructive" });
       }
 
       return { pageIdMapping };
@@ -6664,7 +6728,7 @@ ${context.details}
   // 创建引用页
   const handleCreateReferences = useCallback(
     async (input: {
-      pages: CanvasPageData[];
+      pages: CanvasTransferPageIdentity[];
       pageLayouts: Record<string, CanvasPageLayout>;
       pageGroups: CanvasPageGroup[];
       sourceProjectId: string;
@@ -6673,27 +6737,46 @@ ${context.details}
       if (!sessionId) return { pageIdMapping };
 
       try {
-        const sourcePageIds = input.pages.map((p) => p.id);
-        const newPages = await projectApiClient.createReferencePages(
+        const layouts = Object.values(input.pageLayouts);
+        const prepared = await projectApiClient.preparePageTransfer(
           demoId,
-          input.sourceProjectId,
-          sourcePageIds,
           sessionId,
+          {
+            sourceProjectId: input.sourceProjectId,
+            sourcePageIds: input.pages.map((page) => page.id),
+            mode: "reference",
+            targetFolderId: null,
+            placement: layouts.length > 0
+              ? {
+                  anchorX: Math.min(...layouts.map((layout) => layout.x)),
+                  anchorY: Math.min(...layouts.map((layout) => layout.y)),
+                }
+              : undefined,
+            pagePlacements: Object.fromEntries(Object.entries(input.pageLayouts).map(([pageId, layout]) => [pageId, { x: layout.x, y: layout.y }])),
+            idempotencyKey: crypto.randomUUID(),
+          },
         );
-
-        newPages.forEach((newPage, index) => {
-          pageIdMapping.set(input.pages[index]?.id ?? "", newPage.id);
-        });
-
-        setDemoPages((current) =>
-          [...current, ...newPages].sort((a, b) => a.order - b.order),
-        );
+        const result = prepared.status === "needs_resolution"
+          ? prepared
+          : await projectApiClient.executePageTransfer(
+              demoId,
+              prepared.id,
+              sessionId,
+            );
+        for (const item of result.items) {
+          if (item.status === "completed") {
+            pageIdMapping.set(item.sourcePageId, item.targetPageId);
+          }
+        }
         handleWorkspaceTreeChanged();
         toast({
-          title:
-            newPages.length === 1
-              ? `已引用页面「${newPages[0].name}」`
-              : `已引用 ${newPages.length} 个页面`,
+          title: pageIdMapping.size === 1
+            ? "已引用 1 个页面"
+            : `已引用 ${pageIdMapping.size} 个页面`,
+          description: result.status === "needs_resolution" || result.status === "partial"
+            ? "部分页面需要处理冲突，可稍后重试该转移任务。"
+            : undefined,
+          variant: pageIdMapping.size === 0 ? "destructive" : undefined,
         });
       } catch (err) {
         console.error("创建引用页失败:", err);
@@ -8277,7 +8360,7 @@ ${context.details}
     const activeCodePageId =
       pageCodes[activeDemoId] === code ? activeDemoId : undefined;
 
-    return demoPages.map((page) => {
+    return visibleDemoPages.map((page) => {
       const runtimeData =
         page.runtimeType === "sandboxed-html"
           ? {
@@ -8399,7 +8482,6 @@ ${context.details}
     activeDemoId,
     code,
     configDataMap,
-    demoPages,
     pageCodes,
     pagePreviewSizeMap,
     pagePrototypeMap,
@@ -8409,6 +8491,7 @@ ${context.details}
     sandboxExecutionMap,
     pageSchemaMap,
     pageSnapshots,
+    visibleDemoPages,
     visibilityResolution,
   ]);
   const activeSinglePreviewDocumentNode = useMemo(() => {
@@ -8643,8 +8726,8 @@ ${context.details}
   );
 
   const singlePreviewNavigation = useMemo(
-    () => buildSinglePreviewNavigation(demoPages, canvasState),
-    [canvasState, demoPages],
+    () => buildSinglePreviewNavigation(visibleDemoPages, canvasState),
+    [canvasState, visibleDemoPages],
   );
   const singlePreviewNavigableItems = singlePreviewNavigation.items;
   const singlePreviewCurrentIndex = singlePreviewNavigableItems.findIndex(
@@ -9359,7 +9442,7 @@ ${context.details}
   );
 
   const toolbarCenter =
-    previewMode === "single" && demoPages.length > 0 ? (
+    previewMode === "single" && visibleDemoPages.length > 0 ? (
       <div className="flex items-center gap-1.5">
         <Button
           type="button"
@@ -9659,12 +9742,12 @@ ${context.details}
                       >
                         <Layers className="h-4 w-4" />
                         {tabValue === "pages" && <span>页面</span>}
-                        {tabValue === "pages" && demoPages.length > 0 && (
+                        {tabValue === "pages" && visibleDemoPages.length > 0 && (
                           <Badge
                             variant="secondary"
                             className="ml-1 text-[10px] h-4 px-1"
                           >
-                            {demoPages.length}
+                            {visibleDemoPages.length}
                           </Badge>
                         )}
                       </TabsTrigger>
@@ -10103,9 +10186,9 @@ ${context.details}
                     <DemoPageTree
                       projectId={demoId}
                       sessionId={sessionId}
-                      pages={demoPages}
+                      pages={visibleDemoPages}
                       folders={demoFolders}
-                      onPagesChange={setDemoPages}
+                      onPagesChange={handleVisiblePagesChange}
                       onFoldersChange={setDemoFolders}
                       onWorkspaceChange={handleWorkspaceTreeChanged}
                       htmlImportInitialFiles={droppedHtmlFiles}
@@ -10401,13 +10484,8 @@ ${context.details}
                       onReferenceFocusConsumed={() =>
                         setDocumentReferenceFocus(null)
                       }
-                      userRole={
-                        currentUserRole === "admin" ||
-                        currentUserRole === "editor"
-                          ? currentUserRole
-                          : ""
-                      }
-                      pages={demoPages.map((p) => ({ id: p.id, name: p.name }))}
+                      userRole={currentUserRole}
+                      pages={visibleDemoPages.map((p) => ({ id: p.id, name: p.name }))}
                       onCommentTargetChange={setActiveDocumentCommentTarget}
                       onDocumentCommentSelection={(documentAnchor) => {
                         setActiveCommentThreadId(null);
@@ -10529,7 +10607,7 @@ ${context.details}
                             interactionMode="editor"
                             selectorSlot={
                               previewMode === "single" &&
-                              demoPages.length > 0 ? (
+                              visibleDemoPages.length > 0 ? (
                                 <>
                                   {activeDemoPage?.runtimeType ===
                                     "sketch-scene" && (
@@ -11249,7 +11327,7 @@ ${context.details}
                           className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
                         >
                           <PageConfigPanel
-                            pages={demoPages.map((page) => ({
+                            pages={visibleDemoPages.map((page) => ({
                               id: page.id,
                               name: page.name,
                               order: page.order,
@@ -11441,7 +11519,7 @@ ${context.details}
                           className="flex-1 flex flex-col mt-0 min-h-0 data-[state=inactive]:hidden"
                         >
                           <PageConfigPanel
-                            pages={demoPages.map((page) => ({
+                            pages={visibleDemoPages.map((page) => ({
                               id: page.id,
                               name: page.name,
                               order: page.order,
@@ -11600,7 +11678,7 @@ ${context.details}
                           commentMode={commentModeActive}
                           onCommentModeChange={setCommentModeActive}
                           groupByPage
-                          commentPages={demoPages.map((page) => ({
+                          commentPages={visibleDemoPages.map((page) => ({
                             id: page.id,
                             name: page.name,
                             order: page.order,
@@ -11736,7 +11814,7 @@ ${context.details}
         }
         currentUserRole={currentUserRole}
         projectType={projectType}
-        pages={demoPages}
+        pages={visibleDemoPages}
         onSettingsSaved={() => window.location.reload()}
       />
 

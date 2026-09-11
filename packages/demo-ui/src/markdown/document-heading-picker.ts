@@ -10,6 +10,7 @@ import {
   PRIMARY_HEADING_STYLE_OPTIONS,
   MORE_HEADING_STYLE_OPTIONS,
 } from "./heading-style-toolbar";
+import { lucideHeadingIcon } from "./lucide-icons";
 import {
   buildHeadingTransaction,
   getHeadingSelection,
@@ -105,10 +106,7 @@ export class DocumentHeadingPicker {
         items: options.map(({ label, level }) => ({
           key: level === null ? "text" : `h${level}`,
           label,
-          icon:
-            level === null
-              ? '<svg viewBox="0 0 24 24"><path d="M5 5h14v2h-6v12h-2V7H5V5Z"/></svg>'
-              : '<svg viewBox="0 0 24 24"><path d="M5 5h2v6h10V5h2v14h-2v-6H7v6H5Z"/></svg>',
+          icon: lucideHeadingIcon(level),
           checked: info.label === label,
           disabled: !buildHeadingTransaction(this.#target!, level),
           description:

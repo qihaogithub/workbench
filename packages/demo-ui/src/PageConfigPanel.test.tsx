@@ -650,7 +650,7 @@ describe("PageConfigPanel 引用页配置能力", () => {
         pages={[{
           id: "reference-page",
           name: "引用页",
-          reference: { sourceProjectId: "source-project", sourcePageId: "source-page" },
+          reference: { grantId: "grant-1", sourceProjectId: "source-project", sourcePageId: "source-page" },
           schema: pageSchema,
           configData: { cover: "/cover.png" },
           configItemCapabilities: {

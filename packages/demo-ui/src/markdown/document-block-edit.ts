@@ -15,10 +15,10 @@ import {
   createDocumentBlockNode,
   type DocumentBlockMenuItem,
 } from "./document-block-menu";
+import { LUCIDE_ICONS } from "./lucide-icons";
 import { mountDocumentOverlayPositioner } from "./document-overlay-positioning";
 
-const HANDLE_ICON =
-  '<svg viewBox="0 0 24 24"><circle cx="8" cy="7" r="1.4"/><circle cx="16" cy="7" r="1.4"/><circle cx="8" cy="12" r="1.4"/><circle cx="16" cy="12" r="1.4"/><circle cx="8" cy="17" r="1.4"/><circle cx="16" cy="17" r="1.4"/></svg>';
+const HANDLE_ICON = LUCIDE_ICONS.dragHandle;
 
 export interface DocumentBlockEditOptions {
   root: HTMLElement;
@@ -300,7 +300,9 @@ class DocumentBlockEditView implements PluginView {
       // command creates its insertion paragraph, never opening/cancelling a menu.
       if (position !== null && item.key === "insert-project-reference") {
         // A reference picker is a read-only interaction until a target is chosen.
-        const transaction = state.tr.setSelection(TextSelection.near(state.doc.resolve(position)));
+        const transaction = state.tr.setSelection(
+          TextSelection.near(state.doc.resolve(position)),
+        );
         this.#view.dispatch(transaction);
       } else if (position !== null) {
         const transaction = state.tr.insert(

@@ -1,8 +1,8 @@
 import type {
   CanvasFreeNode,
-  CanvasPageData,
   CanvasPageGroup,
   CanvasPageLayout,
+  CanvasTransferPageIdentity,
   CanvasNavigationState,
   CanvasSection,
 } from "./types";
@@ -12,7 +12,7 @@ const CLIPBOARD_KEY = "workbench:canvas-clipboard";
 /** 画布剪贴板数据格式 */
 export interface CanvasClipboardData {
   /** 格式版本，便于未来迁移 */
-  version: 1;
+  version: 2;
   /** 复制时间戳 */
   copiedAt: number;
   /** 来源项目 ID */
@@ -21,8 +21,8 @@ export interface CanvasClipboardData {
   sourceSessionId?: string;
   /** 选中的自由节点 */
   nodes: CanvasFreeNode[];
-  /** 选中的页面（含内容） */
-  pages: CanvasPageData[];
+  /** 选中的页面身份；内容由服务端从已提交源版本解析。 */
+  pages: CanvasTransferPageIdentity[];
   /** 选中页面的布局信息（key 为源 pageId） */
   pageLayouts: Record<string, CanvasPageLayout>;
   /** 涉及的页面组 */
@@ -50,7 +50,7 @@ export function readCanvasClipboard(): CanvasClipboardData | null {
     const raw = window.localStorage.getItem(CLIPBOARD_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as CanvasClipboardData;
-    if (data.version !== 1) return null;
+    if (data.version !== 2) return null;
     if (!Array.isArray(data.nodes)) return null;
     if (!Array.isArray(data.pages)) return null;
     if (typeof data.pageLayouts !== "object" || data.pageLayouts === null)

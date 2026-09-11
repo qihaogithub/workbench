@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { editorViewCtx } from "@milkdown/kit/core";
 import { AllSelection, TextSelection } from "@milkdown/kit/prose/state";
 import { undo, undoDepth } from "@milkdown/kit/prose/history";
@@ -88,103 +94,277 @@ describe("shared editor block menu transactions", () => {
       vi.fn(async ({ projectId }: { projectId?: string }) =>
         projectId === "b"
           ? [projectReference]
-          : [{ target: { kind: "page" as const, projectId: "a", pageId: "home" }, label: "首页", displayPath: "当前活动 / 首页" }]),
-      { listProjects: vi.fn(async () => [{ id: "a", name: "当前活动" }, { id: "b", name: "品牌官网" }]) },
+          : [
+              {
+                target: {
+                  kind: "page" as const,
+                  projectId: "a",
+                  pageId: "home",
+                },
+                label: "首页",
+                displayPath: "当前活动 / 首页",
+              },
+            ],
+      ),
+      {
+        listProjects: vi.fn(async () => [
+          { id: "a", name: "当前活动" },
+          { id: "b", name: "品牌官网" },
+        ]),
+      },
     );
     render(
       <DocumentEditor
         value="说明"
         onChange={vi.fn()}
-        referenceContext={{ source: { kind: "knowledge-document", projectId: "a", workspaceId: "w", docId: "d" }, policy: { sameProjectOnly: false, allowedTargetKinds: ["project", "page", "config", "document"] } }}
+        referenceContext={{
+          source: {
+            kind: "knowledge-document",
+            projectId: "a",
+            workspaceId: "w",
+            docId: "d",
+          },
+          policy: {
+            sameProjectOnly: false,
+            allowedTargetKinds: ["project", "page", "config", "document"],
+          },
+        }}
         referenceProvider={provider}
       />,
     );
     const view = await ready();
     open();
-    fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    fireEvent.click(
+      screen.getByRole("tab", { name: "插入项目引用", hidden: true }),
+    );
     fireEvent.click(await screen.findByRole("button", { name: "当前活动" }));
     const option = await screen.findByRole("option", { name: /品牌官网/ });
-    fireEvent.click(within(option).getByRole("button", { name: "插入项目引用：品牌官网" }));
-    await waitFor(() => expect(document.querySelector('[data-reference-uri="wb://project/b"]')).toBeTruthy());
-    expect(provider).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: "b", query: "", context: expect.objectContaining({ source: expect.objectContaining({ projectId: "a" }) }) }));
+    fireEvent.click(
+      within(option).getByRole("button", { name: "插入项目引用：品牌官网" }),
+    );
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-reference-uri="wb://project/b"]'),
+      ).toBeTruthy(),
+    );
+    expect(provider).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        projectId: "b",
+        query: "",
+        context: expect.objectContaining({
+          source: expect.objectContaining({ projectId: "a" }),
+        }),
+      }),
+    );
     expect(view.state.doc.textContent).toContain("品牌官网");
   });
 
   it("cancels a delayed whole-project request when the menu closes and reopens", async () => {
     let resolveOld!: (value: any[]) => void;
     let oldSignal: AbortSignal | undefined;
-    const projectReference = { target: { kind: "project" as const, projectId: "b" }, label: "品牌官网", displayPath: "品牌官网" };
+    const projectReference = {
+      target: { kind: "project" as const, projectId: "b" },
+      label: "品牌官网",
+      displayPath: "品牌官网",
+    };
     const provider = Object.assign(
-      vi.fn(({ projectId, signal }: { projectId?: string; signal?: AbortSignal }) => {
-        if (projectId === "b") {
-          oldSignal = signal;
-          return new Promise<any[]>((resolve) => { resolveOld = resolve; });
-        }
-        return [{ target: { kind: "page" as const, projectId: "a", pageId: "home" }, label: "首页", displayPath: "当前活动 / 首页" }];
-      }),
-      { listProjects: vi.fn(async () => [{ id: "a", name: "当前活动" }, { id: "b", name: "品牌官网" }]) },
+      vi.fn(
+        ({
+          projectId,
+          signal,
+        }: {
+          projectId?: string;
+          signal?: AbortSignal;
+        }) => {
+          if (projectId === "b") {
+            oldSignal = signal;
+            return new Promise<any[]>((resolve) => {
+              resolveOld = resolve;
+            });
+          }
+          return [
+            {
+              target: { kind: "page" as const, projectId: "a", pageId: "home" },
+              label: "首页",
+              displayPath: "当前活动 / 首页",
+            },
+          ];
+        },
+      ),
+      {
+        listProjects: vi.fn(async () => [
+          { id: "a", name: "当前活动" },
+          { id: "b", name: "品牌官网" },
+        ]),
+      },
     );
-    render(<DocumentEditor value="说明" onChange={vi.fn()}
-      referenceContext={{ source: { kind: "knowledge-document", projectId: "a", workspaceId: "w", docId: "d" }, policy: { sameProjectOnly: false, allowedTargetKinds: ["project", "page", "config", "document"] } }}
-      referenceProvider={provider} />);
+    render(
+      <DocumentEditor
+        value="说明"
+        onChange={vi.fn()}
+        referenceContext={{
+          source: {
+            kind: "knowledge-document",
+            projectId: "a",
+            workspaceId: "w",
+            docId: "d",
+          },
+          policy: {
+            sameProjectOnly: false,
+            allowedTargetKinds: ["project", "page", "config", "document"],
+          },
+        }}
+        referenceProvider={provider}
+      />,
+    );
     const view = await ready();
     open();
-    fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    fireEvent.click(
+      screen.getByRole("tab", { name: "插入项目引用", hidden: true }),
+    );
     fireEvent.click(await screen.findByRole("button", { name: "当前活动" }));
     const option = await screen.findByRole("option", { name: /品牌官网/ });
-    fireEvent.click(within(option).getByRole("button", { name: "插入项目引用：品牌官网" }));
-    await waitFor(() => expect(provider).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: "b", signal: expect.any(AbortSignal) })));
+    fireEvent.click(
+      within(option).getByRole("button", { name: "插入项目引用：品牌官网" }),
+    );
+    await waitFor(() =>
+      expect(provider).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          projectId: "b",
+          signal: expect.any(AbortSignal),
+        }),
+      ),
+    );
     fireEvent.click(screen.getByRole("button", { name: "关闭项目引用" }));
     open();
-    fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    fireEvent.click(
+      screen.getByRole("tab", { name: "插入项目引用", hidden: true }),
+    );
     resolveOld([projectReference]);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(oldSignal?.aborted).toBe(true);
     expect(view.state.doc.textContent).toBe("说明");
-    expect(document.querySelector('[data-reference-uri="wb://project/b"]')).toBeNull();
+    expect(
+      document.querySelector('[data-reference-uri="wb://project/b"]'),
+    ).toBeNull();
   });
 
   it("hides whole-project shortcuts when policy disallows project targets", async () => {
     const provider = Object.assign(
-      vi.fn(async () => [{ target: { kind: "page" as const, projectId: "a", pageId: "home" }, label: "首页", displayPath: "当前活动 / 首页" }]),
-      { listProjects: vi.fn(async () => [{ id: "a", name: "当前活动" }, { id: "b", name: "品牌官网" }]) },
+      vi.fn(async () => [
+        {
+          target: { kind: "page" as const, projectId: "a", pageId: "home" },
+          label: "首页",
+          displayPath: "当前活动 / 首页",
+        },
+      ]),
+      {
+        listProjects: vi.fn(async () => [
+          { id: "a", name: "当前活动" },
+          { id: "b", name: "品牌官网" },
+        ]),
+      },
     );
-    render(<DocumentEditor value="说明" onChange={vi.fn()}
-      referenceContext={{ source: { kind: "knowledge-document", projectId: "a", workspaceId: "w", docId: "d" }, policy: { sameProjectOnly: false, allowedTargetKinds: ["page"] } }}
-      referenceProvider={provider} />);
+    render(
+      <DocumentEditor
+        value="说明"
+        onChange={vi.fn()}
+        referenceContext={{
+          source: {
+            kind: "knowledge-document",
+            projectId: "a",
+            workspaceId: "w",
+            docId: "d",
+          },
+          policy: { sameProjectOnly: false, allowedTargetKinds: ["page"] },
+        }}
+        referenceProvider={provider}
+      />,
+    );
     await ready();
     open();
-    fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    fireEvent.click(
+      screen.getByRole("tab", { name: "插入项目引用", hidden: true }),
+    );
     fireEvent.click(await screen.findByRole("button", { name: "当前活动" }));
     await screen.findByRole("option", { name: /品牌官网/ });
-    expect(screen.queryByRole("button", { name: /插入项目引用：品牌官网/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /插入项目引用：品牌官网/ }),
+    ).toBeNull();
     expect(screen.queryByRole("button", { name: /引用整个项目/ })).toBeNull();
   });
 
   it("switches reference projects without editing and inserts the foreign identity in one undo", async () => {
-    const foreign = { target: { kind: "page" as const, projectId: "b", pageId: "home" }, label: "外部首页", displayPath: "品牌官网 / 外部首页" };
-    const provider = Object.assign(vi.fn(async ({ projectId }: { projectId?: string }) => projectId === "b" ? [foreign] : []), {
-      listProjects: vi.fn(async () => [{ id: "a", name: "当前活动" }, { id: "b", name: "品牌官网" }]),
-    });
+    const foreign = {
+      target: { kind: "page" as const, projectId: "b", pageId: "home" },
+      label: "外部首页",
+      displayPath: "品牌官网 / 外部首页",
+    };
+    const provider = Object.assign(
+      vi.fn(async ({ projectId }: { projectId?: string }) =>
+        projectId === "b" ? [foreign] : [],
+      ),
+      {
+        listProjects: vi.fn(async () => [
+          { id: "a", name: "当前活动" },
+          { id: "b", name: "品牌官网" },
+        ]),
+      },
+    );
     const onReferenceClick = vi.fn();
-    render(<DocumentEditor value="说明" onChange={vi.fn()} onReferenceClick={onReferenceClick}
-      referenceContext={{ source: { kind: "knowledge-document", projectId: "a", workspaceId: "w", docId: "d" }, policy: { sameProjectOnly: false, allowedTargetKinds: ["page", "config", "document"] } }} referenceProvider={provider} />);
+    render(
+      <DocumentEditor
+        value="说明"
+        onChange={vi.fn()}
+        onReferenceClick={onReferenceClick}
+        referenceContext={{
+          source: {
+            kind: "knowledge-document",
+            projectId: "a",
+            workspaceId: "w",
+            docId: "d",
+          },
+          policy: {
+            sameProjectOnly: false,
+            allowedTargetKinds: ["page", "config", "document"],
+          },
+        }}
+        referenceProvider={provider}
+      />,
+    );
     const view = await ready();
     const before = view.state.doc;
     const depth = undoDepth(view.state);
-    open(); fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    open();
+    fireEvent.click(
+      screen.getByRole("tab", { name: "插入项目引用", hidden: true }),
+    );
     fireEvent.click(await screen.findByRole("button", { name: "当前活动" }));
     const option = await screen.findByRole("option", { name: /品牌官网/ });
     fireEvent.click(within(option).getByRole("button", { name: "品牌官网" }));
     const row = await screen.findByRole("treeitem", { name: "外部首页" });
     expect(view.state.doc.eq(before)).toBe(true);
     expect(undoDepth(view.state)).toBe(depth);
-    expect(provider).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: "b", context: expect.objectContaining({ source: expect.objectContaining({ projectId: "a" }) }) }));
+    expect(provider).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        projectId: "b",
+        context: expect.objectContaining({
+          source: expect.objectContaining({ projectId: "a" }),
+        }),
+      }),
+    );
     fireEvent.click(row);
-    const reference = document.querySelector('[data-reference-uri="wb://page/b/home"]')!;
-    expect(reference).toHaveAttribute("data-reference-path", "品牌官网 / 外部首页");
+    const reference = document.querySelector(
+      '[data-reference-uri="wb://page/b/home"]',
+    )!;
+    expect(reference).toHaveAttribute(
+      "data-reference-path",
+      "品牌官网 / 外部首页",
+    );
     fireEvent.click(reference);
-    expect(onReferenceClick).toHaveBeenCalledWith(expect.objectContaining({ target: foreign.target }));
+    expect(onReferenceClick).toHaveBeenCalledWith(
+      expect.objectContaining({ target: foreign.target }),
+    );
     expect(undoDepth(view.state)).toBe(depth + 1);
     undo(view.state, view.dispatch);
     expect(view.state.doc.eq(before)).toBe(true);
@@ -193,49 +373,107 @@ describe("shared editor block menu transactions", () => {
   it("refreshes referenced projects independently and revokes only an inaccessible project", async () => {
     let denied = false;
     const provider = vi.fn(async ({ projectId }: { projectId?: string }) => {
-      if (projectId === "b") throw Object.assign(new Error("failed"), { status: denied ? 403 : 503 });
-      return [{ target: { kind: "page" as const, projectId: "a", pageId: "home" }, label: "当前首页", displayPath: "当前活动 / 首页" }];
+      if (projectId === "b")
+        throw Object.assign(new Error("failed"), {
+          status: denied ? 403 : 503,
+        });
+      return [
+        {
+          target: { kind: "page" as const, projectId: "a", pageId: "home" },
+          label: "当前首页",
+          displayPath: "当前活动 / 首页",
+        },
+      ];
     });
-    render(<DocumentEditor value="[当前](wb://page/a/home) [外部](wb://page/b/home)" onChange={vi.fn()}
-      referenceContext={{ source: { kind: "knowledge-document", projectId: "a", workspaceId: "w", docId: "d" }, policy: { sameProjectOnly: false, allowedTargetKinds: ["page", "config", "document"] } }} referenceProvider={provider} />);
+    render(
+      <DocumentEditor
+        value="[当前](wb://page/a/home) [外部](wb://page/b/home)"
+        onChange={vi.fn()}
+        referenceContext={{
+          source: {
+            kind: "knowledge-document",
+            projectId: "a",
+            workspaceId: "w",
+            docId: "d",
+          },
+          policy: {
+            sameProjectOnly: false,
+            allowedTargetKinds: ["page", "config", "document"],
+          },
+        }}
+        referenceProvider={provider}
+      />,
+    );
     const view = await ready();
     const before = view.state.doc;
-    await waitFor(() => expect(document.querySelector('[data-reference-uri="wb://page/a/home"]')).toHaveAttribute("data-reference-status", "available"));
-    expect(document.querySelector('[data-reference-uri="wb://page/b/home"]')).toHaveAttribute("data-reference-status", "unknown");
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-reference-uri="wb://page/a/home"]'),
+      ).toHaveAttribute("data-reference-status", "available"),
+    );
+    expect(
+      document.querySelector('[data-reference-uri="wb://page/b/home"]'),
+    ).toHaveAttribute("data-reference-status", "unknown");
     denied = true;
     fireEvent.focus(window);
-    await waitFor(() => expect(document.querySelector('[data-reference-uri="wb://page/b/home"]')).toHaveAttribute("data-reference-status", "unavailable"));
-    expect(document.querySelector('[data-reference-uri="wb://page/a/home"]')).toHaveAttribute("data-reference-status", "available");
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-reference-uri="wb://page/b/home"]'),
+      ).toHaveAttribute("data-reference-status", "unavailable"),
+    );
+    expect(
+      document.querySelector('[data-reference-uri="wb://page/a/home"]'),
+    ).toHaveAttribute("data-reference-status", "available");
     expect(view.state.doc.eq(before)).toBe(true);
   });
 
   it("blocks coordinate-based native previews for references but keeps ordinary link previews", async () => {
-    render(<DocumentEditor value="[页面](wb://page/p/home) [网站](https://example.com)" onChange={vi.fn()} />);
+    render(
+      <DocumentEditor
+        value="[页面](wb://page/p/home) [网站](https://example.com)"
+        onChange={vi.fn()}
+      />,
+    );
     const view = await ready();
     const positions: Record<string, number> = {};
     view.state.doc.descendants((node, pos) => {
-      const href = node.marks.find(mark => mark.type.name === "link")?.attrs.href;
+      const href = node.marks.find((mark) => mark.type.name === "link")?.attrs
+        .href;
       if (href) positions[href] = pos;
     });
     const focus = vi.spyOn(view, "hasFocus").mockReturnValue(true);
-    const coords = vi.spyOn(view, "posAtCoords").mockReturnValue({ pos: positions["https://example.com"], inside: 0 });
+    const coords = vi
+      .spyOn(view, "posAtCoords")
+      .mockReturnValue({ pos: positions["https://example.com"], inside: 0 });
     try {
       fireEvent.mouseMove(view.dom, { clientX: 20, clientY: 20 });
-      await waitFor(() => expect(document.querySelector('.milkdown-link-preview')?.getAttribute('data-show')).toBe('true'));
+      await waitFor(() =>
+        expect(
+          document
+            .querySelector(".milkdown-link-preview")
+            ?.getAttribute("data-show"),
+        ).toBe("true"),
+      );
       coords.mockReturnValue({ pos: positions["wb://page/p/home"], inside: 0 });
       // Event target is the paragraph/editor, as with an icon or edge hit test.
       // DOM-target-only filtering does not protect this upstream delayed callback.
       fireEvent.mouseMove(view.dom, { clientX: 20, clientY: 20 });
-      await waitFor(() => expect(document.querySelector('.milkdown-link-preview')?.getAttribute('data-show')).toBe('false'));
-    } finally { coords.mockRestore(); focus.mockRestore(); }
+      await waitFor(() =>
+        expect(
+          document
+            .querySelector(".milkdown-link-preview")
+            ?.getAttribute("data-show"),
+        ).toBe("false"),
+      );
+    } finally {
+      coords.mockRestore();
+      focus.mockRestore();
+    }
   });
 
   it("keeps typing after a project reference outside the reference link", async () => {
     render(
-      <DocumentEditor
-        value="[首页](wb://page/p/home)"
-        onChange={vi.fn()}
-      />,
+      <DocumentEditor value="[首页](wb://page/p/home)" onChange={vi.fn()} />,
     );
     const view = await ready();
     let referenceEnd = 0;
@@ -252,24 +490,34 @@ describe("shared editor block menu transactions", () => {
 
     view.focus();
     view.dispatch(
-      view.state.tr.setSelection(TextSelection.create(view.state.doc, referenceEnd)),
+      view.state.tr.setSelection(
+        TextSelection.create(view.state.doc, referenceEnd),
+      ),
     );
     expect(view.state.storedMarks).toEqual([]);
-    const linkButton = document.querySelector<HTMLButtonElement>(
-      '.top-bar-inner [aria-label="链接"]',
-    );
-    expect(linkButton).toBeTruthy();
-    expect(linkButton).not.toHaveClass("active");
+    expect(
+      document.querySelector<HTMLButtonElement>(
+        '.top-bar-inner [aria-label="插入"]',
+      ),
+    ).toBeTruthy();
 
     view.dispatch(view.state.tr.insertText("后续文字"));
     const paragraph = view.state.doc.firstChild!;
     expect(paragraph.textContent).toBe("首页后续文字");
-    expect(paragraph.child(0).marks.some((mark) => mark.attrs.href === "wb://page/p/home")).toBe(true);
-    expect(paragraph.child(1).marks.some((mark) => mark.type.name === "link")).toBe(false);
+    expect(
+      paragraph
+        .child(0)
+        .marks.some((mark) => mark.attrs.href === "wb://page/p/home"),
+    ).toBe(true);
+    expect(
+      paragraph.child(1).marks.some((mark) => mark.type.name === "link"),
+    ).toBe(false);
   });
 
   it("does not normalize the end of an ordinary external link", async () => {
-    render(<DocumentEditor value="[网站](https://example.com)" onChange={vi.fn()} />);
+    render(
+      <DocumentEditor value="[网站](https://example.com)" onChange={vi.fn()} />,
+    );
     const view = await ready();
     let linkEnd = 0;
     view.state.doc.descendants((node, pos) => {
@@ -291,33 +539,69 @@ describe("shared editor block menu transactions", () => {
 
     const paragraph = view.state.doc.firstChild!;
     expect(paragraph.textContent).toBe("网站继续");
-    expect(paragraph.child(0).marks.some((mark) => mark.attrs.href === "https://example.com")).toBe(true);
+    expect(
+      paragraph
+        .child(0)
+        .marks.some((mark) => mark.attrs.href === "https://example.com"),
+    ).toBe(true);
   });
 
   it("project reference tab opens directly, cancellation is inert and insertion is one undo", async () => {
     const onChange = vi.fn();
     const onReferenceClick = vi.fn();
-    render(<DocumentEditor value="引用说明" onChange={onChange}
-      onReferenceClick={onReferenceClick}
-      referenceContext={{ source: { kind: "knowledge-document", projectId: "p", workspaceId: "w", docId: "d" }, policy: { sameProjectOnly: true, allowedTargetKinds: ["page", "config", "document"] } }}
-      referenceProvider={() => [{ target: { kind: "page", projectId: "p", pageId: "home" }, label: "首页", displayPath: "项目 / 首页" }]} />);
+    render(
+      <DocumentEditor
+        value="引用说明"
+        onChange={onChange}
+        onReferenceClick={onReferenceClick}
+        referenceContext={{
+          source: {
+            kind: "knowledge-document",
+            projectId: "p",
+            workspaceId: "w",
+            docId: "d",
+          },
+          policy: {
+            sameProjectOnly: true,
+            allowedTargetKinds: ["page", "config", "document"],
+          },
+        }}
+        referenceProvider={() => [
+          {
+            target: { kind: "page", projectId: "p", pageId: "home" },
+            label: "首页",
+            displayPath: "项目 / 首页",
+          },
+        ]}
+      />,
+    );
     const view = await ready();
     const before = view.state.doc;
     const depth = undoDepth(view.state);
     open();
-    fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    fireEvent.click(
+      screen.getByRole("tab", { name: "插入项目引用", hidden: true }),
+    );
     await screen.findByRole("treeitem", { name: "首页" });
     expect(view.state.doc).toBe(before);
     expect(undoDepth(view.state)).toBe(depth);
     fireEvent.click(screen.getByRole("tab", { name: "文档" }));
     fireEvent.click(screen.getByRole("button", { name: "关闭项目引用" }));
     expect(view.state.doc).toBe(before);
-    open(); fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    open();
+    fireEvent.click(
+      screen.getByRole("tab", { name: "插入项目引用", hidden: true }),
+    );
     fireEvent.click(await screen.findByRole("treeitem", { name: "首页" }));
-    const reference = document.querySelector('[data-reference-uri="wb://page/p/home"]');
+    const reference = document.querySelector(
+      '[data-reference-uri="wb://page/p/home"]',
+    );
     expect(reference).toBeTruthy();
     fireEvent.click(reference!);
-    expect(onReferenceClick).toHaveBeenCalledWith({ target: { kind: "page", projectId: "p", pageId: "home" }, labelSnapshot: "首页" });
+    expect(onReferenceClick).toHaveBeenCalledWith({
+      target: { kind: "page", projectId: "p", pageId: "home" },
+      labelSnapshot: "首页",
+    });
     expect(screen.queryByRole("dialog", { name: "插入项目引用" })).toBeNull();
     expect(undoDepth(view.state)).toBe(depth + 1);
     expect(view.state.storedMarks).toEqual([]);
@@ -326,15 +610,44 @@ describe("shared editor block menu transactions", () => {
   });
   it("does not reopen a cancelled project reference request when the response arrives", async () => {
     let finish: (value: any[]) => void = () => {};
-    render(<DocumentEditor value="说明" onChange={() => {}}
-      referenceContext={{ source: { kind: "knowledge-document", projectId: "p", workspaceId: "w", docId: "d" }, policy: { sameProjectOnly: true, allowedTargetKinds: ["page", "config", "document"] } }}
-      referenceProvider={() => new Promise(resolve => { finish = resolve; })} />);
-    const view = await ready(); const before = view.state.doc;
-    open(); fireEvent.click(screen.getByRole("tab", { name: "插入项目引用", hidden: true }));
+    render(
+      <DocumentEditor
+        value="说明"
+        onChange={() => {}}
+        referenceContext={{
+          source: {
+            kind: "knowledge-document",
+            projectId: "p",
+            workspaceId: "w",
+            docId: "d",
+          },
+          policy: {
+            sameProjectOnly: true,
+            allowedTargetKinds: ["page", "config", "document"],
+          },
+        }}
+        referenceProvider={() =>
+          new Promise((resolve) => {
+            finish = resolve;
+          })
+        }
+      />,
+    );
+    const view = await ready();
+    const before = view.state.doc;
+    open();
+    fireEvent.click(
+      screen.getByRole("tab", { name: "插入项目引用", hidden: true }),
+    );
     await screen.findByRole("status");
     fireEvent.click(screen.getByRole("button", { name: "关闭项目引用" }));
-    finish([{ target: { kind: "page", projectId: "p", pageId: "home" }, displayPath: "首页" }]);
-    await new Promise(resolve => setTimeout(resolve, 0));
+    finish([
+      {
+        target: { kind: "page", projectId: "p", pageId: "home" },
+        displayPath: "首页",
+      },
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByRole("dialog", { name: "插入项目引用" })).toBeNull();
     expect(view.state.doc).toBe(before);
   });
@@ -342,44 +655,85 @@ describe("shared editor block menu transactions", () => {
     let width = 140;
     let resize = () => {};
     const previousObserver = globalThis.ResizeObserver;
-    vi.stubGlobal("ResizeObserver", class {
-      constructor(private callback: () => void) {}
-      observe(element: HTMLElement) {
-        if (element.classList.contains("top-bar-inner")) resize = this.callback;
-      }
-      unobserve() {}
-      disconnect() {}
-    });
-    const clientWidth = vi.spyOn(HTMLElement.prototype, "clientWidth", "get")
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(private callback: () => void) {}
+        observe(element: HTMLElement) {
+          if (element.classList.contains("top-bar-inner"))
+            resize = this.callback;
+        }
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    const clientWidth = vi
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
       .mockImplementation(function (this: HTMLElement) {
         return this.classList.contains("top-bar-inner") ? width : 0;
       });
-    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function (this: HTMLElement) {
-        return new DOMRect(0, 0, this.classList.contains("top-bar-divider") ? 10 : 70, 32);
+        return new DOMRect(
+          0,
+          0,
+          this.classList.contains("top-bar-divider") ? 10 : 70,
+          32,
+        );
       });
     try {
-      const { rerender } = render(<DocumentEditor value="选择文字" onChange={() => {}} />);
+      const { rerender } = render(
+        <DocumentEditor value="选择文字" onChange={() => {}} />,
+      );
       const view = await ready();
-      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 5)));
+      view.dispatch(
+        view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 5)),
+      );
       const before = view.state.doc;
       const selection = view.state.selection;
-      await waitFor(() => expect(document.querySelector(".top-bar-more")).toBeTruthy());
+      await waitFor(() =>
+        expect(document.querySelector(".top-bar-more")).toBeTruthy(),
+      );
       fireEvent.click(document.querySelector(".top-bar-more")!);
-      await waitFor(() => expect(document.querySelector(".top-bar-overflow-menu")).toBeTruthy());
+      await waitFor(() =>
+        expect(document.querySelector(".top-bar-overflow-menu")).toBeTruthy(),
+      );
       expect(view.state.doc).toBe(before);
       expect(view.state.selection.eq(selection)).toBe(true);
-      fireEvent.click(document.querySelector('.top-bar-overflow-menu [aria-label="加粗"]')!);
-      expect(view.state.doc.firstChild?.firstChild?.marks.some(mark => mark.type.name === "strong")).toBe(true);
-      await waitFor(() => expect(document.querySelector(".top-bar-overflow-menu")).toBeNull());
+      fireEvent.click(
+        document.querySelector('.top-bar-overflow-menu [aria-label="加粗"]')!,
+      );
+      expect(
+        view.state.doc.firstChild?.firstChild?.marks.some(
+          (mark) => mark.type.name === "strong",
+        ),
+      ).toBe(true);
+      await waitFor(() =>
+        expect(document.querySelector(".top-bar-overflow-menu")).toBeNull(),
+      );
       width = 2000;
       resize();
-      await waitFor(() => expect(document.querySelector(".top-bar-more")).toBeNull());
-      expect(document.querySelector('.top-bar-inner > [aria-label="分隔线"]')).toBeTruthy();
-      rerender(<DocumentEditor value="选择文字" onChange={() => {}} readOnly />);
-      await waitFor(() => expect(document.querySelector(".top-bar-inner")).toBeNull());
+      await waitFor(() =>
+        expect(document.querySelector(".top-bar-more")).toBeNull(),
+      );
+      expect(
+        document.querySelector(
+          ".top-bar-inner > button:has([data-document-insert-trigger])",
+        ),
+      ).toBeTruthy();
+      rerender(
+        <DocumentEditor value="选择文字" onChange={() => {}} readOnly />,
+      );
+      await waitFor(() =>
+        expect(document.querySelector(".top-bar-inner")).toBeNull(),
+      );
       rerender(<DocumentEditor value="选择文字" onChange={() => {}} />);
-      await waitFor(() => expect(document.querySelector('.top-bar-inner > [aria-label="加粗"]')).toBeTruthy());
+      await waitFor(() =>
+        expect(
+          document.querySelector('.top-bar-inner > [aria-label="加粗"]'),
+        ).toBeTruthy(),
+      );
     } finally {
       clientWidth.mockRestore();
       rect.mockRestore();
@@ -534,6 +888,169 @@ describe("shared editor block menu transactions", () => {
     expect(trigger.textContent).toContain("H4");
     expect(undoDepth(view.state)).toBe(1);
   });
+
+  it("TopBar exposes one searchable insert menu and keeps direct formatting tools", async () => {
+    render(<DocumentEditor value="原文" onChange={() => {}} />);
+    await ready();
+    const trigger = document
+      .querySelector<HTMLButtonElement>("[data-document-insert-trigger]")
+      ?.closest("button");
+    expect(trigger).toHaveAttribute("aria-label", "插入");
+    expect(
+      document.querySelector('.top-bar-inner [aria-label="链接"]'),
+    ).toBeTruthy();
+    expect(
+      document.querySelector('.top-bar-inner [aria-label="引用"]'),
+    ).toBeTruthy();
+    expect(document.querySelector(".top-bar-inner > button")).toBe(trigger);
+
+    fireEvent.click(trigger!);
+    const menu = document.querySelector<HTMLElement>(
+      ".document-topbar-insert-menu",
+    )!;
+    expect(menu.dataset.show).toBe("true");
+    expect(menu.querySelector(".document-insert-search")).toBeTruthy();
+    expect(menu.textContent).toContain("基础");
+    expect(menu.textContent).toContain("通用");
+    expect(menu.querySelector('[data-menu-key="link"]')).toBeTruthy();
+    expect(menu.querySelector('[data-menu-key="quote"]')).toBeTruthy();
+    expect(menu.querySelector('[data-menu-key="image"]')).toBeTruthy();
+    const h1 = menu.querySelector<HTMLButtonElement>('[data-menu-key="h1"]');
+    const h2 = menu.querySelector<HTMLButtonElement>('[data-menu-key="h2"]');
+    expect(h1).toHaveAttribute("aria-label", "H1");
+    expect(h1).toHaveAttribute("title", "H1");
+    expect(h1?.querySelector(".document-insert-item-label")).toBeNull();
+    expect(h1?.querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 24 24");
+    expect(h2?.querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 24 24");
+    expect(h1?.querySelector("svg")?.innerHTML).not.toBe(
+      h2?.querySelector("svg")?.innerHTML,
+    );
+    fireEvent.input(menu.querySelector(".document-insert-search")!, {
+      target: { value: "表格" },
+    });
+    expect(menu.querySelectorAll(".document-insert-item")).toHaveLength(1);
+    expect(menu.querySelector('[data-menu-key="table"]')).toBeTruthy();
+    fireEvent.keyDown(menu.querySelector(".document-insert-search")!, {
+      key: "Escape",
+    });
+    expect(menu.dataset.show).toBe("false");
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("direct link and block quote buttons reuse the editor commands", async () => {
+    render(<DocumentEditor value="原文" onChange={() => {}} />);
+    const view = await ready();
+    const linkButton = document.querySelector<HTMLButtonElement>(
+      '.top-bar-inner [aria-label="链接"]',
+    );
+    const quoteButton = document.querySelector<HTMLButtonElement>(
+      '.top-bar-inner [aria-label="引用"]',
+    );
+    expect(linkButton).toBeTruthy();
+    expect(quoteButton).toBeTruthy();
+
+    fireEvent.click(quoteButton!);
+    expect(view.state.doc.firstChild?.type.name).toBe("blockquote");
+    expect(view.state.doc.textContent).toBe("原文");
+  });
+
+  it("direct link keeps the selected text as the command target", async () => {
+    render(<DocumentEditor value="选择文字" onChange={() => {}} />);
+    const view = await ready();
+    view.focus();
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, 1, 5)),
+    );
+    const selection = view.state.selection;
+    const linkButton = document.querySelector<HTMLButtonElement>(
+      '.top-bar-inner [aria-label="链接"]',
+    )!;
+
+    fireEvent.click(linkButton);
+
+    expect(view.state.selection.eq(selection)).toBe(true);
+  });
+
+  it("records only successful TopBar insertions in the current editor instance", async () => {
+    render(
+      <DocumentEditor
+        value="原文"
+        onChange={() => {}}
+        referenceCandidates={[{ key: "theme.primary", label: "主题色" }]}
+      />,
+    );
+    const view = await ready();
+    view.focus();
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, 3)),
+    );
+    const trigger = document
+      .querySelector("[data-document-insert-trigger]")!
+      .closest("button")!;
+    fireEvent.click(trigger);
+    let menu = document.querySelector<HTMLElement>(
+      ".document-topbar-insert-menu",
+    )!;
+    fireEvent.click(menu.querySelector('[data-menu-key="h1"]')!);
+    expect(view.state.doc.childCount).toBe(3);
+
+    fireEvent.click(trigger);
+    menu = document.querySelector<HTMLElement>(".document-topbar-insert-menu")!;
+    const recent = menu.querySelector<HTMLElement>(
+      ".document-insert-section:first-of-type",
+    );
+    expect(recent?.textContent).toContain("最近使用");
+    expect(recent?.querySelector('[data-menu-key="h1"]')).toBeTruthy();
+    fireEvent.click(
+      menu.querySelector('[data-menu-key="reference-theme.primary"]')!,
+    );
+    expect(view.state.doc.textContent).toContain("主题色");
+  });
+
+  it("TopBar block insertion splits at the caret, preserves selection text and undoes once", async () => {
+    const onChange = vi.fn();
+    render(<DocumentEditor value="前选中文字后" onChange={onChange} />);
+    const view = await ready();
+    view.focus();
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.create(view.state.doc, 2, 6)),
+    );
+    const before = view.state.doc;
+    const historyDepth = undoDepth(view.state);
+    const trigger = document
+      .querySelector("[data-document-insert-trigger]")!
+      .closest("button")!;
+    fireEvent.click(trigger);
+    const menu = document.querySelector<HTMLElement>(
+      ".document-topbar-insert-menu",
+    )!;
+    fireEvent.click(menu.querySelector('[data-menu-key="h2"]')!);
+
+    expect(view.state.doc.childCount).toBe(3);
+    expect(view.state.doc.child(0).textContent).toBe("前");
+    expect(view.state.doc.child(1).type.name).toBe("heading");
+    expect(view.state.doc.child(1).attrs.level).toBe(2);
+    expect(view.state.doc.child(2).textContent).toBe("选中文字后");
+    expect(view.state.doc.textContent).toBe("前选中文字后");
+    expect(view.state.selection.$from.parent.type.name).toBe("heading");
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+    expect(undoDepth(view.state)).toBe(historyDepth + 1);
+    undo(view.state, view.dispatch);
+    expect(view.state.doc.eq(before)).toBe(true);
+  });
+
+  it("hides the TopBar insert tool in readonly editors", async () => {
+    render(<DocumentEditor value="只读" onChange={() => {}} readOnly />);
+    await waitFor(() =>
+      expect(document.querySelector(".ProseMirror")).toBeTruthy(),
+    );
+    expect(
+      document.querySelector<HTMLElement>(".milkdown-top-bar"),
+    ).toHaveStyle({
+      display: "none",
+    });
+  });
+
   it("opening, switching groups and cancelling never changes Markdown or history", async () => {
     const onChange = vi.fn();
     render(<DocumentEditor value="原文" onChange={onChange} />);

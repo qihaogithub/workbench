@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { InventoryQueryEntry } from "@workbench/shared";
 import { DocumentView } from "./DocumentView";
 
 const toast = jest.fn();
@@ -36,6 +37,36 @@ jest.mock("./DesignSpecEditor", () => ({
 function jsonResponse(data: unknown, ok = true) {
   return Promise.resolve({ ok, json: async () => data });
 }
+
+const inventoryProjectEntry = {
+  canonicalUri: "wb://project/project-1",
+  resourceType: "project",
+  scope: "local",
+  parentUri: null,
+  refreshMode: "auto",
+  native: {
+    name: "项目入口",
+    aliases: [],
+    description: "项目入口说明",
+    metadata: {},
+  },
+  generated: null,
+  human: {
+    summary: null,
+    confirmedGeneratedHash: null,
+    updatedAt: null,
+  },
+  resolved: {
+    name: "项目入口",
+    summary: "项目入口说明",
+    aliases: [],
+  },
+  matchedBy: [],
+  targetAvailability: "available",
+  sourceState: "active",
+  generationState: "not_required",
+  reviewState: "not_required",
+} satisfies InventoryQueryEntry;
 
 describe("DocumentView knowledge creation", () => {
   beforeEach(() => {
@@ -88,6 +119,50 @@ describe("DocumentView knowledge creation", () => {
       }
       return jsonResponse({ success: false }, false);
     }) as jest.Mock;
+  });
+
+  it("离开有未保存资源清单时先提示，确认后才切换目录", async () => {
+    const user = userEvent.setup();
+    global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/inventory/overrides")) {
+        return jsonResponse({
+          success: true,
+          data: {
+            entries: [inventoryProjectEntry],
+            overrides: { schemaVersion: 2, entries: {} },
+            orphanEntries: [],
+            freshness: "fresh",
+            hash: "inventory-hash",
+          },
+        });
+      }
+      return jsonResponse({ success: false }, false);
+    }) as jest.Mock;
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+        userRole="editor"
+      />,
+    );
+
+    await user.click(await screen.findByText("项目清单"));
+    await user.click(await screen.findByRole("button", { name: "编辑简介：项目入口" }));
+    await user.type(screen.getByRole("textbox", { name: "简介" }), "本地简介");
+    await user.click(screen.getByRole("button", { name: "关闭" }));
+    await user.click(screen.getByText("AI 记忆"));
+
+    expect(await screen.findByRole("heading", { name: "资源清单有未保存修改" })).toBeInTheDocument();
+    expect(screen.getByTestId("project-inventory-view")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "继续编辑" }));
+    expect(screen.getByTestId("project-inventory-view")).toBeInTheDocument();
+
+    await user.click(screen.getByText("AI 记忆"));
+    await user.click(screen.getByRole("button", { name: "放弃并离开" }));
+    expect(screen.queryByTestId("project-inventory-view")).not.toBeInTheDocument();
   });
 
   it("自动保存完成后不会用列表刷新覆盖当前编辑内容", async () => {
@@ -971,5 +1046,59 @@ describe("DocumentView knowledge creation", () => {
     expect(screen.getByRole("tab", { name: /此文档链接到/ })).toHaveAttribute("data-state", "active");
     expect(screen.getByRole("tab", { name: /链接到此文档/ })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /提及但未链接/ })).toBeInTheDocument();
+  });
+
+  it("在没有公约文件时仍从项目公约目录打开虚拟资源清单", async () => {
+    global.fetch = jest.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("workspace/files?include=conventions")) {
+        return jsonResponse({ success: true, data: { paths: [] } });
+      }
+      if (url.startsWith("/api/knowledge?") || url.startsWith("/api/design-specs")) {
+        return jsonResponse({ success: true, data: [] });
+      }
+      if (url.includes("/inventory/overrides")) {
+        return jsonResponse({
+          success: true,
+          data: {
+            entries: [],
+            overrides: { schemaVersion: 2, entries: {} },
+            orphanEntries: [],
+            freshness: "fresh",
+            hash: null,
+            revision: null,
+          },
+        });
+      }
+      if (url.includes("/workspace/files/")) {
+        return jsonResponse({ success: true, data: { content: "AI 记忆正文" } });
+      }
+      return jsonResponse({ success: false }, false);
+    }) as jest.Mock;
+
+    render(
+      <DocumentView
+        workingDir="/workspace"
+        projectId="project-1"
+        sessionId="session-1"
+        userRole="admin"
+      />,
+    );
+
+    const inventoryEntry = await screen.findByText("项目清单", { selector: "span" });
+    expect(screen.getByText("暂无公约，可通过右上角 + 新建")).toBeInTheDocument();
+    fireEvent.click(inventoryEntry);
+
+    expect(await screen.findByRole("heading", { name: "项目清单" })).toBeInTheDocument();
+    expect(screen.getByTestId("project-inventory-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("document-editor")).not.toBeInTheDocument();
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(([input]) =>
+        String(input).includes("/workspace/files/") && !String(input).includes("include=conventions"),
+      ),
+    ).toHaveLength(0);
+
+    fireEvent.click(screen.getByText("AI 记忆", { selector: "span" }));
+    expect(await screen.findByTestId("document-editor-value")).toHaveTextContent("AI 记忆正文");
   });
 });

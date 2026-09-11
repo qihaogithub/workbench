@@ -1,3 +1,5 @@
+import { DEFAULT_CDN_BASE_URL } from "@workbench/runtime-config/topology";
+
 export interface IframeTemplateOptions {
   cssImports?: string[];
   compiledCode?: string;
@@ -13,7 +15,7 @@ export interface IframeTemplateOptions {
   previewInstanceId?: string;
 }
 
-const DEFAULT_CDN_BASE = "https://esm.sh";
+const DEFAULT_CDN_BASE = DEFAULT_CDN_BASE_URL;
 const DEFAULT_RUNTIME_IMPORTS: Record<string, string> = {
   react: "/preview-runtime/vendor/react.js",
   "react-dom": "/preview-runtime/vendor/react-dom.js",

@@ -95,6 +95,7 @@ import {
   reconcileCanvasSectionMembership,
   removeCanvasSection,
 } from "./canvas-section";
+import { createCanvasId } from "./canvas-id";
 
 const DocumentEditor = lazy(() =>
   import("./DocumentEditor").then((module) => ({
@@ -143,6 +144,7 @@ import type {
   CanvasTextNode,
   CanvasDocumentNode,
   CanvasPageData,
+  CanvasTransferPageIdentity,
   CanvasPageGroup,
   CanvasPageRenderMode,
   CanvasSection,
@@ -181,7 +183,7 @@ function remapNavigation(
   for (const hotspot of Object.values(navigation.hotspots)) {
     const pageId = pageIdMapping.get(hotspot.pageId);
     if (!pageId) continue;
-    const id = `navigation_hotspot_${crypto.randomUUID()}`;
+    const id = createCanvasId("navigation_hotspot", "_");
     hotspotIds.set(hotspot.id, id);
     hotspots[id] = {
       ...hotspot,
@@ -197,7 +199,7 @@ function remapNavigation(
     const targetPageId = pageIdMapping.get(connection.target.pageId);
     const hotspotId = hotspotIds.get(connection.source.hotspotId);
     if (!sourcePageId || !targetPageId || !hotspotId) continue;
-    const id = `navigation_connection_${crypto.randomUUID()}`;
+    const id = createCanvasId("navigation_connection", "_");
     connections[id] = {
       ...connection,
       id,
@@ -844,7 +846,7 @@ export function PreviewCanvas({
 
   // 跨项目粘贴选择器状态
   const [pendingPasteModal, setPendingPasteModal] = useState<{
-    pages: CanvasPageData[];
+    pages: CanvasTransferPageIdentity[];
     pageLayouts: Record<string, CanvasPageLayout>;
     pageGroups: CanvasPageGroup[];
     sections: CanvasSection[];
@@ -1270,7 +1272,7 @@ export function PreviewCanvas({
   const handleCreateSection = useCallback(
     (rect: CanvasRect) => {
       if (rect.width < 80 || rect.height < 60) return;
-      const id = `section_${crypto.randomUUID()}`;
+      const id = createCanvasId("section", "_");
       const maxZ = Math.max(
         0,
         ...Object.values(allItemLayouts).map((layout) => layout.zIndex ?? 0),
@@ -1785,12 +1787,18 @@ export function PreviewCanvas({
         if (node) copiedNodes.push(node);
       });
 
-      const copiedPages: CanvasPageData[] = [];
+      const copiedPages: CanvasTransferPageIdentity[] = [];
       const copiedPageLayouts: Record<string, CanvasPageLayout> = {};
       new Set([...pageIdsToCopy, ...copiedSectionPageIds]).forEach((pageId) => {
         const page = pagesById.get(pageId);
         const layout = effectivePages[pageId];
-        if (page) copiedPages.push(page);
+        if (page) {
+          copiedPages.push({
+            id: page.id,
+            name: page.name,
+            runtimeType: page.runtimeType,
+          });
+        }
         if (layout) copiedPageLayouts[pageId] = layout;
       });
 
@@ -1822,7 +1830,7 @@ export function PreviewCanvas({
       };
 
       writeCanvasClipboard({
-        version: 1,
+        version: 2,
         copiedAt: Date.now(),
         sourceProjectId: projectId,
         sourceSessionId: sessionId,
@@ -1863,6 +1871,7 @@ export function PreviewCanvas({
       pages: data.pages,
       pageLayouts: data.pageLayouts,
       pageGroups: data.pageGroups,
+      sourceProjectId: data.sourceProjectId,
     }).then(({ pageIdMapping }) => {
       updateState((prev) => {
         const nextPages = { ...prev.pages };
@@ -1877,7 +1886,7 @@ export function PreviewCanvas({
           nodeIdMapping: data.nodeIdMapping,
           offset: data.offset,
           now: Date.now(),
-          createId: () => `section_${crypto.randomUUID()}`,
+          createId: () => createCanvasId("section", "_"),
         });
         for (const oldGroup of data.pageGroups) {
           const newGroupPages = oldGroup.pages.map((entry) => ({
@@ -1886,7 +1895,7 @@ export function PreviewCanvas({
           }));
           const newActivePageId =
             pageIdMapping.get(oldGroup.activePageId) ?? oldGroup.activePageId;
-          const groupId = `page-group-${crypto.randomUUID()}`;
+          const groupId = createCanvasId("page-group");
           nextGroups[groupId] = {
             ...oldGroup,
             id: groupId,
@@ -1935,7 +1944,7 @@ export function PreviewCanvas({
           nodeIdMapping: data.nodeIdMapping,
           offset: data.offset,
           now: Date.now(),
-          createId: () => `section_${crypto.randomUUID()}`,
+          createId: () => createCanvasId("section", "_"),
         });
         for (const oldGroup of data.pageGroups) {
           const newGroupPages = oldGroup.pages.map((entry) => ({
@@ -1944,7 +1953,7 @@ export function PreviewCanvas({
           }));
           const newActivePageId =
             pageIdMapping.get(oldGroup.activePageId) ?? oldGroup.activePageId;
-          const groupId = `page-group-${crypto.randomUUID()}`;
+          const groupId = createCanvasId("page-group");
           nextGroups[groupId] = {
             ...oldGroup,
             id: groupId,
@@ -2117,7 +2126,7 @@ export function PreviewCanvas({
     if (selectedPageLikeLayoutEntries.length < 2 || !selectedPageBounds) return;
     const padding = 24;
     const titleSpace = 28;
-    const id = `section_${crypto.randomUUID()}`;
+    const id = createCanvasId("section", "_");
     const section = createCanvasSection({
       id,
       title: "分组",
@@ -2660,7 +2669,7 @@ export function PreviewCanvas({
               : node.kind === "image"
                 ? "img"
                 : "doc";
-          const newId = `${prefix}-${crypto.randomUUID()}`;
+          const newId = createCanvasId(prefix);
           newNodeIds.push(newId);
           nodeIdMapping.set(node.id, newId);
           return {
@@ -2699,7 +2708,7 @@ export function PreviewCanvas({
             nodeIdMapping,
             offset: { x: offsetX, y: offsetY },
             now,
-            createId: () => `section_${crypto.randomUUID()}`,
+            createId: () => createCanvasId("section", "_"),
           }),
         },
       }));
@@ -2742,6 +2751,7 @@ export function PreviewCanvas({
           pages: clipboardData.pages,
           pageLayouts: shiftedPageLayouts,
           pageGroups: clipboardData.pageGroups,
+          sourceProjectId: clipboardData.sourceProjectId,
         }).then(({ pageIdMapping }) => {
           // 将新页面布局写入画布状态
           updateState((prev) => {
@@ -2757,7 +2767,7 @@ export function PreviewCanvas({
               nodeIdMapping,
               offset: { x: offsetX, y: offsetY },
               now,
-              createId: () => `section_${crypto.randomUUID()}`,
+              createId: () => createCanvasId("section", "_"),
             });
             const remappedNavigation = remapNavigation(
               clipboardData.navigation,
@@ -2771,7 +2781,7 @@ export function PreviewCanvas({
               const newActivePageId =
                 pageIdMapping.get(oldGroup.activePageId) ??
                 oldGroup.activePageId;
-              const groupId = `page-group-${crypto.randomUUID()}`;
+              const groupId = createCanvasId("page-group");
               nextGroups[groupId] = {
                 ...oldGroup,
                 id: groupId,
@@ -2999,7 +3009,9 @@ export function PreviewCanvas({
         if (copyDrag.kind === "node") {
           const sourceNode = canvasStateRef.current.nodes?.[copyDrag.sourceId];
           if (sourceNode) {
-            const newId = `${sourceNode.kind === "text" ? "text" : sourceNode.kind === "image" ? "img" : "doc"}-${crypto.randomUUID()}`;
+            const newId = createCanvasId(
+              sourceNode.kind === "text" ? "text" : sourceNode.kind === "image" ? "img" : "doc",
+            );
             const now = Date.now();
             updateState((prev) => {
               const nextNodes = {
@@ -3367,10 +3379,7 @@ export function PreviewCanvas({
   }, [containerSize, effectiveNodes, effectivePages, updateState]);
 
   const createNodeId = useCallback((prefix: string) => {
-    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-      return `${prefix}-${crypto.randomUUID()}`;
-    }
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return createCanvasId(prefix);
   }, []);
 
   const handleMergeSelectedPages = useCallback(() => {
@@ -3933,7 +3942,7 @@ export function PreviewCanvas({
       const width = fixedLayout?.width ?? 18;
       const height = fixedLayout?.height ?? Math.ceil(18 * 1.35);
       setPendingTextDraft({
-        id: `draft_text_${crypto.randomUUID()}`,
+        id: createCanvasId("draft_text", "_"),
         kind: "text",
         title: "文字",
         text: "",

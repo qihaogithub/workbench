@@ -50,7 +50,7 @@ function makeClipboardData(
   overrides: Partial<CanvasClipboardData> = {},
 ): CanvasClipboardData {
   return {
-    version: 1,
+    version: 2,
     copiedAt: Date.now(),
     nodes: [],
     pages: [],
@@ -68,7 +68,7 @@ describe("剪贴板工具模块", () => {
       writeCanvasClipboard(data);
       const result = readCanvasClipboard();
       expect(result).not.toBeNull();
-      expect(result!.version).toBe(1);
+      expect(result!.version).toBe(2);
       expect(result!.nodes).toEqual([]);
       expect(result!.pages).toEqual([]);
       expect(result!.pageLayouts).toEqual({});
@@ -118,7 +118,7 @@ describe("剪贴板工具模块", () => {
     it("版本不匹配返回 null", () => {
       localStorageMock.getItem.mockReturnValueOnce(
         JSON.stringify({
-          version: 2,
+          version: 1,
           nodes: [],
           pages: [],
           pageLayouts: {},
@@ -131,7 +131,7 @@ describe("剪贴板工具模块", () => {
     it("nodes 不是数组返回 null", () => {
       localStorageMock.getItem.mockReturnValueOnce(
         JSON.stringify({
-          version: 1,
+          version: 2,
           nodes: "not-array",
           pages: [],
           pageLayouts: {},
@@ -144,7 +144,7 @@ describe("剪贴板工具模块", () => {
     it("pages 不是数组返回 null", () => {
       localStorageMock.getItem.mockReturnValueOnce(
         JSON.stringify({
-          version: 1,
+          version: 2,
           nodes: [],
           pages: 123,
           pageLayouts: {},
