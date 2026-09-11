@@ -3,6 +3,35 @@ import type { MarkdownReferenceTarget } from "./markdown-reference";
 
 export const PROJECT_INVENTORY_SCHEMA_VERSION = 2 as const;
 export const PROJECT_INVENTORY_GENERATOR_VERSION = "inventory-summary-v2" as const;
+export const INVENTORY_GENERATION_MAX_ATTEMPTS = 3;
+export const INVENTORY_GENERATION_LEASE_MS = 180_000;
+
+export type InventoryGenerationJobStatus =
+  | "pending"
+  | "running"
+  | "ready"
+  | "failed"
+  | "superseded";
+
+export type InventoryGenerationErrorCode =
+  | "AGENT_UNAVAILABLE"
+  | "AUTHORITY_UNAVAILABLE"
+  | "STALE_EVIDENCE"
+  | "INVALID_EVIDENCE"
+  | "INVALID_OUTPUT"
+  | "MODEL_UNAVAILABLE"
+  | "RATE_LIMITED"
+  | "TIMEOUT"
+  | "REQUEST_TOO_LARGE"
+  | "INTERNAL_ERROR";
+
+export interface InventoryGenerationAttemptIdentity {
+  taskKey: string;
+  generationId: number;
+  attemptId: string;
+  leaseToken: string;
+  leaseOwner: string;
+}
 
 export type InventoryResourceType = MarkdownReferenceTarget["kind"];
 export type InventoryScope = "local" | "referenced";

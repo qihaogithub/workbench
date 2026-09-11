@@ -75,14 +75,15 @@ describe("DocumentView knowledge creation", () => {
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.startsWith("/api/knowledge?") && init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
         return jsonResponse({
           success: true,
           data: {
             id: "kb-new",
-            title: "未命名文档",
+            title: body.title,
             source: "user",
-            description: "未命名文档",
-            fileName: "未命名文档.md",
+            description: body.description,
+            fileName: `${body.title}.md`,
             addedAt: "2026-08-11T00:00:00.000Z",
             updatedAt: "2026-08-11T00:00:00.000Z",
             sizeBytes: 0,
@@ -512,7 +513,7 @@ describe("DocumentView knowledge creation", () => {
     expect(screen.getByTestId("document-editor-value")).toHaveTextContent("# 项目规范!!");
   });
 
-  it("creates an unnamed document, opens it, and commits an inline rename", async () => {
+  it("keeps a new document local until a valid inline title is committed", async () => {
     const user = userEvent.setup();
     render(
       <DocumentView
@@ -525,17 +526,16 @@ describe("DocumentView knowledge creation", () => {
     await user.click(await screen.findByTitle("新建或上传文档"));
     await user.click(screen.getByText("新建"));
 
-    const input = await screen.findByDisplayValue("未命名文档");
-    expect(screen.getByTestId("document-editor")).toBeInTheDocument();
-    await user.clear(input);
+    const input = await screen.findByRole("textbox", { name: "新文档标题" });
+    expect((global.fetch as jest.Mock).mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
     await user.type(input, "项目说明{Enter}");
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/knowledge/kb-new?"),
+        expect.stringContaining("/api/knowledge?"),
         expect.objectContaining({
-          method: "PUT",
-          body: JSON.stringify({ title: "项目说明" }),
+          method: "POST",
+          body: JSON.stringify({ title: "项目说明", description: "项目说明", content: "" }),
         }),
       );
     });
@@ -681,7 +681,7 @@ describe("DocumentView knowledge creation", () => {
     );
   });
 
-  it("cancels an inline rename with Escape and commits it on blur", async () => {
+  it("cancels an inline draft with Escape and creates it once on blur", async () => {
     const user = userEvent.setup();
     render(
       <DocumentView
@@ -692,24 +692,21 @@ describe("DocumentView knowledge creation", () => {
     );
     await user.click(await screen.findByTitle("新建或上传文档"));
     await user.click(screen.getByText("新建"));
-    const input = await screen.findByDisplayValue("未命名文档");
-    await user.clear(input);
+    const input = await screen.findByRole("textbox", { name: "新文档标题" });
     await user.type(input, "不要保存{Escape}");
-    expect(screen.queryByDisplayValue("不要保存")).not.toBeInTheDocument();
-    expect(screen.getByText("未命名文档")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "新文档标题" })).not.toBeInTheDocument();
+    expect((global.fetch as jest.Mock).mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
 
     await user.click(screen.getByTitle("新建或上传文档"));
     await user.click(screen.getByText("新建"));
-    const secondInput = await screen.findByDisplayValue("未命名文档");
-    await user.clear(secondInput);
+    const secondInput = await screen.findByRole("textbox", { name: "新文档标题" });
     await user.type(secondInput, "失焦保存");
     fireEvent.blur(secondInput);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/knowledge/kb-new?"),
-        expect.objectContaining({ body: JSON.stringify({ title: "失焦保存" }) }),
-      );
+      const createCalls = (global.fetch as jest.Mock).mock.calls.filter(([, init]) => init?.method === "POST");
+      expect(createCalls).toHaveLength(1);
+      expect(createCalls[0]?.[1]).toEqual(expect.objectContaining({ body: JSON.stringify({ title: "失焦保存", description: "失焦保存", content: "" }) }));
     });
   });
 
@@ -822,6 +819,8 @@ describe("DocumentView knowledge creation", () => {
 
     await user.click(await screen.findByTitle("新建或上传文档"));
     await user.click(screen.getByText("新建"));
+    const titleInput = await screen.findByLabelText("新文档标题");
+    await user.type(titleInput, "创建失败文档{Enter}");
 
     await waitFor(() => {
       expect(toast).toHaveBeenCalledWith(

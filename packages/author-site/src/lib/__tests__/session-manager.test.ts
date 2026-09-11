@@ -94,6 +94,37 @@ function writeActiveSession(
   );
 }
 
+describe("活跃 Session 枚举", () => {
+  const originalEnv = { ...process.env };
+  let dataDir: string;
+
+  beforeEach(() => {
+    dataDir = makeTempDataDir();
+  });
+
+  afterEach(() => {
+    cleanup(dataDir);
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  it("返回所有用户的活跃 Session，不包含归档 Session", async () => {
+    writeActiveSession(dataDir, "user-a", "project-a", "session-a", "workspace-a");
+    writeActiveSession(dataDir, "user-b", "project-b", "session-b", "workspace-b");
+    writeSession(dataDir, "user-c", "project-c", "session-c", Date.now());
+
+    const { listActiveSessions } = await importSessionManager(dataDir);
+
+    expect(listActiveSessions()).toEqual(
+      expect.arrayContaining([
+        { userId: "user-a", sessionId: "session-a" },
+        { userId: "user-b", sessionId: "session-b" },
+      ]),
+    );
+    expect(listActiveSessions()).toHaveLength(2);
+  });
+});
+
 describe("编辑 Session 续期", () => {
   const originalEnv = { ...process.env };
   let dataDir: string;

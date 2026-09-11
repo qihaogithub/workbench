@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 
 const list = jest.fn();
 const create = jest.fn();
+const refreshProjectInventoryAfterDocumentMutation = jest.fn();
 const actor = { id: "u1", name: "Author", role: "creator" as const };
 
 jest.mock("@/lib/auth/current-user", () => ({
@@ -12,6 +13,7 @@ jest.mock("@/lib/document-application-service", () => ({
   documentErrorResponse: jest.fn((error: unknown) => ({ status: 500, body: { success: false, error: { code: "TEST", message: String(error) } } })),
   resolveDocumentActor: jest.fn(async () => actor),
   resolveDocumentContext: jest.fn(async () => ({})),
+  refreshProjectInventoryAfterDocumentMutation,
   createDocumentApplicationService: jest.fn(() => ({ list, create })),
 }));
 
@@ -23,17 +25,19 @@ describe("project document collection API", () => {
   beforeEach(() => {
     list.mockReset();
     create.mockReset();
+    refreshProjectInventoryAfterDocumentMutation.mockReset();
   });
 
   it("lists metadata without exposing a workspace path", async () => {
-    list.mockResolvedValue([{ projectId: "p1", documentId: "d1", title: "Rules", description: "Rules", updatedAt: "2026-09-01T00:00:00.000Z", contentHash: "hash", source: "user", sizeBytes: 5 }]);
+    list.mockResolvedValue({ items: [{ projectId: "p1", documentId: "d1", title: "Rules", description: "Rules", updatedAt: "2026-09-01T00:00:00.000Z", source: "user", sizeBytes: 5, sourceState: "active" }], issues: [] });
     const { GET } = await import("./route");
     const response = await GET(request("http://localhost/api/projects/p1/documents"), { params: Promise.resolve({ projectId: "p1" }) });
     const body = await response.json();
     expect(response.status).toBe(200);
-    expect(body.data[0]).not.toHaveProperty("workingDir");
-    expect(body.data[0]).not.toHaveProperty("fileName");
-    expect(body.data[0]).not.toHaveProperty("content");
+    expect(body.data.items[0]).not.toHaveProperty("workingDir");
+    expect(body.data.items[0]).not.toHaveProperty("fileName");
+    expect(body.data.items[0]).not.toHaveProperty("content");
+    expect(body.data.issues).toEqual([]);
   });
 
   it("creates through the application service contract", async () => {

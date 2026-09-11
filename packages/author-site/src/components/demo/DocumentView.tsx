@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import {
   Brain,
+  AlertTriangle,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -64,7 +65,7 @@ import {
   getKnowledgeUploadTitle,
   isSupportedKnowledgeUpload,
 } from "./document-view-knowledge";
-import { toKnowledgeItem, toKnowledgeItems } from "./document-api-adapter";
+import { toKnowledgeDocumentIssues, toKnowledgeItem, toKnowledgeItems, type KnowledgeDocumentIssue } from "./document-api-adapter";
 import { localizeRemoteImageForSession } from "@workbench/demo-ui/markdown/remote-image-localizer";
 import {
   DocumentSaveCoordinator,
@@ -188,6 +189,8 @@ export function DocumentView({
   const toastRef = useRef(toast);
   toastRef.current = toast;
   const [items, setItems] = useState<KnowledgeItem[]>([]);
+  const [knowledgeIssues, setKnowledgeIssues] = useState<KnowledgeDocumentIssue[]>([]);
+  const [knowledgeListError, setKnowledgeListError] = useState<string | null>(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const canManageGovernance = userRole === "admin";
@@ -242,6 +245,9 @@ export function DocumentView({
   const [proposalReviewOpen, setProposalReviewOpen] = useState(false);
   const [renamingKnowledgeId, setRenamingKnowledgeId] = useState<string | null>(null);
   const [renamingKnowledgeTitle, setRenamingKnowledgeTitle] = useState("");
+  const [knowledgeDraftTitle, setKnowledgeDraftTitle] = useState<string | null>(null);
+  const [creatingKnowledgeDraft, setCreatingKnowledgeDraft] = useState(false);
+  const creatingKnowledgeDraftRef = useRef(false);
   const [renamingDesignSpecId, setRenamingDesignSpecId] = useState<string | null>(null);
   const [renamingDesignSpecTitle, setRenamingDesignSpecTitle] = useState("");
   const knowledgeMutationVersionRef = useRef(0);
@@ -357,17 +363,18 @@ export function DocumentView({
           : `/api/knowledge?${params.toString()}`,
       );
       const data = await res.json();
-      if (data.success) {
-        if (knowledgeMutationVersionRef.current !== requestMutationVersion) return;
-        const nextItems = documentApiMode === "project"
-          ? toKnowledgeItems(data.data)
-          : data.data;
-        setItems(nextItems);
-        onItemsChangeRef.current?.(nextItems);
-        onItemsLoadedRef.current?.(nextItems);
-      }
-    } catch {
-      // 静默失败
+      if (!res.ok || !data.success) throw new Error(data.error?.message || "读取知识文档失败");
+      if (knowledgeMutationVersionRef.current !== requestMutationVersion) return;
+      const nextItems = documentApiMode === "project"
+        ? toKnowledgeItems(data.data)
+        : data.data;
+      setItems(nextItems);
+      setKnowledgeIssues(documentApiMode === "project" ? toKnowledgeDocumentIssues(data.data) : []);
+      setKnowledgeListError(null);
+      onItemsChangeRef.current?.(nextItems);
+      onItemsLoadedRef.current?.(nextItems);
+    } catch (error) {
+      setKnowledgeListError(error instanceof Error ? error.message : "读取知识文档失败");
     } finally {
       setLoading(false);
     }
@@ -905,13 +912,34 @@ export function DocumentView({
     [documentApiMode, projectId, selectTarget, sessionId, toast, workingDir],
   );
 
-  const handleCreate = useCallback(async () => {
+  const handleCreate = useCallback(() => {
     setKnowledgeMenuOpen(false);
-    const item = await createKnowledgeDocument("未命名文档", "");
-    if (!item) return;
-    setRenamingKnowledgeId(item.id);
-    setRenamingKnowledgeTitle(item.title);
-  }, [createKnowledgeDocument]);
+    if (knowledgeDraftTitle !== null || creatingKnowledgeDraftRef.current) return;
+    window.setTimeout(() => {
+      setUserExpanded(true);
+      setKnowledgeDraftTitle("");
+    }, 0);
+  }, [knowledgeDraftTitle]);
+
+  const cancelKnowledgeDraft = useCallback(() => {
+    if (creatingKnowledgeDraftRef.current) return;
+    setKnowledgeDraftTitle(null);
+  }, []);
+
+  const commitKnowledgeDraft = useCallback(async () => {
+    const title = knowledgeDraftTitle?.trim() ?? "";
+    if (!title) {
+      cancelKnowledgeDraft();
+      return;
+    }
+    if (creatingKnowledgeDraftRef.current) return;
+    creatingKnowledgeDraftRef.current = true;
+    setCreatingKnowledgeDraft(true);
+    const item = await createKnowledgeDocument(title, "");
+    creatingKnowledgeDraftRef.current = false;
+    setCreatingKnowledgeDraft(false);
+    if (item) setKnowledgeDraftTitle(null);
+  }, [cancelKnowledgeDraft, createKnowledgeDocument, knowledgeDraftTitle]);
 
   const handleKnowledgeUpload = useCallback(
     async (file: File | undefined) => {
@@ -1137,6 +1165,21 @@ export function DocumentView({
     },
     [documentApiMode, workingDir, projectId, sessionId, activeTarget, toast, onDocDeleted, fetchItems],
   );
+
+  const handleDeleteIssue = useCallback(async (issue: KnowledgeDocumentIssue) => {
+    if (!projectId || documentApiMode !== "project") return;
+    if (!confirm(`确定要清理缺失正文的记录「${issue.title}」吗？`)) return;
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(issue.documentId)}${sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : ""}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error?.message || "清理失败");
+      toast({ title: "异常文档记录已清理" });
+      await fetchItems();
+      window.dispatchEvent(new Event("knowledge-updated"));
+    } catch (error) {
+      toast({ title: "清理失败", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+    }
+  }, [documentApiMode, fetchItems, projectId, sessionId, toast]);
 
   const isActive = (target: ActiveTarget) =>
     activeTarget?.kind === target.kind &&
@@ -1389,11 +1432,14 @@ export function DocumentView({
                       <Plus className="h-3.5 w-3.5" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent align="end" side="bottom" className="w-32 p-1">
+                  <PopoverContent align="end" side="bottom" className="w-32 p-1" onCloseAutoFocus={(event) => event.preventDefault()}>
                     <button
                       type="button"
                       className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                      onClick={handleCreate}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleCreate();
+                      }}
                     >
                       <FileText className="h-3.5 w-3.5" />
                       新建
@@ -1401,7 +1447,8 @@ export function DocumentView({
                     <button
                       type="button"
                       className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation();
                         setKnowledgeMenuOpen(false);
                         knowledgeUploadInputRef.current?.click();
                       }}
@@ -1414,11 +1461,33 @@ export function DocumentView({
               </div>
               {userExpanded && (
                 <div className="space-y-0">
-                  {loading && userItems.length === 0 ? (
+                  {knowledgeListError ? (
+                    <div role="alert" className="mx-2 my-1 rounded border border-destructive/40 bg-destructive/10 px-2 py-2 text-xs text-destructive">
+                      <div className="flex items-start gap-1.5"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span>{knowledgeListError}</span></div>
+                      <button type="button" className="mt-1 underline" onClick={() => void fetchItems()}>重试</button>
+                    </div>
+                  ) : null}
+                  {knowledgeIssues.map((issue) => (
+                    <div key={issue.documentId} className="mx-2 my-1 flex items-center gap-2 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-200">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">{issue.title}：正文缺失</span>
+                      <button type="button" className="underline" onClick={() => void handleDeleteIssue(issue)}>清理</button>
+                    </div>
+                  ))}
+                  {knowledgeDraftTitle !== null ? (
+                    <KnowledgeDraftItem
+                      value={knowledgeDraftTitle}
+                      creating={creatingKnowledgeDraft}
+                      onChange={setKnowledgeDraftTitle}
+                      onCommit={() => void commitKnowledgeDraft()}
+                      onCancel={cancelKnowledgeDraft}
+                    />
+                  ) : null}
+                  {loading && userItems.length === 0 && knowledgeDraftTitle === null ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
-                  ) : userItems.length === 0 ? (
+                  ) : userItems.length === 0 && knowledgeDraftTitle === null && !knowledgeListError && knowledgeIssues.length === 0 ? (
                     <div
                       className="px-3 py-2 text-xs text-muted-foreground"
                       style={{ paddingLeft: 24 + 12 }}
@@ -1748,6 +1817,69 @@ export function DocumentView({
           setContentReloadRevision((current) => current + 1);
           void fetchItems();
           window.dispatchEvent(new Event("knowledge-updated"));
+        }}
+      />
+    </div>
+  );
+}
+
+function KnowledgeDraftItem({
+  value,
+  creating,
+  onChange,
+  onCommit,
+  onCancel,
+}: {
+  value: string;
+  creating: boolean;
+  onChange: (value: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ignoreInitialBlurRef = useRef(true);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      ignoreInitialBlurRef.current = false;
+      inputRef.current?.focus();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return (
+    <div className="flex items-center gap-1.5 rounded-sm py-1 pr-2 text-sm" style={{ paddingLeft: 24 + 8 }}>
+      {creating ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" /> : <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />}
+      <input
+        ref={inputRef}
+        autoFocus
+        aria-label="新文档标题"
+        placeholder="输入文档标题"
+        disabled={creating}
+        className="h-6 min-w-0 flex-1 rounded border bg-background px-1 text-sm outline-none focus:ring-1 focus:ring-ring"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={(event) => {
+          if (ignoreInitialBlurRef.current) return;
+          if (event.relatedTarget instanceof Element && event.relatedTarget.closest('[title="新建或上传文档"]')) {
+            window.setTimeout(() => inputRef.current?.focus(), 0);
+            return;
+          }
+          blurTimerRef.current = setTimeout(() => {
+            blurTimerRef.current = null;
+            if (value.trim()) onCommit();
+            else onCancel();
+          }, 0);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+            value.trim() ? onCommit() : onCancel();
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+            onCancel();
+          }
         }}
       />
     </div>

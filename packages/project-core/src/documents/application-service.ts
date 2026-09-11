@@ -11,7 +11,7 @@ import type {
   DocumentUpdateInput,
   DocumentWriteContext,
 } from "./types.js";
-import type { DocumentListItem, DocumentLocator, DocumentRevisionDetail, DocumentRevisionSummary, DocumentSnapshot, DocumentWriteResult } from "@workbench/shared/document";
+import type { DocumentDeleteResult, DocumentListResult, DocumentLocator, DocumentRevisionDetail, DocumentRevisionSummary, DocumentSnapshot, DocumentWriteResult } from "@workbench/shared/document";
 
 function stripStorage(record: import("./types.js").DocumentRecord): DocumentSnapshot {
   const snapshot = { ...record } as DocumentSnapshot & Record<string, unknown>;
@@ -29,15 +29,13 @@ export class DocumentApplicationService {
     private readonly policy: DocumentPolicyPort = new DocumentPolicy(),
   ) {}
 
-  async list(projectId: string, actor: ProjectAdminActor, context?: DocumentWriteContext): Promise<readonly DocumentListItem[]> {
+  async list(projectId: string, actor: ProjectAdminActor, context?: DocumentWriteContext): Promise<DocumentListResult> {
     this.assertRead(actor, projectId);
-    const records = await this.repository.list(projectId, context);
-    return records.map((record) => {
-      const snapshot = stripStorage(record);
-      const item = { ...snapshot } as DocumentListItem & Record<string, unknown>;
-      delete item.content;
-      return item;
-    });
+    const result = await this.repository.list(projectId, context);
+    return {
+      items: result.items.map(stripListStorage),
+      issues: result.issues.map(stripIssueStorage),
+    };
   }
 
   async get(locator: DocumentLocator, actor: ProjectAdminActor, context?: DocumentWriteContext): Promise<DocumentSnapshot> {
@@ -62,13 +60,26 @@ export class DocumentApplicationService {
     return this.writeResult(input.actor, input.locator, record);
   }
 
-  async remove(input: DocumentDeleteInput): Promise<DocumentWriteResult> {
+  async remove(input: DocumentDeleteInput): Promise<DocumentDeleteResult> {
     this.assertWrite(input.actor, input.locator.projectId);
-    const current = await this.repository.get(input.locator, input);
+    const current = await this.repository.getMetadata(input.locator, input);
     if (!current) throw new DocumentApplicationError({ code: "DOCUMENT_NOT_FOUND", message: "文档不存在" });
     if (!this.policy.canMutateDocument(input.actor, current)) throw new DocumentApplicationError({ code: "DOCUMENT_READONLY", message: "系统只读文档不能删除" });
-    const record = await this.repository.remove(input);
-    return this.writeResult(input.actor, input.locator, record, "delete_document", true);
+    const removed = await this.repository.remove(input);
+    let resourceVersionId: string | undefined;
+    if (removed.record) {
+      try {
+        resourceVersionId = await this.revisions?.record({ locator: input.locator, record: removed.record, actor: input.actor, note: "delete_document", tombstone: true });
+      } catch {
+        // The Authority deletion is durable; version materialization remains a
+        // derived concern and can be reconciled independently.
+      }
+    }
+    return {
+      deleted: "code" in removed.deleted ? stripIssueStorage(removed.deleted) : stripListStorage(removed.deleted),
+      ...(removed.authorityRevision === undefined || removed.authorityRootHash === undefined ? {} : { authority: { revision: removed.authorityRevision, rootHash: removed.authorityRootHash } }),
+      ...(resourceVersionId ? { resourceVersionId } : {}),
+    };
   }
 
   async listRevisions(locator: DocumentLocator, actor: ProjectAdminActor): Promise<readonly DocumentRevisionSummary[]> {
@@ -110,4 +121,20 @@ export class DocumentApplicationService {
   private assertWrite(actor: ProjectAdminActor, projectId: string): void {
     if (!this.policy.canWrite(actor, projectId)) throw new DocumentApplicationError({ code: "DOCUMENT_FORBIDDEN", message: "当前操作者没有文档写权限" });
   }
+}
+
+function stripListStorage(record: import("./types.js").DocumentListRecord): import("@workbench/shared/document").DocumentListItem {
+  const item = { ...record } as import("@workbench/shared/document").DocumentListItem & Record<string, unknown>;
+  delete item.storageFileName;
+  delete item.storageWorkspacePath;
+  return item;
+}
+
+function stripIssueStorage(record: import("./types.js").DocumentListIssueRecord): import("@workbench/shared/document").DocumentListIssue {
+  const issue = { ...record } as import("@workbench/shared/document").DocumentListIssue & Record<string, unknown>;
+  delete issue.storageFileName;
+  delete issue.storageWorkspacePath;
+  delete issue.source;
+  delete issue.readonly;
+  return issue;
 }

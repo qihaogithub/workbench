@@ -3,11 +3,14 @@ import type { BackendProvidersConfig } from "@workbench/shared";
 import {
   fetchBackendProvidersFromAgent,
   pushBackendProvidersToAgent,
+  pushSessionModelConfigToAgent,
   type PushResult,
 } from "./agent-providers";
 import { readDbConfigWithMeta } from "./db-config";
 import { getServerAgentServiceUrl } from "./runtime-config";
 import { hydrateBackendProviders } from "./global-model-secrets";
+import { readUserBackendProvidersConfig } from "./user-model-config";
+import { listActiveSessions } from "./session-manager";
 
 const CONFIG_ID = "model_config";
 const STARTUP_SYNC_DELAY_MS = 3000;
@@ -198,6 +201,48 @@ function updateStateForMissingConfig(
   return result;
 }
 
+async function syncActiveSessionsWithBackendProviders(
+  config: BackendProvidersConfig,
+): Promise<void> {
+  const sessions = listActiveSessions();
+  if (sessions.length === 0) return;
+
+  const results = await Promise.all(
+    sessions.map(async ({ userId, sessionId }) => {
+      try {
+        const effectiveConfig = readUserBackendProvidersConfig(userId, config);
+        if (!effectiveConfig) {
+          return { ok: false };
+        }
+
+        const result = await pushSessionModelConfigToAgent(
+          sessionId,
+          effectiveConfig,
+        );
+        return { ok: result.ok };
+      } catch (error) {
+        console.warn(
+          "[BackendProviders Sync] active session refresh failed:",
+          error instanceof Error ? error.message : error,
+        );
+        return { ok: false };
+      }
+    }),
+  );
+
+  const succeeded = results.filter((result) => result.ok).length;
+  const failed = results.length - succeeded;
+  if (failed > 0) {
+    console.warn(
+      `[BackendProviders Sync] active session refresh completed: ${succeeded}/${results.length} succeeded, ${failed} failed`,
+    );
+  } else {
+    console.log(
+      `[BackendProviders Sync] active session refresh completed: ${succeeded}/${results.length} succeeded`,
+    );
+  }
+}
+
 function scheduleRetryIfNeeded(): void {
   if (retryTimer || syncState.attemptCount >= MAX_RETRY_ATTEMPTS) {
     return;
@@ -238,6 +283,10 @@ export async function syncBackendProvidersConfigToAgent(
   updateStateForAttempt(config, source);
   const result = await pushBackendProvidersToAgent(config);
   updateStateForResult(result);
+
+  if (result.ok) {
+    await syncActiveSessionsWithBackendProviders(config);
+  }
 
   if (!result.ok && options.scheduleRetryOnFailure) {
     scheduleRetryIfNeeded();

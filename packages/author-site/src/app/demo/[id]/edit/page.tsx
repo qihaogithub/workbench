@@ -6791,15 +6791,19 @@ ${context.details}
     [demoId, sessionId, handleWorkspaceTreeChanged, toast, projectApiClient],
   );
 
-  // 查看引用页源项目
+  // 打开引用页源项目并定位到对应源页面
   const handleViewSourcePage = useCallback(
     (pageId: string) => {
       const page = demoPages.find((p) => p.id === pageId);
-      if (page?.reference?.sourceProjectId) {
-        router.push(`/demo/${page.reference.sourceProjectId}/edit`);
-      }
+      const reference = page?.reference;
+      if (!reference?.sourceProjectId || !reference.sourcePageId) return;
+      openAuthorReference(demoId, {
+        kind: "page",
+        projectId: reference.sourceProjectId,
+        pageId: reference.sourcePageId,
+      });
     },
-    [demoPages, router],
+    [demoId, demoPages],
   );
 
   const handleSinglePreviewPageSelect = useCallback(
@@ -8444,6 +8448,7 @@ ${context.details}
         order: page.order,
         isReference: !!page.reference,
         sourceProjectId: page.reference?.sourceProjectId,
+        sourcePageId: page.reference?.sourcePageId,
         ...runtimeData,
         configData: configDataMap[page.id],
         schema: pageSchemaMap[page.id],

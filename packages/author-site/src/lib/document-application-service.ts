@@ -10,6 +10,8 @@ import {
 import { commitWorkspaceMutation } from "@/lib/workspace-authority-client";
 import { getDataDir, findWorkspacePath, getSessionMeta, isSessionExpired, projectExists, sessionExists } from "@/lib/fs-utils";
 import { getCurrentProjectActor } from "@/lib/auth/current-user";
+import { resolveMarkdownReferenceWorkspace } from "@/lib/markdown-references";
+import { reconcileProjectInventory } from "@/lib/agent/project-inventory";
 
 export function createDocumentApplicationService(): DocumentApplicationService {
   const dataDir = getDataDir();
@@ -77,4 +79,18 @@ export function documentErrorResponse(error: unknown): { status: number; body: {
 
 export function assertProject(projectId: string): void {
   if (!projectId || !projectExists(projectId)) throw new DocumentApplicationError({ code: "DOCUMENT_NOT_FOUND", message: "项目不存在" });
+}
+
+export function refreshProjectInventoryAfterDocumentMutation(input: {
+  request: NextRequest;
+  projectId: string;
+  actorId: string;
+  context: DocumentWriteContext;
+}): void {
+  if (!input.context.sessionId) return;
+  const inventoryContext = resolveMarkdownReferenceWorkspace(input.request, input.projectId, input.actorId);
+  if (!inventoryContext) return;
+  void reconcileProjectInventory(inventoryContext, input.context.sessionId).catch((cause) => {
+    console.warn("[documents] mutation committed; inventory refresh deferred:", cause instanceof Error ? cause.message : String(cause));
+  });
 }

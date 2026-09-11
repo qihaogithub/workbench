@@ -20,6 +20,18 @@ export class ConversationService {
     return this.repository.getProjection(ownerUserId, conversationId);
   }
 
+  listForAdmin(filter: Parameters<ConversationRepository["listAdminConversations"]>[0]) {
+    return this.repository.listAdminConversations(filter);
+  }
+
+  getForAdmin(conversationId: string) {
+    return this.repository.getAdminProjection(conversationId);
+  }
+
+  listAdminProjectIds() {
+    return this.repository.listAdminProjectIds();
+  }
+
   getRunArtifact(ownerUserId: string, conversationId: string, artifactId: string) {
     return this.repository.getRunArtifact(ownerUserId, conversationId, artifactId);
   }

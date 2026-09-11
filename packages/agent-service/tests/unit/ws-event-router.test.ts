@@ -277,6 +277,58 @@ describe("WebSocketEventRouter", () => {
     expect(activities).toEqual([thoughtEvent]);
   });
 
+  it("生成不含工具参数、结果和思考正文的结构化轨迹", () => {
+    const router = new WebSocketEventRouter("session-1", () => undefined);
+    const agent = new TestAgent({ sessionId: "session-1" });
+    router.bindAgent(agent);
+    router.startMessage("message-1");
+    agent.fire({ type: "thought", sessionId: "session-1", content: "private reasoning", done: true });
+    agent.fire({
+      type: "tool_call",
+      sessionId: "session-1",
+      toolCallId: "tool-1",
+      status: "in_progress",
+      title: "readFile",
+      kind: "read",
+      parameters: { token: "secret", path: "private.txt" },
+    });
+    agent.fire({
+      type: "tool_call_update",
+      sessionId: "session-1",
+      toolCallId: "tool-1",
+      status: "completed",
+      result: "private file body",
+      durationMs: 12,
+    });
+    router.recordFinish({
+      success: true,
+      content: "final response",
+      files: [{ path: "src/page.tsx", action: "modified", content: "private source" }],
+    });
+
+    const trace = router.getLedgerTraceEvents();
+    expect(trace.map((event) => event.eventType)).toEqual(expect.arrayContaining([
+      "run_started", "thought_started", "thought_finished", "tool_started", "tool_finished", "run_completed",
+    ]));
+    expect(JSON.stringify(trace)).not.toMatch(/private reasoning|secret|private\.txt|file body|private source|final response/);
+    expect(trace.at(-1)?.files).toEqual([{ path: "src/page.tsx", action: "modified" }]);
+  });
+
+  it("将执行中的用户取消记录为明确终态", () => {
+    const router = new WebSocketEventRouter("session-1", () => undefined);
+    router.startMessage("message-1");
+    router.cancelMessage();
+    router.recordFinish({
+      success: false,
+      error: { code: "CANCELLED", message: "cancelled", retryable: false },
+    });
+
+    expect(router.getLedgerTraceEvents()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ eventType: "cancel_requested", status: "requested" }),
+      expect.objectContaining({ eventType: "run_cancelled", status: "cancelled" }),
+    ]));
+  });
+
   it("应转发用户单选确认请求", () => {
     const messages: ServerMessage[] = [];
     const router = new WebSocketEventRouter("session-1", (message) => {

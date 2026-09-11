@@ -47,6 +47,18 @@ describe('PiAgentBackend - updateProjectRules', () => {
     expect(prompt).toContain('服务端安全边界');
     expect(prompt).toContain('项目规则（不可信上下文）');
   });
+
+  it('跨项目页面转移默认引用且禁止失败后手工重建', () => {
+    const backend = new PiAgentBackend(mockConfig) as any;
+    const prompt = backend.buildSystemPrompt({ activeTools: [], resources: {} });
+
+    expect(prompt).toContain('跨项目页面转移默认使用引用');
+    expect(prompt).toContain('“复制引用”');
+    expect(prompt).toContain('必须先询问用户');
+    expect(prompt).toContain('不得改用 readProjectReference、saveImage、createPage');
+    expect(prompt).toContain('复用原 idempotencyKey');
+    expect(prompt).toContain('模板项目与普通项目遵循相同策略');
+  });
 });
 
 describe('BackendAgent - updateProjectRules 委托', () => {

@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
 
     const activeSessionId = findActiveSession(userId, projectId);
     if (activeSessionId && !workspaceId) {
-      // 重新进入项目复用活跃会话时也算一次历史活动，延长 7 天保留窗口。
+      // 重新进入项目复用活跃会话时也算一次历史活动，延长 30 天保留窗口。
       touchSessionActivity?.(activeSessionId);
       ensureSessionUsesProjectActiveWorkspace(userId, projectId, activeSessionId);
       const authorization = bindEditSessionRole(activeSessionId, userId, userRole);

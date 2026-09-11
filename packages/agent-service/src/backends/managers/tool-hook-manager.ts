@@ -57,6 +57,10 @@ export class ToolHookManager {
   private readKnowledgeFiles: Set<string> = new Set();
   private mutationReceipts: MutationReceiptEntry[] = [];
   private previewObservations: PreviewObservationSummary[] = [];
+  private pageTransferAttempt:
+    | { mode: "reference" | "copy"; idempotencyKey: string }
+    | undefined;
+  private pageTransferFailureCode: string | undefined;
 
   constructor(
     private config: AgentConfig,
@@ -103,6 +107,51 @@ export class ToolHookManager {
     this.files = [];
     this.mutationReceipts = [];
     this.previewObservations = [];
+    this.pageTransferAttempt = undefined;
+    this.pageTransferFailureCode = undefined;
+  }
+
+  validatePageTransferCall(
+    toolName: string,
+    input: any,
+  ): { block: boolean; reason: string } | undefined {
+    if (toolName === "transferPages") {
+      const attempt = {
+        mode:
+          input?.mode === "copy" ? ("copy" as const) : ("reference" as const),
+        idempotencyKey: String(input?.idempotencyKey ?? ""),
+      };
+      if (!this.pageTransferAttempt) {
+        this.pageTransferAttempt = attempt;
+        return undefined;
+      }
+      if (
+        attempt.mode !== this.pageTransferAttempt.mode ||
+        attempt.idempotencyKey !== this.pageTransferAttempt.idempotencyKey
+      ) {
+        return {
+          block: true,
+          reason:
+            "PAGE_TRANSFER_RETRY_MISMATCH：页面转移重试必须复用首次 mode 和 idempotencyKey。",
+        };
+      }
+      return undefined;
+    }
+
+    if (!this.pageTransferFailureCode) return undefined;
+    const blockedFallbackTools = new Set([
+      "readProjectReference",
+      "saveImage",
+      "createPage",
+      "writeFile",
+      "editFile",
+      "delegateTask",
+    ]);
+    if (!blockedFallbackTools.has(toolName)) return undefined;
+    return {
+      block: true,
+      reason: `${this.pageTransferFailureCode}：页面转移失败后不得调用 ${toolName} 手工重建；请原样报告错误并停止。`,
+    };
   }
 
   private recordPreviewObservation(event: any, isError: boolean): void {
@@ -388,6 +437,13 @@ export class ToolHookManager {
       onFileChanges?: (changes: FileChange[]) => void;
     },
   ): void {
+    if (toolName === "transferPages" && isError) {
+      const details = getToolResultDetails(event);
+      this.pageTransferFailureCode =
+        typeof details?.error === "string"
+          ? details.error
+          : "PAGE_TRANSFER_FAILED";
+    }
     if (toolName === "observePreview") {
       this.recordPreviewObservation(event, isError);
     }

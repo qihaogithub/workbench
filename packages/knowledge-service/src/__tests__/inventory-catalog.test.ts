@@ -77,41 +77,41 @@ describe("SqliteInventoryCatalog", () => {
   it("replaces active generations atomically and preserves only the newest snapshot", () => {
     const value = catalog();
     value.publish(snapshot([entry({})]));
+    expect(value.generationActivity("p1")).toBe("idle");
     value.publish(snapshot([entry({ canonicalUri: "wb://page/p1/new", native: { name: "新页面", aliases: [], description: null, metadata: {} } })]));
     expect(value.activeSnapshot("p1")?.entries.map((item) => item.canonicalUri)).toEqual(["wb://page/p1/new"]);
     expect(value.stats().activeProjects).toBe(1);
   });
 
-  it("rejects stale annotation results for a changed active source", () => {
+  it("rejects late annotation results after the active generation changes", () => {
     const value = catalog();
-    value.publish(snapshot([entry({})]));
-    expect(value.applyAnnotation({
+    const firstGeneration = value.publish(snapshot([entry({ generationState: "pending" })]));
+    value.createGenerationJobs({
       projectId: "p1",
-      canonicalUri: "wb://page/p1/home",
-      sourceFingerprint: "old-source",
-      generated: {
-        summary: "旧摘要",
-        sourceFingerprint: "old-source",
-        contentHash: "old-content",
-        generatorVersion: PROJECT_INVENTORY_GENERATOR_VERSION,
-        generatedAt: "2026-09-11T00:00:00.000Z",
-        evidenceRefs: [],
-      },
-    })).toBe(true);
-    expect(value.search({ projectId: "p1", query: "旧摘要" }).total).toBe(1);
-    expect(value.applyAnnotation({
+      workspaceId: "w1",
+      generationId: firstGeneration,
+      generatorVersion: PROJECT_INVENTORY_GENERATOR_VERSION,
+      requests: [{ canonicalUri: "wb://page/p1/home", sourceFingerprint: "old-source", evidenceRefs: [] }],
+    });
+    expect(value.generationActivity("p1")).toBe("active");
+    const [oldJob] = value.claimGenerationJobs();
+    expect(oldJob).toBeDefined();
+    const secondGeneration = value.publish(snapshot([entry({ generationState: "pending" })]));
+    value.createGenerationJobs({
       projectId: "p1",
-      canonicalUri: "wb://page/p1/home",
+      workspaceId: "w1",
+      generationId: secondGeneration,
+      generatorVersion: PROJECT_INVENTORY_GENERATOR_VERSION,
+      requests: [{ canonicalUri: "wb://page/p1/home", sourceFingerprint: "new-source", evidenceRefs: [] }],
+    });
+    expect(value.completeGenerationJob({ job: oldJob!, generated: {
+      summary: "不应覆盖",
       sourceFingerprint: "new-source",
-      generated: {
-        summary: "不应覆盖",
-        sourceFingerprint: "new-source",
-        contentHash: "new-content",
-        generatorVersion: PROJECT_INVENTORY_GENERATOR_VERSION,
-        generatedAt: "2026-09-11T00:00:00.000Z",
-        evidenceRefs: [],
-      },
-    })).toBe(false);
+      contentHash: "new-content",
+      generatorVersion: PROJECT_INVENTORY_GENERATOR_VERSION,
+      generatedAt: "2026-09-11T00:00:00.000Z",
+      evidenceRefs: [],
+    } })).toBe("stale");
   });
 
   it("claims evidence-bounded jobs and writes fixed generated JSON", async () => {
@@ -120,9 +120,9 @@ describe("SqliteInventoryCatalog", () => {
       generationState: "pending",
       native: { name: "入口", aliases: [], description: null, metadata: {} },
     });
-    value.publish(snapshot([source]));
-    value.createGenerationJobs("p1", [{ canonicalUri: source.canonicalUri, sourceFingerprint: "fp-1", evidenceRefs: [{ sourceUri: source.canonicalUri, sourceKind: "page-schema", contentHash: "hash", selector: "schema" }] }], PROJECT_INVENTORY_GENERATOR_VERSION);
-    const result = await runInventoryGeneration(value, "p1", { read: async () => "不可信证据" }, {
+    const generationId = value.publish(snapshot([source]));
+    value.createGenerationJobs({ projectId: "p1", workspaceId: "w1", generationId, requests: [{ canonicalUri: source.canonicalUri, sourceFingerprint: "fp-1", evidenceRefs: [{ sourceUri: source.canonicalUri, sourceKind: "page-schema", contentHash: "hash", selector: "schema" }] }], generatorVersion: PROJECT_INVENTORY_GENERATOR_VERSION });
+    const result = await runInventoryGeneration(value, { read: async () => "不可信证据" }, {
       generate: async ({ evidence }) => {
         expect(evidence[0]?.content).toBe("不可信证据");
         return { summary: "可用于活动入口" };
@@ -135,14 +135,64 @@ describe("SqliteInventoryCatalog", () => {
   it("limits UTF-8 evidence by bytes before invoking the generator", async () => {
     const value = catalog();
     const source = entry({ generationState: "pending" });
-    value.publish(snapshot([source]));
-    value.createGenerationJobs("p1", [{ canonicalUri: source.canonicalUri, sourceFingerprint: "fp-bytes", evidenceRefs: [{ sourceUri: source.canonicalUri, sourceKind: "page-schema", contentHash: "hash", selector: "schema" }] }], PROJECT_INVENTORY_GENERATOR_VERSION);
-    await runInventoryGeneration(value, "p1", { read: async () => "证据".repeat(10_000) }, {
+    const generationId = value.publish(snapshot([source]));
+    value.createGenerationJobs({ projectId: "p1", workspaceId: "w1", generationId, requests: [{ canonicalUri: source.canonicalUri, sourceFingerprint: "fp-bytes", evidenceRefs: [{ sourceUri: source.canonicalUri, sourceKind: "page-schema", contentHash: "hash", selector: "schema" }] }], generatorVersion: PROJECT_INVENTORY_GENERATOR_VERSION });
+    await runInventoryGeneration(value, { read: async () => "证据".repeat(10_000) }, {
       generate: async ({ evidence }) => {
         expect(Buffer.byteLength(evidence[0]?.content ?? "", "utf8")).toBeLessThanOrEqual(8 * 1024);
         return { summary: "摘要" };
       },
     });
     expect(value.activeSnapshot("p1")?.entries[0]?.generationState).toBe("ready");
+  });
+
+  it("recovers expired leases, retries bounded failures, and marks terminal jobs failed", () => {
+    const value = catalog();
+    const source = entry({ generationState: "pending" });
+    const generationId = value.publish(snapshot([source]));
+    value.createGenerationJobs({
+      projectId: "p1",
+      workspaceId: "w1",
+      generationId,
+      generatorVersion: PROJECT_INVENTORY_GENERATOR_VERSION,
+      requests: [{ canonicalUri: source.canonicalUri, sourceFingerprint: "fp-retry", evidenceRefs: [] }],
+    });
+
+    const baseNow = Date.now();
+    const first = value.claimGenerationJobs(1, { now: baseNow, leaseMs: 1_000, owner: "worker-a" })[0]!;
+    expect(value.recoverExpiredGenerationJobs(baseNow + 1_000, 3)).toEqual({ recovered: 1, failed: 0 });
+    const second = value.claimGenerationJobs(1, { now: baseNow + 1_000, leaseMs: 1_000, owner: "worker-b" })[0]!;
+    expect(second.attempts).toBe(2);
+    expect(value.failGenerationJob({ job: second, errorCode: "AGENT_UNAVAILABLE", error: "temporary", retryable: true, maxAttempts: 3, availableAt: baseNow + 1_001 })).toBe("retry_scheduled");
+    const third = value.claimGenerationJobs(1, { now: baseNow + 1_001, leaseMs: 1_000, owner: "worker-c" })[0]!;
+    expect(third.attempts).toBe(3);
+    expect(value.failGenerationJob({ job: third, errorCode: "MODEL_UNAVAILABLE", error: "still unavailable", retryable: true, maxAttempts: 3 })).toBe("failed");
+    expect(value.activeSnapshot("p1")?.entries[0]?.generationState).toBe("failed");
+    expect(value.generationActivity("p1")).toBe("failed");
+    expect(value.failGenerationJob({ job: first, errorCode: "TIMEOUT", error: "late", retryable: true })).toBe("duplicate");
+  });
+
+  it("treats repeated completion of the same leased job as a duplicate", () => {
+    const value = catalog();
+    const source = entry({ generationState: "pending" });
+    const generationId = value.publish(snapshot([source]));
+    value.createGenerationJobs({
+      projectId: "p1",
+      workspaceId: "w1",
+      generationId,
+      generatorVersion: PROJECT_INVENTORY_GENERATOR_VERSION,
+      requests: [{ canonicalUri: source.canonicalUri, sourceFingerprint: "fp-duplicate", evidenceRefs: [] }],
+    });
+    const job = value.claimGenerationJobs()[0]!;
+    const generated = {
+      summary: "摘要",
+      sourceFingerprint: "fp-duplicate",
+      contentHash: "content",
+      generatorVersion: PROJECT_INVENTORY_GENERATOR_VERSION,
+      generatedAt: "2026-09-11T00:00:00.000Z",
+      evidenceRefs: [],
+    };
+    expect(value.completeGenerationJob({ job, generated })).toBe("applied");
+    expect(value.completeGenerationJob({ job, generated })).toBe("duplicate");
   });
 });

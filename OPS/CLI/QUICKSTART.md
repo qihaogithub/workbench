@@ -6,6 +6,8 @@
 
 ## 使用步骤
 
+> 运行前请切换到 Node 24（`node -v` 应为 `24.x`）。本指南统一使用 `pnpm dev` 启动 CLI，避免直接调用 `tsx` 包装器在受限沙箱中创建 IPC 管道。
+
 ### 步骤 1: 启动 Agent Service
 
 在项目根目录运行:
@@ -27,7 +29,7 @@ cd OPS\CLI
 
 运行健康检查:
 ```bash
-npx tsx src/index.ts health
+pnpm dev health
 ```
 
 **成功输出示例:**
@@ -47,13 +49,13 @@ npx tsx src/index.ts health
 #### 方式 1: HTTP 模式(简单测试)
 
 ```bash
-npx tsx src/index.ts send "test-1" "你好,请介绍一下自己"
+pnpm dev send "test-1" "你好,请介绍一下自己"
 ```
 
 #### 方式 2: WebSocket 流式模式(推荐,实时显示)
 
 ```bash
-npx tsx src/index.ts stream "test-1" "你好,请介绍一下自己"
+pnpm dev stream "test-1" "你好,请介绍一下自己"
 ```
 
 **成功输出示例:**
@@ -86,7 +88,7 @@ npx tsx src/index.ts stream "test-1" "你好,请介绍一下自己"
 ### 步骤 4: 交互式测试模式(连续对话)
 
 ```bash
-npx tsx src/index.ts interactive "test-1"
+pnpm dev interactive "test-1"
 ```
 
 进入后可以连续发送消息:
@@ -118,7 +120,7 @@ AI:
 如果仍然出现错误,运行诊断:
 
 ```bash
-npx tsx src/index.ts diagnose "test-1" -m "测试消息"
+pnpm dev diagnose "test-1" -m "测试消息"
 ```
 
 **诊断输出示例:**
@@ -152,34 +154,34 @@ npx tsx src/index.ts diagnose "test-1" -m "测试消息"
 
 ```bash
 # 健康检查
-npx tsx src/index.ts health
+pnpm dev health
 
 # 发送消息(HTTP)
-npx tsx src/index.ts send "session-id" "消息内容"
+pnpm dev send "session-id" "消息内容"
 
 # 发送消息(WebSocket 流式)
-npx tsx src/index.ts stream "session-id" "消息内容"
+pnpm dev stream "session-id" "消息内容"
 
 # 查看会话信息
-npx tsx src/index.ts session "session-id"
+pnpm dev session "session-id"
 
 # 列出所有会话
-npx tsx src/index.ts sessions
+pnpm dev sessions
 
 # 销毁会话
-npx tsx src/index.ts destroy "session-id"
+pnpm dev destroy "session-id"
 
 # 错误诊断
-npx tsx src/index.ts diagnose "session-id" -m "测试"
+pnpm dev diagnose "session-id" -m "测试"
 
 # 交互式测试
-npx tsx src/index.ts interactive "session-id"
+pnpm dev interactive "session-id"
 
 # 使用自定义服务地址
-npx tsx src/index.ts -u http://localhost:3000 health
+pnpm dev -- -u http://localhost:3000 health
 
 # 指定工作目录
-npx tsx src/index.ts send "session-id" "修改代码" -w "E:\projects\my-project"
+pnpm dev send "session-id" "修改代码" -w "E:\projects\my-project"
 ```
 
 ## 排查 "Internal error"
@@ -188,13 +190,13 @@ npx tsx src/index.ts send "session-id" "修改代码" -w "E:\projects\my-project
 
 **诊断:**
 ```bash
-npx tsx src/index.ts diagnose "your-session-id" -m "测试"
+pnpm dev diagnose "your-session-id" -m "测试"
 ```
 
 **解决:**
 ```bash
 # 使用新的 sessionId
-npx tsx src/index.ts stream "new-session-$(date +%s)" "测试消息"
+pnpm dev stream "new-session-$(date +%s)" "测试消息"
 ```
 
 ### 可能原因 2: Pi Agent 配置不可用
@@ -202,7 +204,7 @@ npx tsx src/index.ts stream "new-session-$(date +%s)" "测试消息"
 **检查模型供应商配置是否可用:**
 ```bash
 # 检查 agent-service 配置和模型列表
-npx tsx src/index.ts models
+pnpm dev models
 ```
 
 **如果不可用:**
@@ -213,19 +215,19 @@ npx tsx src/index.ts models
 
 **使用 CLI 测试带工作目录的消息:**
 ```bash
-npx tsx src/index.ts send "session-id" "修改代码" -w "E:\projects\my-project"
+pnpm dev send "session-id" "修改代码" -w "E:\projects\my-project"
 ```
 
 ### 可能原因 4: 资源不足
 
 **检查会话列表:**
 ```bash
-npx tsx src/index.ts sessions
+pnpm dev sessions
 ```
 
 **清理旧会话:**
 ```bash
-npx tsx src/index.ts destroy "old-session-id"
+pnpm dev destroy "old-session-id"
 ```
 
 ## 查看日志
@@ -237,9 +239,9 @@ npx tsx src/index.ts destroy "old-session-id"
 查看完整文档:
 ```bash
 cd OPS\CLI
-npx tsx src/index.ts --help
-npx tsx src/index.ts send --help
-npx tsx src/index.ts stream --help
+pnpm dev -- --help
+pnpm dev send --help
+pnpm dev stream --help
 ```
 
 ## 便捷脚本

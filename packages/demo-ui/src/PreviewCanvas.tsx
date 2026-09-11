@@ -22,6 +22,7 @@ import {
   BetweenVerticalStart,
   Combine,
   Copy,
+  ExternalLink,
   Maximize2,
   MessageSquarePlus,
   MoreHorizontal,
@@ -1135,6 +1136,16 @@ export function PreviewCanvas({
     [selectedPageGroupLayoutEntries, selectedPageLayoutEntries],
   );
   const selectedPageLikeCount = selectedPageLikeLayoutEntries.length;
+  const selectedPage =
+    selectedPageLikeCount === 1 && selectedPageIds.length === 1
+      ? pagesById.get(selectedPageIds[0])
+      : undefined;
+  const selectedReferencePageId =
+    selectedPage?.isReference &&
+    selectedPage.sourceProjectId &&
+    selectedPage.sourcePageId
+      ? selectedPage.id
+      : null;
   const selectedPageLayouts = useMemo(
     () => selectedPageLikeLayoutEntries.map((entry) => entry.layout),
     [selectedPageLikeLayoutEntries],
@@ -4285,9 +4296,14 @@ export function PreviewCanvas({
           className="absolute z-30 flex shrink-0 flex-nowrap items-center gap-1 whitespace-nowrap rounded-lg border bg-background/90 p-1 shadow-lg backdrop-blur"
           style={selectionToolbarStyle}
         >
-          {selectedPageLikeCount === 1 && (
-            <span className="px-2 text-xs font-medium text-muted-foreground">
-              已选中 1 个页面
+          {selectedPageLikeCount >= 2 && (
+            <span
+              role="status"
+              aria-label={`已选中 ${selectedPageLikeCount} 个画布对象`}
+              title={`已选中 ${selectedPageLikeCount} 个画布对象`}
+              className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-muted px-1 text-xs font-medium tabular-nums text-muted-foreground"
+            >
+              {selectedPageLikeCount}
             </span>
           )}
           {selectedPageLikeCount >= 2 && (
@@ -4380,6 +4396,18 @@ export function PreviewCanvas({
             >
               <Combine className="h-4 w-4" />
               编组
+            </button>
+          )}
+          {selectedReferencePageId && onViewSource && (
+            <button
+              type="button"
+              aria-label="打开源项目"
+              title="打开源项目"
+              className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => onViewSource(selectedReferencePageId)}
+            >
+              <ExternalLink className="h-4 w-4" />
+              打开源项目
             </button>
           )}
           {onAddPagesToChat && selectedPageIds.length > 0 && (

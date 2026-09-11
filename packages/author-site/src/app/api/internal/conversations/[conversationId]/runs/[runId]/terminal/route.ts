@@ -92,6 +92,7 @@ export async function POST(request: Request, { params }: Params) {
             ? (body.summary as Record<string, unknown>)
             : undefined,
         traceId: typeof body.traceId === "string" ? body.traceId : undefined,
+        traceEvents: Array.isArray(body.traceEvents) ? body.traceEvents : [],
         contextSummary: parseContextSummary(body.contextSummary),
       }),
     );

@@ -20,6 +20,7 @@ import {
 import { enumerateSchemaFields } from "@workbench/shared/demo/config-schema-fields";
 
 import { buildCandidateDirectoryEntries } from "./markdown-references/candidate-directory.js";
+import { hashWorkspaceContent } from "./workspace-resource-registry.js";
 import type {
   MarkdownLinkRecord,
   ResourceDirectoryEntry,
@@ -421,7 +422,7 @@ function pageEvidence(projectId: string, page: InventoryPageInput): InventoryEvi
   const pageUri = encodeMarkdownReferenceUri({ kind: "page", projectId, pageId: page.id });
   if (page.requirementsContentHash) refs.push({ sourceUri: pageUri, sourceKind: "page-requirements", contentHash: page.requirementsContentHash, selector: "document" });
   if (page.conventionContentHash) refs.push({ sourceUri: pageUri, sourceKind: "page-convention", contentHash: page.conventionContentHash, selector: "document" });
-  if (page.schema) refs.push({ sourceUri: pageUri, sourceKind: "page-schema", contentHash: hashInventoryValue(page.schema), selector: "schema" });
+  if (page.schema) refs.push({ sourceUri: pageUri, sourceKind: "page-schema", contentHash: hashWorkspaceContent(page.schema), selector: "schema" });
   return refs;
 }
 

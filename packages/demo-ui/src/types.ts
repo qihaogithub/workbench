@@ -497,6 +497,7 @@ export interface CanvasPageData {
   configCount?: number;
   isReference?: boolean; // 是否为引用页
   sourceProjectId?: string; // 引用页的源项目 ID
+  sourcePageId?: string; // 引用页的源页面 ID
   /** 业务配置驱动的页面状态；创作端保留页面卡片并以置灰方式提示。 */
   visibilityStatus?: {
     visible: boolean;

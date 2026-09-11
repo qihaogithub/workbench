@@ -440,10 +440,13 @@ export class SqliteKnowledgeCatalog {
   }
 
   integrityCheck(): boolean {
-    const row = this.db.prepare("PRAGMA quick_check").get() as {
+    const quick = this.db.prepare("PRAGMA quick_check").get() as {
       quick_check: string;
     };
-    return row.quick_check === "ok";
+    const full = this.db.prepare("PRAGMA integrity_check").get() as {
+      integrity_check: string;
+    };
+    return quick.quick_check === "ok" && full.integrity_check === "ok";
   }
 
   private initializeSchema(): void {

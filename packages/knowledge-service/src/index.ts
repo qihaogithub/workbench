@@ -4,16 +4,19 @@ import path from "node:path";
 export { SqliteInventoryCatalog, hashInventorySnapshot } from "./inventory-catalog.js";
 export { runInventoryGeneration } from "./inventory-generation.js";
 export type {
-  InventoryAnnotationInput,
   InventoryCatalogStats,
+  CreateInventoryJobsInput,
   InventoryGenerationRequest,
   InventorySearchOptions,
   SqliteInventoryCatalogOptions,
   InventoryGenerationJob,
+  InventoryGenerationCommitResult,
+  InventoryGenerationFailureResult,
 } from "./inventory-catalog.js";
 export type {
   InventoryEvidenceProvider,
   InventoryGenerationRunResult,
+  InventoryGenerationRunOptions,
   InventorySummaryDraft,
   InventorySummaryGenerator,
 } from "./inventory-generation.js";

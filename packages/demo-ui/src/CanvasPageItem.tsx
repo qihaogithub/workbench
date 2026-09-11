@@ -1129,7 +1129,9 @@ export function CanvasPageItem({
                   复制
                 </button>
               )}
-              {page.isReference ? (
+              {page.isReference &&
+              page.sourceProjectId &&
+              page.sourcePageId ? (
                 <>
                   <button
                     type="button"
@@ -1140,7 +1142,7 @@ export function CanvasPageItem({
                     }}
                   >
                     <ExternalLink className="h-4 w-4" />
-                    查看源项目
+                    打开源项目
                   </button>
                   <button
                     type="button"

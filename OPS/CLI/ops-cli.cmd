@@ -30,7 +30,7 @@ if "%1"=="" (
     echo   -u, --url ^<url^>          Agent Service 地址 (默认: http://localhost:3101)
     echo   -h, --help                显示帮助
     echo.
-    npx tsx src/index.ts --help
+    node --import tsx src/index.ts --help
 ) else (
-    npx tsx src/index.ts %*
+    node --import tsx src/index.ts %*
 )

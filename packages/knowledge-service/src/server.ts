@@ -5,19 +5,21 @@ import Fastify from "fastify";
 import { resolveDataDir } from "@workbench/runtime-config/paths";
 import { resolveSecrets } from "@workbench/runtime-config/secrets";
 import type { InventoryQuery } from "@workbench/shared";
-import { PROJECT_INVENTORY_GENERATOR_VERSION } from "@workbench/shared";
 
 import {
   SqliteKnowledgeCatalog,
   reconcileTemplateProjects,
 } from "./sqlite-catalog.js";
 import { SqliteInventoryCatalog, type InventoryGenerationRequest } from "./inventory-catalog.js";
+import { runInventoryGeneration, type InventoryGenerationRunResult } from "./inventory-generation.js";
+import { InventoryAgentClient } from "./inventory-agent-client.js";
+import { inspectDatabaseIntegrity, prepareKnowledgeDatabase, readLatestKnowledgeDatabaseRecovery } from "./database-lifecycle.js";
 import {
   decodeMarkdownReferenceUri,
   encodeMarkdownReferenceUri,
   isInventoryEvidenceRef,
-  isInventoryGeneratedSemantic,
   isInventorySnapshot,
+  PROJECT_INVENTORY_GENERATOR_VERSION,
 } from "./shared-runtime.js";
 
 interface SearchBody {
@@ -40,15 +42,10 @@ interface InventoryPublishBody {
 
 interface InventoryJobsBody {
   projectId?: unknown;
+  workspaceId?: unknown;
+  generationId?: unknown;
   generatorVersion?: unknown;
   requests?: unknown;
-}
-
-interface InventoryAnnotationBody {
-  projectId?: unknown;
-  canonicalUri?: unknown;
-  sourceFingerprint?: unknown;
-  generated?: unknown;
 }
 
 resolveSecrets({ required: ["INTERNAL_API_TOKEN"] });
@@ -64,16 +61,49 @@ const backupIntervalMs = numberEnv(
   24 * 60 * 60 * 1_000,
 );
 const backupRetentionDays = numberEnv("KNOWLEDGE_BACKUP_RETENTION_DAYS", 7);
+const inventoryWorkerIntervalMs = numberEnv(
+  "KNOWLEDGE_INVENTORY_WORKER_INTERVAL_MS",
+  5_000,
+);
+const inventoryWorkerBatchSize = numberEnv(
+  "KNOWLEDGE_INVENTORY_WORKER_BATCH_SIZE",
+  4,
+);
 const internalToken = process.env.INTERNAL_API_TOKEN?.trim();
 
 const app = Fastify({ logger: true });
+const databaseRecovery = prepareKnowledgeDatabase({ dataDir }) ?? readLatestKnowledgeDatabaseRecovery(dataDir);
 const catalog = new SqliteKnowledgeCatalog({ dataDir });
 const inventoryCatalog = new SqliteInventoryCatalog({ dataDir, databasePath: catalog.databasePath });
+const inventoryAgentClient = new InventoryAgentClient({ internalToken });
 let reconciling = false;
+let generatingInventory = false;
+let lastInventoryGenerationAt: number | null = null;
+let lastInventoryGenerationError: string | null = null;
+let lastInventoryGeneration: InventoryGenerationRunResult | null = null;
+let inventoryGenerationPromise: Promise<void> | null = null;
 let lastReconcileAt: number | null = null;
 let lastReconcileError: string | null = null;
 let lastBackupAt: number | null = null;
 let lastBackupError: string | null = null;
+
+function integrityState(): { knowledge: boolean; inventory: boolean } {
+  try {
+    return { knowledge: catalog.integrityCheck(), inventory: inventoryCatalog.integrityCheck() };
+  } catch {
+    return { knowledge: false, inventory: false };
+  }
+}
+
+function recoveryStatus() {
+  return databaseRecovery ? {
+    recoveredAt: databaseRecovery.recoveredAt,
+    quarantinePath: databaseRecovery.quarantinePath,
+    movedFiles: databaseRecovery.movedFiles.map((filePath) => path.basename(filePath)),
+    integrityOk: databaseRecovery.integrity?.ok ?? false,
+    error: databaseRecovery.error,
+  } : null;
+}
 
 function authorized(authorization: string | undefined): boolean {
   if (!internalToken) return true;
@@ -110,6 +140,15 @@ async function backup(): Promise<string> {
   const destinationPath = path.join(backupDir, fileName);
   try {
     await catalog.backup(destinationPath);
+    const integrity = inspectDatabaseIntegrity(destinationPath);
+    if (!integrity.ok) {
+      const quarantineDir = path.join(backupDir, "quarantine");
+      fs.mkdirSync(quarantineDir, { recursive: true });
+      const quarantinedPath = path.join(quarantineDir, path.basename(destinationPath));
+      fs.renameSync(destinationPath, quarantinedPath);
+      fs.writeFileSync(`${quarantinedPath}.json`, `${JSON.stringify({ quarantinedAt: new Date().toISOString(), integrity }, null, 2)}\n`, "utf8");
+      throw new Error("KNOWLEDGE_BACKUP_INTEGRITY_FAILED");
+    }
     lastBackupAt = Date.now();
     lastBackupError = null;
     pruneBackups(backupDir, backupRetentionDays);
@@ -118,6 +157,34 @@ async function backup(): Promise<string> {
     lastBackupError = error instanceof Error ? error.message : String(error);
     throw error;
   }
+}
+
+async function generateInventory(): Promise<void> {
+  if (generatingInventory) return;
+  generatingInventory = true;
+  const run = runInventoryGeneration(
+    inventoryCatalog,
+    null,
+    {
+      generateJob: ({ entry, job }) => inventoryAgentClient.generate({ entry, job }),
+    },
+    {
+      limit: inventoryWorkerBatchSize,
+      owner: `knowledge-worker:${process.pid}`,
+    },
+  );
+  inventoryGenerationPromise = run.then((result) => {
+    lastInventoryGenerationAt = Date.now();
+    lastInventoryGenerationError = null;
+    lastInventoryGeneration = result;
+  }).catch((error) => {
+    lastInventoryGenerationError = error instanceof Error ? error.message : String(error);
+    app.log.error({ error }, "inventory generation worker failed");
+  }).finally(() => {
+    generatingInventory = false;
+    inventoryGenerationPromise = null;
+  });
+  await inventoryGenerationPromise;
 }
 
 app.addHook("onRequest", async (request, reply) => {
@@ -130,17 +197,35 @@ app.addHook("onRequest", async (request, reply) => {
   }
 });
 
-app.get("/health", async () => ({
-  status: lastReconcileError ? "degraded" : "ok",
+app.get("/health", async () => {
+  const integrity = integrityState();
+  return {
+  status: lastReconcileError || lastBackupError || lastInventoryGenerationError || !integrity.knowledge || !integrity.inventory ? "degraded" : "ok",
   timestamp: new Date().toISOString(),
+  integrity,
+  reconcile: { running: reconciling, lastAt: lastReconcileAt, lastError: lastReconcileError },
+  backup: { lastAt: lastBackupAt, lastError: lastBackupError },
+  recovery: recoveryStatus(),
+  generationWorker: {
+    running: generatingInventory,
+    lastAt: lastInventoryGenerationAt,
+    lastError: lastInventoryGenerationError,
+    lastRun: lastInventoryGeneration,
+  },
   lastReconcileAt,
   lastReconcileError,
   lastBackupAt,
   lastBackupError,
+  lastInventoryGenerationAt,
+  lastInventoryGenerationError,
+  inventoryGeneration: lastInventoryGeneration,
   stats: catalog.stats(),
-}));
+  };
+});
 
-app.get("/api/knowledge/status", async () => ({
+app.get("/api/knowledge/status", async () => {
+  const integrity = integrityState();
+  return {
   success: true,
   data: {
     stats: catalog.stats(),
@@ -148,9 +233,17 @@ app.get("/api/knowledge/status", async () => ({
     lastReconcileError,
     lastBackupAt,
     lastBackupError,
-    integrityOk: catalog.integrityCheck(),
+    lastInventoryGenerationAt,
+    lastInventoryGenerationError,
+    inventoryGeneration: lastInventoryGeneration,
+    integrityOk: integrity.knowledge,
+    inventoryIntegrityOk: integrity.inventory,
+    recovery: recoveryStatus(),
+    reconcileRunning: reconciling,
+    inventoryGenerationRunning: generatingInventory,
   },
-}));
+  };
+});
 
 app.post("/api/knowledge/reconcile", async () => ({
   success: true,
@@ -207,16 +300,26 @@ app.post<{ Body: ReadBody }>(
   },
 );
 
-app.get("/api/inventory/status", async () => ({
+app.get("/api/inventory/status", async () => {
+  const integrity = integrityState();
+  return {
   success: true,
-  data: { stats: inventoryCatalog.stats(), integrityOk: inventoryCatalog.integrityCheck() },
-}));
+  data: {
+    stats: inventoryCatalog.stats(),
+    integrityOk: integrity.inventory,
+    recovery: recoveryStatus(),
+    reconcile: { running: reconciling, lastAt: lastReconcileAt, lastError: lastReconcileError },
+    backup: { lastAt: lastBackupAt, lastError: lastBackupError },
+    generationWorker: { running: generatingInventory, lastAt: lastInventoryGenerationAt, lastError: lastInventoryGenerationError, lastRun: lastInventoryGeneration },
+  },
+  };
+});
 
 app.get<{ Querystring: { projectId?: string } }>("/api/inventory/snapshot", async (request, reply) => {
   if (!request.query.projectId) return reply.code(400).send({ success: false, error: { code: "INVALID_REQUEST", message: "projectId 无效" } });
   const snapshot = inventoryCatalog.activeSnapshot(request.query.projectId);
   if (!snapshot) return reply.code(404).send({ success: false, error: { code: "INVENTORY_NOT_FOUND", message: "清单不存在" } });
-  return { success: true, data: snapshot };
+  return { success: true, data: { snapshot, generationActivity: inventoryCatalog.generationActivity(request.query.projectId) } };
 });
 
 app.post<{ Body: InventoryPublishBody }>(
@@ -250,7 +353,10 @@ app.post<{ Body: InventorySearchBody }>(
 app.post<{ Body: InventoryJobsBody }>(
   "/api/inventory/jobs",
   async (request, reply) => {
-    if (typeof request.body?.projectId !== "string" || !request.body.projectId || request.body.projectId.length > 256 || !isInventoryGenerationRequests(request.body.requests)) {
+    if (typeof request.body?.projectId !== "string" || !request.body.projectId || request.body.projectId.length > 256
+      || typeof request.body.workspaceId !== "string" || !request.body.workspaceId || request.body.workspaceId.length > 256
+      || !Number.isSafeInteger(request.body.generationId) || (request.body.generationId as number) < 1
+      || !isInventoryGenerationRequests(request.body.requests)) {
       return reply.code(400).send({
         success: false,
         error: { code: "INVALID_REQUEST", message: "生成任务参数无效" },
@@ -263,51 +369,14 @@ app.post<{ Body: InventoryJobsBody }>(
       return reply.code(400).send({ success: false, error: { code: "INVALID_REQUEST", message: "生成器版本无效" } });
     }
     const requests = request.body.requests;
-    const inserted = inventoryCatalog.createGenerationJobs(request.body.projectId, requests, generatorVersion);
+    const inserted = inventoryCatalog.createGenerationJobs({
+      projectId: request.body.projectId,
+      workspaceId: request.body.workspaceId,
+      generationId: request.body.generationId as number,
+      requests,
+      generatorVersion,
+    });
     return { success: true, data: { inserted } };
-  },
-);
-
-app.post<{ Body: { projectId?: unknown; limit?: unknown } }>(
-  "/api/inventory/jobs/claim",
-  async (request, reply) => {
-    if (typeof request.body?.projectId !== "string" || !request.body.projectId || request.body.projectId.length > 256 || (request.body.limit !== undefined && (!Number.isSafeInteger(request.body.limit) || (request.body.limit as number) < 1 || (request.body.limit as number) > 32))) {
-      return reply.code(400).send({ success: false, error: { code: "INVALID_REQUEST", message: "projectId 或 limit 无效" } });
-    }
-    return {
-      success: true,
-      data: {
-        jobs: inventoryCatalog.claimGenerationJobs(
-          request.body.projectId,
-          typeof request.body.limit === "number" ? request.body.limit : undefined,
-        ),
-      },
-    };
-  },
-);
-
-app.post<{ Body: InventoryAnnotationBody }>(
-  "/api/inventory/annotations",
-  async (request, reply) => {
-    const body = request.body;
-    if (typeof body?.projectId !== "string" || typeof body.canonicalUri !== "string" || typeof body.sourceFingerprint !== "string" || !isInventoryGeneratedSemantic(body.generated)) {
-      return reply.code(400).send({ success: false, error: { code: "INVALID_REQUEST", message: "固定清单注解格式无效" } });
-    }
-    const applied = inventoryCatalog.applyAnnotation({ projectId: body.projectId, canonicalUri: body.canonicalUri, sourceFingerprint: body.sourceFingerprint, generated: body.generated });
-    if (!applied) return reply.code(409).send({ success: false, error: { code: "INVENTORY_STALE", message: "清单注解已过期" } });
-    return { success: true, data: { applied: true } };
-  },
-);
-
-app.post<{ Body: { projectId?: unknown; canonicalUri?: unknown; sourceFingerprint?: unknown; error?: unknown } }>(
-  "/api/inventory/jobs/fail",
-  async (request, reply) => {
-    const body = request.body;
-    if (typeof body?.projectId !== "string" || typeof body.canonicalUri !== "string" || typeof body.sourceFingerprint !== "string" || typeof body.error !== "string") {
-      return reply.code(400).send({ success: false, error: { code: "INVALID_REQUEST", message: "失败任务参数无效" } });
-    }
-    const updated = inventoryCatalog.markGenerationFailed({ projectId: body.projectId, canonicalUri: body.canonicalUri, sourceFingerprint: body.sourceFingerprint, error: body.error });
-    return { success: true, data: { updated } };
   },
 );
 
@@ -323,10 +392,16 @@ const backupTimer = setInterval(() => {
   });
 }, backupIntervalMs);
 backupTimer.unref();
+const inventoryWorkerTimer = setInterval(() => {
+  void generateInventory();
+}, inventoryWorkerIntervalMs);
+inventoryWorkerTimer.unref();
 
 const shutdown = async (): Promise<void> => {
   clearInterval(timer);
   clearInterval(backupTimer);
+  clearInterval(inventoryWorkerTimer);
+  await inventoryGenerationPromise;
   await app.close();
   inventoryCatalog.close();
   catalog.close();
@@ -335,8 +410,11 @@ process.once("SIGINT", () => void shutdown().finally(() => process.exit(0)));
 process.once("SIGTERM", () => void shutdown().finally(() => process.exit(0)));
 
 async function start(): Promise<void> {
-  await reconcile();
   await app.listen({ port, host });
+  void reconcile().catch((error) => {
+    app.log.error({ error }, "initial knowledge reconcile failed");
+  });
+  void generateInventory();
 }
 
 void start().catch((error) => {

@@ -39,7 +39,8 @@ describe("ProjectAdminService", () => {
     const projectId = created.data?.id ?? "";
     const edit = service.beginEdit(projectId);
     const editId = (edit.data as EditTransaction).editId;
-    const source = "<button onclick=\"this.textContent='ok'\">Go</button><script>document.body.dataset.ready='1'</script>";
+    const source =
+      "<button onclick=\"this.textContent='ok'\">Go</button><script>document.body.dataset.ready='1'</script>";
     const analyzed = normalizeHtmlImport(source);
     const htmlImportMeta = {
       source: "html-import",
@@ -48,28 +49,74 @@ describe("ProjectAdminService", () => {
       normalizedHash: analyzed.normalizedHash ?? "",
       sandboxPolicyVersion: 1,
     };
-    const dryRun = service.createPage({ editId, name: "交互页", pageId: "sandbox", runtimeType: "sandboxed-html", sandboxHtml: source, htmlImportMeta, dryRun: true });
+    const dryRun = service.createPage({
+      editId,
+      name: "交互页",
+      pageId: "sandbox",
+      runtimeType: "sandboxed-html",
+      sandboxHtml: source,
+      htmlImportMeta,
+      dryRun: true,
+    });
     expect(dryRun.ok).toBe(true);
-    const page = service.createPage({ editId, name: "交互页", pageId: "sandbox", runtimeType: "sandboxed-html", sandboxHtml: source, htmlImportMeta });
+    const page = service.createPage({
+      editId,
+      name: "交互页",
+      pageId: "sandbox",
+      runtimeType: "sandboxed-html",
+      sandboxHtml: source,
+      htmlImportMeta,
+    });
     expect(page.ok).toBe(true);
     expect(page.data?.meta.runtimeType).toBe("sandboxed-html");
     expect(page.data?.files.sandboxHtml).toContain("<script>");
-    expect(service.getPage(editId, "sandbox").data?.files.htmlImportMeta).toMatchObject({ source: "html-import" });
+    expect(
+      service.getPage(editId, "sandbox").data?.files.htmlImportMeta,
+    ).toMatchObject({ source: "html-import" });
 
     expect(service.commitEdit(editId, "新增 sandbox 页").ok).toBe(true);
     const activeEdit = service.beginEdit(projectId);
     const activeEditId = (activeEdit.data as EditTransaction).editId;
 
-    const version = service.createPageVersion({ projectId, pageId: "sandbox", sourceWorkspacePath: (activeEdit.data as EditTransaction).workspacePath, note: "sandbox snapshot" });
-    expect(version.ok, JSON.stringify({ error: version.error, runtime: version.runtimeValidation })).toBe(true);
+    const version = service.createPageVersion({
+      projectId,
+      pageId: "sandbox",
+      sourceWorkspacePath: (activeEdit.data as EditTransaction).workspacePath,
+      note: "sandbox snapshot",
+    });
+    expect(
+      version.ok,
+      JSON.stringify({
+        error: version.error,
+        runtime: version.runtimeValidation,
+      }),
+    ).toBe(true);
     const versionId = version.data?.resourceVersion?.id ?? "";
-    expect(service.resourceVersionGet({ projectId, kind: "page", resourceId: "sandbox", versionId }).data?.content).toMatchObject({ sandboxHtml: expect.stringContaining("<script>") });
+    expect(
+      service.resourceVersionGet({
+        projectId,
+        kind: "page",
+        resourceId: "sandbox",
+        versionId,
+      }).data?.content,
+    ).toMatchObject({ sandboxHtml: expect.stringContaining("<script>") });
 
-    const switched = service.switchPageRuntime({ editId: activeEditId, pageId: "sandbox", targetRuntimeType: "high-fidelity-react", code: "export default function Demo(){return <main/>}" });
+    const switched = service.switchPageRuntime({
+      editId: activeEditId,
+      pageId: "sandbox",
+      targetRuntimeType: "high-fidelity-react",
+      code: "export default function Demo(){return <main/>}",
+    });
     expect(switched.ok).toBe(true);
-    const pageDir = path.join((activeEdit.data as EditTransaction).workspacePath, "demos", "sandbox");
+    const pageDir = path.join(
+      (activeEdit.data as EditTransaction).workspacePath,
+      "demos",
+      "sandbox",
+    );
     expect(fs.existsSync(path.join(pageDir, "sandbox.html"))).toBe(false);
-    expect(service.restorePageVersion(projectId, "sandbox", versionId).ok).toBe(true);
+    expect(service.restorePageVersion(projectId, "sandbox", versionId).ok).toBe(
+      true,
+    );
   });
 
   it("创建项目并读取详情", () => {
@@ -180,7 +227,12 @@ describe("ProjectAdminService", () => {
   it("项目列表、详情和 project.json 投影统一读取 workspace tree", () => {
     const created = service.createProject({ name: "投影一致性项目" });
     const projectId = created.data?.id ?? "";
-    const workspacePath = path.join(tempDir, "projects", projectId, "workspace");
+    const workspacePath = path.join(
+      tempDir,
+      "projects",
+      projectId,
+      "workspace",
+    );
     const pageIds = ["page-a", "page-b", "page-c"];
     for (const pageId of pageIds) {
       const pageDir = path.join(workspacePath, "demos", pageId);
@@ -203,14 +255,25 @@ describe("ProjectAdminService", () => {
       "utf-8",
     );
 
-    const projectJsonPath = path.join(tempDir, "projects", projectId, "project.json");
+    const projectJsonPath = path.join(
+      tempDir,
+      "projects",
+      projectId,
+      "project.json",
+    );
     const staleMeta = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8"));
-    staleMeta.demoPages = [{ id: "stale", name: "旧页面", order: 0, parentId: null }];
+    staleMeta.demoPages = [
+      { id: "stale", name: "旧页面", order: 0, parentId: null },
+    ];
     fs.writeFileSync(projectJsonPath, JSON.stringify(staleMeta), "utf-8");
 
-    const listed = service.listProjects().data?.find((item) => item.id === projectId);
+    const listed = service
+      .listProjects()
+      .data?.find((item) => item.id === projectId);
     expect(listed?.demoPages?.map((page) => page.id)).toEqual(pageIds);
-    expect(service.getProject(projectId).data?.pages.map((page) => page.id)).toEqual(pageIds);
+    expect(
+      service.getProject(projectId).data?.pages.map((page) => page.id),
+    ).toEqual(pageIds);
 
     service.updateProject({ projectId, name: "投影一致性项目（已写回）" });
     const persisted = JSON.parse(fs.readFileSync(projectJsonPath, "utf-8")) as {
@@ -263,9 +326,15 @@ describe("ProjectAdminService", () => {
     const page = service.createPage({ editId, name: "首页" });
     expect(page.ok).toBe(true);
     expect((page.data as PageDetail).meta.name).toBe("首页");
-    expect(resolvePageRuntimeType(path.join(transaction.workspacePath, "demos", (page.data as PageDetail).meta.id))).toBe(
-      "prototype-html-css",
-    );
+    expect(
+      resolvePageRuntimeType(
+        path.join(
+          transaction.workspacePath,
+          "demos",
+          (page.data as PageDetail).meta.id,
+        ),
+      ),
+    ).toBe("prototype-html-css");
     expect((page.data as PageDetail).files.prototypeHtml).toContain("<main");
 
     const validation = service.editValidate(editId);
@@ -557,6 +626,68 @@ describe("ProjectAdminService", () => {
     });
   });
 
+  it("新 live workspace 打开后使用最新已提交版本的 canonical proof 导出", () => {
+    const created = service.createProject({ name: "canonical proof 回退项目" });
+    const projectId = created.data?.id ?? "";
+    const edit = service.beginEdit(projectId);
+    const transaction = edit.data as EditTransaction;
+    expect(
+      service.createPage({ editId: transaction.editId, name: "首页" }).ok,
+    ).toBe(true);
+    expect(service.commitEdit(transaction.editId, "初始化页面").ok).toBe(true);
+
+    const projectPath = path.join(
+      tempDir,
+      "projects",
+      projectId,
+      "project.json",
+    );
+    const project = JSON.parse(fs.readFileSync(projectPath, "utf-8"));
+    const latestVersion = project.versions.at(-1);
+    fs.writeFileSync(
+      projectPath,
+      JSON.stringify(
+        {
+          ...project,
+          activeWorkspaceId: "live-newly-opened",
+          activeWorkspaceUpdatedAt: 4000,
+          canonicalSyncedWorkspaceId: undefined,
+          canonicalSyncedRevision: undefined,
+          canonicalSyncedRootHash: undefined,
+          canonicalSyncedAt: undefined,
+          versions: [
+            ...project.versions.slice(0, -1),
+            {
+              ...latestVersion,
+              workspaceId: "live-committed",
+              workspaceRevision: 14,
+              workspaceRootHash: "committed-root-hash",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+
+    const exported = service.exportProjectPackage(projectId);
+    expect(exported.ok).toBe(true);
+    expect(exported.data).toMatchObject({
+      workspaceId: "live-committed",
+      workspaceRevision: 14,
+      workspaceRootHash: "committed-root-hash",
+    });
+
+    const template = service.createTemplateFromProject(projectId, {
+      category: "测试",
+      name: "仍需 live 同步的模板",
+      description: "版本 proof 回退只用于只读导出",
+    });
+    expect(template.ok).toBe(false);
+    expect(template.error?.code).toBe("WORKSPACE_STALE");
+  });
+
   it("保存项目为模板时要求 active workspace 已同步并记录来源 workspace proof", () => {
     const created = service.createProject({ name: "模板 proof 项目" });
     const projectId = created.data?.id ?? "";
@@ -671,17 +802,37 @@ describe("ProjectAdminService", () => {
     const created = service.createProject({ name: "知识删除 tombstone 项目" });
     const projectId = created.data?.id ?? "";
     const item = {
-      id: "kb_deleted", title: "已删除文档", source: "user" as const, description: "删除前快照",
-      fileName: "deleted.md", addedAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+      id: "kb_deleted",
+      title: "已删除文档",
+      source: "user" as const,
+      description: "删除前快照",
+      fileName: "deleted.md",
+      addedAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
     };
     const tombstone = service.resourceVersionCreateKnowledgeTombstone({
-      projectId, resourceId: item.id, item, content: "# 删除前正文\n",
-      workspaceId: "live-delete", workspaceRevision: 52, workspaceRootHash: "delete-root",
+      projectId,
+      resourceId: item.id,
+      item,
+      content: "# 删除前正文\n",
+      workspaceId: "live-delete",
+      workspaceRevision: 52,
+      workspaceRootHash: "delete-root",
     });
     expect(tombstone.ok).toBe(true);
-    const version = service.resourceVersionGet({ projectId, kind: "knowledge_document", resourceId: item.id, versionId: tombstone.data!.id });
-    expect(version.data?.version.metadata).toMatchObject({ tombstone: true, item: { id: item.id } });
-    expect(service.projectCommitList(projectId).data?.commits[0]?.audit).toMatchObject({ workspaceId: "live-delete", workspaceRevision: 52 });
+    const version = service.resourceVersionGet({
+      projectId,
+      kind: "knowledge_document",
+      resourceId: item.id,
+      versionId: tombstone.data!.id,
+    });
+    expect(version.data?.version.metadata).toMatchObject({
+      tombstone: true,
+      item: { id: item.id },
+    });
+    expect(
+      service.projectCommitList(projectId).data?.commits[0]?.audit,
+    ).toMatchObject({ workspaceId: "live-delete", workspaceRevision: 52 });
   });
 
   it("恢复页面资源版本时记录 restore snapshot 和 commit 的 workspace proof", () => {
@@ -969,9 +1120,7 @@ describe("ProjectAdminService", () => {
     expect(upgrade.runtimeValidation?.ok).toBe(false);
     expect(upgrade.runtimeValidation?.prototypeGate).toMatchObject({
       decision: "upgrade_to_high_fidelity",
-      reasonCodes: expect.arrayContaining([
-        "PROTOTYPE_EMBED_FORBIDDEN",
-      ]),
+      reasonCodes: expect.arrayContaining(["PROTOTYPE_EMBED_FORBIDDEN"]),
     });
   });
 
@@ -1006,7 +1155,11 @@ describe("ProjectAdminService", () => {
         "utf-8",
       ),
     ).toContain("高保真页");
-    expect(fs.existsSync(path.join(workspacePath, "demos", pageId, "prototype.html"))).toBe(false);
+    expect(
+      fs.existsSync(
+        path.join(workspacePath, "demos", pageId, "prototype.html"),
+      ),
+    ).toBe(false);
 
     const reverted = service.switchPageRuntime({
       editId,
@@ -1278,7 +1431,9 @@ describe("ProjectAdminService", () => {
     expect(executed.ok).toBe(true);
     expect(executed.data?.trashed).toBe(true);
     expect(service.getProject(projectId).ok).toBe(false);
-    expect(service.listTrashedProjects().data?.map((project) => project.id)).toContain(projectId);
+    expect(
+      service.listTrashedProjects().data?.map((project) => project.id),
+    ).toContain(projectId);
   });
 
   it("编辑者可删除并恢复普通项目，但不能管理模板项目", () => {
@@ -1293,19 +1448,31 @@ describe("ProjectAdminService", () => {
       editor,
     );
     expect(trashed.ok).toBe(true);
-    expect(service.listTrashedProjects(editor).data?.map((project) => project.id)).toContain(standardId);
+    expect(
+      service.listTrashedProjects(editor).data?.map((project) => project.id),
+    ).toContain(standardId);
     expect(service.restoreTrashedProject(standardId, editor).ok).toBe(true);
     expect(service.getProject(standardId).ok).toBe(true);
 
     const template = service.createProject({ name: "模板项目" });
     const templateId = template.data?.id ?? "";
-    expect(service.updateProject({
-      projectId: templateId,
-      projectType: "template",
-      templateSettings: { description: "模板", scope: "team", official: false },
-    }).ok).toBe(true);
-    expect(service.deleteProjectPreview(templateId, editor).error?.code).toBe("FORBIDDEN");
-    expect(service.deleteTemplatePreview(templateId, editor).error?.code).toBe("FORBIDDEN");
+    expect(
+      service.updateProject({
+        projectId: templateId,
+        projectType: "template",
+        templateSettings: {
+          description: "模板",
+          scope: "team",
+          official: false,
+        },
+      }).ok,
+    ).toBe(true);
+    expect(service.deleteProjectPreview(templateId, editor).error?.code).toBe(
+      "FORBIDDEN",
+    );
+    expect(service.deleteTemplatePreview(templateId, editor).error?.code).toBe(
+      "FORBIDDEN",
+    );
   });
 
   it("回收站项目可提前清除并会在到期后自动清理", () => {
@@ -1325,7 +1492,9 @@ describe("ProjectAdminService", () => {
       (secondPreview.data as PreviewPlan).planId,
       (secondPreview.data as PreviewPlan).confirmToken,
     );
-    expect(service.purgeExpiredTrashedProjects(secondTrashed.data?.purgeAt ?? 0)).toBe(1);
+    expect(
+      service.purgeExpiredTrashedProjects(secondTrashed.data?.purgeAt ?? 0),
+    ).toBe(1);
     expect(service.listTrashedProjects().data).toEqual([]);
     expect(trashed.ok).toBe(true);
   });
@@ -1801,7 +1970,11 @@ describe("ProjectAdminService", () => {
       allowedProjectIds: [projectId],
     };
 
-    const updated = service.setProjectCover(projectId, "/thumbnails/cover.webp", creator);
+    const updated = service.setProjectCover(
+      projectId,
+      "/thumbnails/cover.webp",
+      creator,
+    );
     expect(updated.ok).toBe(true);
     expect(updated.data?.thumbnail).toBe("/thumbnails/cover.webp");
     expect(updated.auditId).toBeTruthy();

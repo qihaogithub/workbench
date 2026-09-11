@@ -35,6 +35,128 @@ afterEach(() => {
 });
 
 describe("page transfer tools", () => {
+  it("defaults an omitted Agent mode to reference", async () => {
+    vi.stubEnv("AUTHOR_SITE_URL", "http://author.test");
+    vi.stubEnv("INTERNAL_API_TOKEN", "internal-token");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response({ jobId: "job-default", status: "prepared" }),
+      )
+      .mockResolvedValueOnce(
+        response({ jobId: "job-default", status: "completed" }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await createTransferPagesTool(config).execute(
+      "call-default",
+      {
+        sourceProjectId: "source-project",
+        sourcePageIds: ["page-1"],
+        idempotencyKey: "retry-default",
+      },
+    );
+
+    expect(result.isError).toBeFalsy();
+    const [, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      mode: "reference",
+    });
+  });
+
+  it("keeps an explicit copy mode", async () => {
+    vi.stubEnv("AUTHOR_SITE_URL", "http://author.test");
+    vi.stubEnv("INTERNAL_API_TOKEN", "internal-token");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response({ jobId: "job-copy", status: "prepared" }),
+      )
+      .mockResolvedValueOnce(
+        response({ jobId: "job-copy", status: "completed" }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createTransferPagesTool(config).execute("call-copy", {
+      sourceProjectId: "source-project",
+      sourcePageIds: ["page-1"],
+      mode: "copy",
+      idempotencyKey: "retry-copy",
+    });
+
+    const [, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(request.body))).toMatchObject({ mode: "copy" });
+  });
+
+  it("explains reference permissions without executing or switching to copy", async () => {
+    vi.stubEnv("AUTHOR_SITE_URL", "http://author.test");
+    vi.stubEnv("INTERNAL_API_TOKEN", "internal-token");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: false,
+          error: { code: "FORBIDDEN", message: "项目不可编辑" },
+        }),
+        { status: 403, headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await createTransferPagesTool(config).execute(
+      "call-forbidden",
+      {
+        sourceProjectId: "source-project",
+        sourcePageIds: ["page-1"],
+        idempotencyKey: "retry-forbidden",
+      },
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.details.error).toBe("FORBIDDEN");
+    expect(result.details.message).toBe("项目不可编辑");
+    expect(result.content[0].text).toContain("引用需要源项目编辑或管理权限");
+    expect(result.content[0].text).toContain("询问用户是否明确改用复制");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body),
+    ).toContain('"mode":"reference"');
+  });
+
+  it("preserves the server error message and details", async () => {
+    vi.stubEnv("AUTHOR_SITE_URL", "http://author.test");
+    vi.stubEnv("INTERNAL_API_TOKEN", "internal-token");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: {
+              code: "WORKSPACE_STALE",
+              message: "源项目 canonical proof 不可用",
+              details: { sourceProjectId: "source-project", revision: 14 },
+            },
+          }),
+          { status: 409, headers: { "content-type": "application/json" } },
+        ),
+      ),
+    );
+
+    const result = await createTransferPagesTool(config).execute("call-error", {
+      sourceProjectId: "source-project",
+      sourcePageIds: ["page-1"],
+      idempotencyKey: "retry-error",
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("源项目 canonical proof 不可用");
+    expect(result.details).toMatchObject({
+      error: "WORKSPACE_STALE",
+      message: "源项目 canonical proof 不可用",
+      errorDetails: { sourceProjectId: "source-project", revision: 14 },
+    });
+  });
+
   it("never accepts a model-supplied target project or role", async () => {
     vi.stubEnv("AUTHOR_SITE_URL", "http://author.test");
     vi.stubEnv("INTERNAL_API_TOKEN", "internal-token");

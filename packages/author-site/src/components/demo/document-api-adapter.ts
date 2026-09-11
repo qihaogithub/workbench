@@ -1,5 +1,13 @@
 import type { KnowledgeItem } from "./KnowledgeDocDialog";
 
+export interface KnowledgeDocumentIssue {
+  code: "source_missing";
+  documentId: string;
+  title: string;
+  sourceState: "missing";
+  repairable: true;
+}
+
 /**
  * Convert the project document contract into the legacy UI item shape.
  *
@@ -49,6 +57,21 @@ export function toKnowledgeItem(payload: unknown): KnowledgeItem {
 }
 
 export function toKnowledgeItems(payload: unknown): KnowledgeItem[] {
-  if (!Array.isArray(payload)) throw new Error("文档列表响应格式无效");
-  return payload.map(toKnowledgeItem);
+  const items = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object" && Array.isArray((payload as { items?: unknown }).items)
+      ? (payload as { items: unknown[] }).items
+      : null;
+  if (!items) throw new Error("文档列表响应格式无效");
+  return items.map(toKnowledgeItem);
+}
+
+export function toKnowledgeDocumentIssues(payload: unknown): KnowledgeDocumentIssue[] {
+  if (!payload || typeof payload !== "object" || !Array.isArray((payload as { issues?: unknown }).issues)) return [];
+  return (payload as { issues: unknown[] }).issues.flatMap((issue) => {
+    if (!issue || typeof issue !== "object") return [];
+    const value = issue as Record<string, unknown>;
+    if (value.code !== "source_missing" || typeof value.documentId !== "string" || typeof value.title !== "string") return [];
+    return [{ code: "source_missing" as const, documentId: value.documentId, title: value.title, sourceState: "missing" as const, repairable: true as const }];
+  });
 }

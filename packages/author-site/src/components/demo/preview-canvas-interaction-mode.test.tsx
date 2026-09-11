@@ -320,6 +320,8 @@ function TestEditorCanvasWithConfigCallback({
   onPageConfigEdit,
   onRequestDeletePages,
   configCount,
+  isReference = false,
+  onViewSource,
 }: {
   onPageConfigEdit: (
     pageId: string,
@@ -327,6 +329,8 @@ function TestEditorCanvasWithConfigCallback({
   ) => void;
   onRequestDeletePages?: (pageIds: string[]) => void;
   configCount?: number;
+  isReference?: boolean;
+  onViewSource?: (pageId: string) => void;
 }) {
   const [state, setState] = useState<CanvasState>({
     viewport: { x: 40, y: 40, zoom: 0.5 },
@@ -347,23 +351,29 @@ function TestEditorCanvasWithConfigCallback({
           code: "export default function Demo(){return null}",
           previewSize: { width: 375, height: 812 },
           configCount,
+          isReference,
+          sourceProjectId: isReference ? "source_project_1" : undefined,
+          sourcePageId: isReference ? "source_page_1" : undefined,
         },
       ]}
       canvasState={state}
       onCanvasStateChange={setState}
       onPageConfigEdit={onPageConfigEdit}
       onRequestDeletePages={onRequestDeletePages}
+      onViewSource={onViewSource}
     />
   );
 }
 
 function TestPageGroupWithConfigCallback({
   onPageConfigEdit,
+  onViewSource,
 }: {
   onPageConfigEdit: (
     pageId: string,
     options?: { openConfigDetail?: boolean },
   ) => void;
+  onViewSource?: (pageId: string) => void;
 }) {
   const [state, setState] = useState<CanvasState>({
     viewport: { x: 0, y: 0, zoom: 1 },
@@ -414,6 +424,7 @@ function TestPageGroupWithConfigCallback({
       canvasState={state}
       onCanvasStateChange={setState}
       onPageConfigEdit={onPageConfigEdit}
+      onViewSource={onViewSource}
     />
   );
 }
@@ -609,6 +620,34 @@ function dragMarquee(
   });
 }
 
+function selectCanvasPage(page: HTMLElement, pointerId: number) {
+  Object.defineProperty(page, "getBoundingClientRect", {
+    configurable: true,
+    value: () => ({
+      left: 100,
+      top: 120,
+      right: 475,
+      bottom: 932,
+      width: 375,
+      height: 812,
+      x: 100,
+      y: 120,
+      toJSON: () => ({}),
+    }),
+  });
+  fireEvent.pointerDown(page, {
+    button: 0,
+    clientX: 220,
+    clientY: 260,
+    pointerId,
+  });
+  fireEvent.pointerUp(page, {
+    clientX: 220,
+    clientY: 260,
+    pointerId,
+  });
+}
+
 describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
   beforeAll(() => {
     class MockPointerEvent extends MouseEvent {
@@ -792,7 +831,9 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
     const { container } = render(
       <TestEditorCanvasWithConfigCallback onPageConfigEdit={onPageConfigEdit} />,
     );
-    const page = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+    const page = container.querySelector(
+      "[data-page-id='page_1']",
+    ) as HTMLElement;
 
     Object.defineProperty(page, "getBoundingClientRect", {
       configurable: true,
@@ -977,6 +1018,102 @@ describe("PreviewCanvas viewer 浜や簰妯″紡", () => {
     fireEvent.keyDown(window, { key: "Delete" });
 
     expect(onRequestDeletePages).toHaveBeenCalledWith(["page_1"]);
+  });
+
+  it("单选页面工具栏不显示选中数量文案", async () => {
+    const { container } = render(
+      <TestEditorCanvasWithConfigCallback onPageConfigEdit={jest.fn()} />,
+    );
+    const page = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+
+    selectCanvasPage(page, 61);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("单选页面工具栏")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("已选中 1 个页面")).not.toBeInTheDocument();
+  });
+
+  it("多选页面工具栏显示带无障碍标签的数字徽标", async () => {
+    const { container } = render(<TestMultiPageEditorCanvas />);
+    const root = container.querySelector("[data-canvas-root='true']") as HTMLElement;
+
+    dragMarquee(root, { clientX: 80, clientY: 80 }, { clientX: 650, clientY: 320 });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("多选对齐工具栏")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("status", { name: "已选中 3 个画布对象" }),
+    ).toHaveTextContent("3");
+    expect(screen.queryByText("已选中 3 个页面")).not.toBeInTheDocument();
+  });
+
+  it("单选引用页面显示打开源项目并回调页面 ID", async () => {
+    const onViewSource = jest.fn();
+    const { container } = render(
+      <TestEditorCanvasWithConfigCallback
+        onPageConfigEdit={jest.fn()}
+        isReference
+        onViewSource={onViewSource}
+      />,
+    );
+    const page = container.querySelector("[data-page-id='page_1']") as HTMLElement;
+
+    selectCanvasPage(page, 62);
+
+    const sourceButton = await screen.findByRole("button", {
+      name: "打开源项目",
+    });
+    fireEvent.click(sourceButton);
+
+    expect(onViewSource).toHaveBeenCalledWith("page_1");
+  });
+
+  it("普通页面和页面组不显示打开源项目", async () => {
+    const firstView = render(
+      <TestEditorCanvasWithConfigCallback
+        onPageConfigEdit={jest.fn()}
+        onViewSource={jest.fn()}
+      />,
+    );
+    const page = firstView.container.querySelector(
+      "[data-page-id='page_1']",
+    ) as HTMLElement;
+    selectCanvasPage(page, 63);
+    await waitFor(() => {
+      expect(screen.getByLabelText("单选页面工具栏")).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole("button", { name: "打开源项目" }),
+    ).not.toBeInTheDocument();
+
+    firstView.unmount();
+
+    const groupViewSource = jest.fn();
+    const groupView = render(
+      <TestPageGroupWithConfigCallback
+        onPageConfigEdit={jest.fn()}
+        onViewSource={groupViewSource}
+      />,
+    );
+    const group = groupView.container.querySelector(
+      "[data-page-group-id='group_1']",
+    ) as HTMLElement;
+    fireEvent.pointerDown(group, {
+      button: 0,
+      clientX: 150,
+      clientY: 130,
+      pointerId: 64,
+    });
+    fireEvent.pointerUp(group, { clientX: 150, clientY: 130, pointerId: 64 });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("单选页面工具栏")).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole("button", { name: "打开源项目" }),
+    ).not.toBeInTheDocument();
   });
 
   it("editor 模式页面右键菜单可以请求删除页面", async () => {

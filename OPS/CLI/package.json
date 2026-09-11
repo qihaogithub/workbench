@@ -5,8 +5,8 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "test": "tsx --test src/**/*.test.ts",
-    "dev": "tsx src/index.ts",
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "dev": "node --import tsx src/index.ts",
     "build": "tsc"
   },
   "dependencies": {

@@ -12,7 +12,10 @@ import {
   createAgentRunLog,
 } from "../session/run-log-store";
 import { logger } from "../utils/logger";
-import type { LedgerTerminalInput } from "../services/conversation-ledger-client";
+import type {
+  LedgerTerminalInput,
+  LedgerTraceEventInput,
+} from "../services/conversation-ledger-client";
 import type {
   ObservePreviewInput,
   PreviewObservationResult,
@@ -154,6 +157,10 @@ export class WebSocketEventRouter {
   private boundHandler: (event: AgentEvent) => void;
   private onActivity?: (event: AgentEvent) => void;
   private ledgerDisplayParts: Array<Record<string, unknown>> = [];
+  private ledgerTraceEvents: LedgerTraceEventInput[] = [];
+  private streamPhase: { startedAt: number; contentLength: number; eventCount: number } | null = null;
+  private thoughtPhase: { startedAt: number; contentLength: number; eventCount: number } | null = null;
+  private terminalTraceRecorded = false;
   private latestContextSummary: NonNullable<
     LedgerTerminalInput["contextSummary"]
   > | null = null;
@@ -194,6 +201,10 @@ export class WebSocketEventRouter {
     logOptions?: Omit<AgentRunLogStartOptions, "sessionId" | "messageId">,
   ): void {
     this.ledgerDisplayParts = [];
+    this.ledgerTraceEvents = [];
+    this.streamPhase = null;
+    this.thoughtPhase = null;
+    this.terminalTraceRecorded = false;
     this.latestContextSummary = null;
     this.activeMessage = {
       id: messageId,
@@ -209,12 +220,24 @@ export class WebSocketEventRouter {
           ...logOptions,
         })
       : null;
+    this.pushTraceEvent({
+      source: "system",
+      eventType: "run_started",
+      title: "Agent 运行开始",
+      status: "running",
+    });
   }
 
   cancelMessage(): void {
     if (this.activeMessage) {
       this.activeMessage.isCancelled = true;
       this.runLog?.recordCancel();
+      this.pushTraceEvent({
+        source: "system",
+        eventType: "cancel_requested",
+        title: "用户请求取消运行",
+        status: "requested",
+      });
     }
   }
 
@@ -226,12 +249,45 @@ export class WebSocketEventRouter {
 
   recordFinish(result: AgentResult): void {
     this.runLog?.recordFinish(result);
+    if (this.terminalTraceRecorded) return;
+    this.closeModelPhases();
+    this.terminalTraceRecorded = true;
+    const terminalStatus = result.success
+      ? "completed"
+      : this.isCancelled()
+        ? "cancelled"
+        : "failed";
+    this.pushTraceEvent({
+      source: "system",
+      eventType: `run_${terminalStatus}`,
+      title: terminalStatus === "completed"
+        ? "Agent 运行完成"
+        : terminalStatus === "cancelled"
+          ? "Agent 运行已取消"
+          : "Agent 运行失败",
+      status: terminalStatus,
+      errorCode: result.success ? undefined : result.error?.code,
+      durationMs: result.metadata?.duration,
+      metrics: {
+        success: result.success,
+        contentLength: result.content?.length ?? 0,
+        fileCount: result.files?.length ?? 0,
+      },
+      files: result.files?.map(({ path, action }) => ({ path, action })),
+    });
   }
 
   recordError(
     error: AgentError | { code?: string; message?: string; details?: unknown },
   ): void {
     this.runLog?.recordError(error);
+    this.pushTraceEvent({
+      source: "system",
+      eventType: "run_error",
+      title: "运行发生错误",
+      status: "failed",
+      errorCode: error.code,
+    });
   }
 
   isActive(): boolean {
@@ -255,6 +311,15 @@ export class WebSocketEventRouter {
     return this.ledgerDisplayParts.map((part) => ({ ...part }));
   }
 
+  getLedgerTraceEvents(): LedgerTraceEventInput[] {
+    this.closeModelPhases();
+    return this.ledgerTraceEvents.map((event) => ({
+      ...event,
+      metrics: event.metrics ? { ...event.metrics } : undefined,
+      files: event.files?.map((file) => ({ ...file })),
+    }));
+  }
+
   getContextSummary():
     | NonNullable<LedgerTerminalInput["contextSummary"]>
     | undefined {
@@ -275,6 +340,18 @@ export class WebSocketEventRouter {
     errorCode?: string;
   }): void {
     this.runLog?.recordContextRestore(input);
+    this.pushTraceEvent({
+      source: "system",
+      eventType: "context_restored",
+      title: input.success ? "恢复对话上下文" : "恢复对话上下文失败",
+      status: input.success ? "completed" : "failed",
+      durationMs: input.durationMs,
+      errorCode: input.errorCode,
+      metrics: {
+        success: input.success,
+        restoredMessageCount: input.restoredMessageCount,
+      },
+    });
   }
 
   async destroy(): Promise<void> {
@@ -321,6 +398,7 @@ export class WebSocketEventRouter {
 
     switch (event.type) {
       case "stream":
+        this.recordModelPhase("stream", event.content.length, event.done);
         this.sendMessage({
           type: "stream",
           id: messageId,
@@ -332,6 +410,7 @@ export class WebSocketEventRouter {
         break;
 
       case "thought":
+        this.recordModelPhase("thought", event.content.length, event.done);
         this.sendMessage({
           type: "thought",
           id: messageId,
@@ -350,6 +429,15 @@ export class WebSocketEventRouter {
           kind: event.kind,
           status: event.status,
         });
+        this.pushTraceEvent({
+          source: this.isSubagentTool(event.title) ? "subagent" : "tool",
+          eventType: "tool_started",
+          title: event.title,
+          status: event.status,
+          toolName: event.title,
+          toolCallId: event.toolCallId,
+          metrics: { toolKind: event.kind },
+        });
         this.sendMessage({
           type: "tool_call",
           id: messageId,
@@ -363,7 +451,7 @@ export class WebSocketEventRouter {
         });
         break;
 
-      case "tool_call_update":
+      case "tool_call_update": {
         this.ledgerDisplayParts = this.ledgerDisplayParts.map((part) =>
           part.toolCallId === event.toolCallId
             ? {
@@ -374,6 +462,22 @@ export class WebSocketEventRouter {
               }
             : part,
         );
+        const originalTool = this.ledgerDisplayParts.find(
+          (part) => part.toolCallId === event.toolCallId,
+        );
+        const toolTitle = typeof originalTool?.title === "string"
+          ? originalTool.title
+          : "工具调用";
+        this.pushTraceEvent({
+          source: this.isSubagentTool(toolTitle) ? "subagent" : "tool",
+          eventType: "tool_finished",
+          title: toolTitle,
+          status: event.status,
+          toolName: toolTitle,
+          toolCallId: event.toolCallId,
+          durationMs: event.durationMs,
+          errorCode: event.status === "failed" ? "TOOL_CALL_FAILED" : undefined,
+        });
         this.sendMessage({
           type: "tool_call_update",
           id: messageId,
@@ -388,11 +492,19 @@ export class WebSocketEventRouter {
           error: event.error,
         });
         break;
+      }
 
       case "plan":
         this.ledgerDisplayParts.push({
           type: "plan",
           content: event.content.slice(0, 8_000),
+        });
+        this.pushTraceEvent({
+          source: "model",
+          eventType: "plan_updated",
+          title: "Agent 更新执行计划",
+          status: "completed",
+          metrics: { contentLength: event.content.length },
         });
         this.sendMessage({
           type: "plan",
@@ -404,6 +516,13 @@ export class WebSocketEventRouter {
         break;
 
       case "error":
+        this.pushTraceEvent({
+          source: "system",
+          eventType: "agent_error",
+          title: "Agent 返回错误",
+          status: "failed",
+          errorCode: event.error.code,
+        });
         this.sendMessage({
           type: "error",
           id: messageId,
@@ -414,6 +533,12 @@ export class WebSocketEventRouter {
         break;
 
       case "status":
+        this.pushTraceEvent({
+          source: "system",
+          eventType: "status_changed",
+          title: `运行状态：${event.status}`,
+          status: event.status,
+        });
         this.sendMessage({
           type: "status",
           id: messageId,
@@ -424,6 +549,18 @@ export class WebSocketEventRouter {
         break;
 
       case "context_compacted":
+        this.pushTraceEvent({
+          source: "system",
+          eventType: "context_compacted",
+          title: "压缩对话上下文",
+          status: "completed",
+          durationMs: event.durationMs,
+          metrics: {
+            reason: event.reason,
+            tokensBefore: event.tokensBefore,
+            contextWindow: event.contextWindow,
+          },
+        });
         this.sendMessage({
           type: "context_compacted",
           id: messageId,
@@ -438,7 +575,38 @@ export class WebSocketEventRouter {
         });
         break;
 
-      case "run_summary":
+      case "run_summary": {
+        const projectionStatus = event.runSummary.projections.some(
+          (projection) => projection.status === "failed",
+        )
+          ? "failed"
+          : event.runSummary.projections.some((projection) => projection.status === "pending")
+            ? "pending"
+            : event.runSummary.projections.length > 0
+              ? "applied"
+              : "none";
+        this.pushTraceEvent({
+          source: "system",
+          eventType: "projection_summary",
+          title: "运行结果投影摘要",
+          status: "completed",
+          metrics: {
+            mutationCount: event.runSummary.mutations.length,
+            projectionCount: event.runSummary.projections.length,
+            observationCount: event.runSummary.observations?.length ?? 0,
+            mutationCommitted: event.runSummary.mutations.every(
+              (mutation) => mutation.status === "committed",
+            ),
+            projectionStatus,
+          },
+          files: event.runSummary.mutations.flatMap((mutation) =>
+            mutation.resources.flatMap((resource) =>
+              resource.action === "moved"
+                ? []
+                : [{ path: resource.path, action: resource.action }],
+            ),
+          ),
+        });
         this.sendMessage({
           type: "run_summary",
           id: messageId,
@@ -447,8 +615,17 @@ export class WebSocketEventRouter {
           runSummary: event.runSummary,
         });
         break;
+      }
 
       case "permission_request":
+        this.pushTraceEvent({
+          source: "system",
+          eventType: "permission_requested",
+          title: "等待用户授权",
+          status: "pending",
+          toolCallId: event.permissionRequest?.toolCall?.toolCallId,
+          toolName: event.permissionRequest?.toolCall?.title,
+        });
         logger.info(
           {
             event: "permission_request",
@@ -466,6 +643,12 @@ export class WebSocketEventRouter {
         break;
 
       case "user_choice_request":
+        this.pushTraceEvent({
+          source: "system",
+          eventType: "user_choice_requested",
+          title: "等待用户选择",
+          status: "pending",
+        });
         logger.info(
           {
             event: "user_choice_request",
@@ -481,6 +664,79 @@ export class WebSocketEventRouter {
           userChoiceRequest: event.userChoiceRequest,
         });
         break;
+
+      case "capability_activation":
+        this.pushTraceEvent({
+          source: "system",
+          eventType: "capability_activation",
+          title: "加载 Agent 能力",
+          status: event.status,
+          durationMs: event.durationMs,
+          errorCode: event.status === "failed" ? "CAPABILITY_ACTIVATION_FAILED" : undefined,
+          metrics: {
+            capabilityGroups: event.capabilities,
+            previousActiveToolCount: event.previousActiveToolCount,
+            activeToolCount: event.activeToolCount,
+          },
+        });
+        break;
     }
+  }
+
+  private pushTraceEvent(
+    event: Omit<LedgerTraceEventInput, "occurredAt"> & { occurredAt?: number },
+  ): void {
+    if (!this.activeMessage || this.ledgerTraceEvents.length >= 2_000) return;
+    this.ledgerTraceEvents.push({ ...event, occurredAt: event.occurredAt ?? Date.now() });
+  }
+
+  private recordModelPhase(
+    phase: "stream" | "thought",
+    contentLength: number,
+    done: boolean,
+  ): void {
+    const key = phase === "stream" ? "streamPhase" : "thoughtPhase";
+    let current = this[key];
+    if (!current) {
+      current = { startedAt: Date.now(), contentLength: 0, eventCount: 0 };
+      this[key] = current;
+      this.pushTraceEvent({
+        occurredAt: current.startedAt,
+        source: "model",
+        eventType: `${phase}_started`,
+        title: phase === "stream" ? "开始生成回复" : "开始思考",
+        status: "running",
+      });
+    }
+    current.contentLength += contentLength;
+    current.eventCount += 1;
+    if (done) this.closeModelPhase(phase);
+  }
+
+  private closeModelPhases(): void {
+    this.closeModelPhase("thought");
+    this.closeModelPhase("stream");
+  }
+
+  private closeModelPhase(phase: "stream" | "thought"): void {
+    const key = phase === "stream" ? "streamPhase" : "thoughtPhase";
+    const current = this[key];
+    if (!current) return;
+    this[key] = null;
+    this.pushTraceEvent({
+      source: "model",
+      eventType: `${phase}_finished`,
+      title: phase === "stream" ? "回复生成结束" : "思考阶段结束",
+      status: "completed",
+      durationMs: Date.now() - current.startedAt,
+      metrics: {
+        contentLength: current.contentLength,
+        thoughtEventCount: current.eventCount,
+      },
+    });
+  }
+
+  private isSubagentTool(title: string): boolean {
+    return /sub.?agent|delegate|子\s*agent|子智能体/i.test(title);
   }
 }

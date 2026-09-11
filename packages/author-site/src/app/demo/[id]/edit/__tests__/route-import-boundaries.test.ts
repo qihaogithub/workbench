@@ -37,8 +37,8 @@ describe("编辑路由导入边界", () => {
   it("评论启动链维护项目级线程，并派生页面与配置项目标", () => {
     const page = readAuthorFile("src/app/demo/[id]/edit/page.tsx");
 
-    expect(page).toContain(
-      "const commentQueryTarget = useMemo<CommentTarget | undefined>(() => undefined, []);",
+    expect(page).toMatch(
+      /const\s+commentQueryTarget\s*=\s*useMemo<CommentTarget\s*\|\s*undefined>\s*\(\s*\(\)\s*=>\s*undefined,\s*\[\s*\],?\s*\);/,
     );
     expect(page).toMatch(
       /const commentsData = useComments\(\{[\s\S]*?target: commentQueryTarget,[\s\S]*?enabled: Boolean\(activeDemoId\),[\s\S]*?\}\);/,

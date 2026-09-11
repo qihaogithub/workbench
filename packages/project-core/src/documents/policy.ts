@@ -10,7 +10,7 @@ export class DocumentPolicy implements DocumentPolicyPort {
     return actor.role !== "readonly" && this.canRead(actor, projectId);
   }
 
-  canMutateDocument(actor: ProjectAdminActor, record: DocumentRecord): boolean {
+  canMutateDocument(actor: ProjectAdminActor, record: Pick<DocumentRecord, "projectId" | "source" | "readonly">): boolean {
     return !record.readonly && record.source !== "system" && actor.role !== "readonly";
   }
 }

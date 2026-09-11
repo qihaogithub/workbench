@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createDocumentApplicationService, documentErrorResponse, resolveDocumentActor, resolveDocumentContext, assertProject } from "@/lib/document-application-service";
+import { createDocumentApplicationService, documentErrorResponse, resolveDocumentActor, resolveDocumentContext, assertProject, refreshProjectInventoryAfterDocumentMutation } from "@/lib/document-application-service";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     const context = await resolveDocumentContext(request, projectId, actor, body);
     const result = await createDocumentApplicationService().create({ projectId, title: body.title, description: typeof body.description === "string" ? body.description : undefined, content: body.content, actor, ...context });
+    refreshProjectInventoryAfterDocumentMutation({ request, projectId, actorId: actor.id, context });
     return NextResponse.json({ success: true, data: result }, { status: 201 });
   } catch (error) {
     const response = documentErrorResponse(error);

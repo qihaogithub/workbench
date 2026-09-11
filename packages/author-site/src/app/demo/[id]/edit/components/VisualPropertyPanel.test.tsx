@@ -331,11 +331,11 @@ describe("VisualPropertyPanel 配置项入口", () => {
 
     expect(screen.getByRole("dialog")).toHaveTextContent("格式限制");
     expect(screen.getByText("全部图片")).toBeInTheDocument();
-    expect(screen.getByLabelText("W下限具体数值")).toHaveValue(320);
-    expect(screen.getByLabelText("H上限具体数值")).toHaveValue(900);
+    expect(screen.getByLabelText("W尺寸具体数值")).toHaveValue(320);
+    expect(screen.getByLabelText("H尺寸具体数值")).toHaveValue(900);
     expect(screen.getByLabelText("上传默认图片")).toHaveAttribute("type", "file");
 
-    fireEvent.change(screen.getByLabelText("W下限比较符"), { target: { value: ">" } });
+    fireEvent.change(screen.getByLabelText("W尺寸比较符"), { target: { value: ">" } });
     expect(onUpdateConfigMark).toHaveBeenLastCalledWith("config-mark-image", expect.objectContaining({ widthRule: { min: { value: 320, inclusive: false } } }));
 
     fireEvent.click(screen.getByText("全部图片"));

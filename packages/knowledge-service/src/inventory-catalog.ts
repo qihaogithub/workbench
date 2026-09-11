@@ -8,6 +8,8 @@ import type {
   InventoryFreshness,
   InventoryGeneratedSemantic,
   InventoryEvidenceRef,
+  InventoryGenerationErrorCode,
+  InventoryGenerationJobStatus,
   InventoryMatchReason,
   InventoryQuery,
   InventoryQueryResult,
@@ -17,6 +19,8 @@ import type {
 import {
   canonicalInventoryJson,
   inventorySearchText,
+  INVENTORY_GENERATION_LEASE_MS,
+  INVENTORY_GENERATION_MAX_ATTEMPTS,
   PROJECT_INVENTORY_SCHEMA_VERSION,
   resolveInventorySemantic,
 } from "./shared-runtime.js";
@@ -30,6 +34,14 @@ export interface InventoryGenerationRequest {
   canonicalUri: string;
   sourceFingerprint: string;
   evidenceRefs: InventoryEvidenceRef[];
+}
+
+export interface CreateInventoryJobsInput {
+  projectId: string;
+  workspaceId: string;
+  generationId: number;
+  requests: readonly InventoryGenerationRequest[];
+  generatorVersion: string;
 }
 
 export interface InventoryCatalogStats {
@@ -60,24 +72,29 @@ export interface InventorySearchOptions extends InventoryQuery {
   targetAvailability?: (entry: InventoryEntry) => InventoryTargetAvailability;
 }
 
-export interface InventoryAnnotationInput {
-  projectId: string;
-  canonicalUri: string;
-  sourceFingerprint: string;
-  generated: InventoryGeneratedSemantic;
-}
-
 export interface InventoryGenerationJob {
   taskKey: string;
   projectId: string;
+  workspaceId: string;
+  generationId: number;
   canonicalUri: string;
   sourceFingerprint: string;
   generatorVersion: string;
   evidenceRefs: InventoryEvidenceRef[];
-  status: "pending" | "running" | "ready" | "failed" | "superseded";
+  status: InventoryGenerationJobStatus;
   attempts: number;
+  availableAt: number;
+  attemptId?: string;
+  leaseToken?: string;
+  leaseOwner?: string;
+  leaseExpiresAt?: number;
+  errorCode?: InventoryGenerationErrorCode;
   error?: string;
 }
+
+export type InventoryGenerationCommitResult = "applied" | "duplicate" | "stale";
+export type InventoryGenerationFailureResult = "retry_scheduled" | "failed" | "stale" | "duplicate";
+export type InventoryGenerationActivity = "active" | "idle" | "failed";
 
 export class SqliteInventoryCatalog {
   readonly databasePath: string;
@@ -189,7 +206,9 @@ export class SqliteInventoryCatalog {
         "UPDATE inventory_generations SET status = 'superseded' WHERE project_id = ? AND status = 'active' AND generation_id <> ?",
       ).run(snapshot.projectId, generationId);
       this.db.prepare(
-        "UPDATE inventory_generation_jobs SET status = 'superseded', updated_at = ? WHERE project_id = ? AND status IN ('pending', 'running')",
+        `UPDATE inventory_generation_jobs SET status = 'superseded', attempt_id = NULL,
+            lease_token = NULL, lease_owner = NULL, lease_expires_at = NULL, updated_at = ?
+         WHERE project_id = ? AND status IN ('pending', 'running')`,
       ).run(Date.now(), snapshot.projectId);
       return generationId;
     });
@@ -226,6 +245,20 @@ export class SqliteInventoryCatalog {
     };
   }
 
+  generationActivity(projectId: string): InventoryGenerationActivity {
+    const row = this.db.prepare(
+      `SELECT
+         SUM(CASE WHEN j.status IN ('pending', 'running') THEN 1 ELSE 0 END) AS activeCount,
+         SUM(CASE WHEN j.status = 'failed' THEN 1 ELSE 0 END) AS failedCount
+       FROM inventory_generations AS g
+       LEFT JOIN inventory_generation_jobs AS j ON j.generation_id = g.generation_id
+       WHERE g.project_id = ? AND g.status = 'active'`,
+    ).get(projectId) as { activeCount: number | null; failedCount: number | null };
+    if ((row.activeCount ?? 0) > 0) return "active";
+    if ((row.failedCount ?? 0) > 0) return "failed";
+    return "idle";
+  }
+
   generatedForProject(projectId: string): Map<string, InventoryGeneratedSemantic> {
     const snapshot = this.activeSnapshot(projectId);
     return new Map(
@@ -235,130 +268,255 @@ export class SqliteInventoryCatalog {
     );
   }
 
-  createGenerationJobs(
-    projectId: string,
-    requests: readonly InventoryGenerationRequest[],
-    generatorVersion: string,
-  ): number {
+  createGenerationJobs(input: CreateInventoryJobsInput): number {
     const insert = this.db.prepare(
       `INSERT INTO inventory_generation_jobs
-        (task_key, project_id, canonical_uri, source_fingerprint, generator_version,
-         evidence_json, status, attempts, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)
+        (task_key, project_id, workspace_id, generation_id, canonical_uri,
+         source_fingerprint, generator_version, evidence_json, status, attempts,
+         available_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?)
        ON CONFLICT(task_key) DO UPDATE SET
          evidence_json = excluded.evidence_json,
-         status = 'pending', attempts = 0, error = NULL, updated_at = excluded.updated_at
+         status = 'pending', attempts = 0, available_at = excluded.available_at,
+         attempt_id = NULL, lease_token = NULL, lease_owner = NULL,
+         lease_expires_at = NULL, error_code = NULL, error = NULL,
+         updated_at = excluded.updated_at
        WHERE inventory_generation_jobs.status IN ('failed', 'superseded')`,
     );
     let inserted = 0;
     const write = this.db.transaction(() => {
-      for (const request of requests) {
-        const taskKey = `${projectId}:${request.canonicalUri}:${request.sourceFingerprint}:${generatorVersion}`;
-        inserted += Number(insert.run(taskKey, projectId, request.canonicalUri, request.sourceFingerprint, generatorVersion, JSON.stringify(request.evidenceRefs), Date.now(), Date.now()).changes);
+      const now = Date.now();
+      for (const request of input.requests) {
+        const taskKey = `${input.projectId}:${input.generationId}:${request.canonicalUri}:${request.sourceFingerprint}:${input.generatorVersion}`;
+        inserted += Number(insert.run(
+          taskKey,
+          input.projectId,
+          input.workspaceId,
+          input.generationId,
+          request.canonicalUri,
+          request.sourceFingerprint,
+          input.generatorVersion,
+          JSON.stringify(request.evidenceRefs),
+          now,
+          now,
+          now,
+        ).changes);
       }
     });
     write();
     return inserted;
   }
 
-  claimGenerationJobs(projectId: string, limit = 8): InventoryGenerationJob[] {
+  recoverExpiredGenerationJobs(
+    now = Date.now(),
+    maxAttempts = INVENTORY_GENERATION_MAX_ATTEMPTS,
+  ): { recovered: number; failed: number } {
+    const recover = this.db.transaction(() => {
+      const expired = this.db.prepare(
+        `SELECT task_key AS taskKey, project_id AS projectId, generation_id AS generationId,
+            canonical_uri AS canonicalUri, attempts
+         FROM inventory_generation_jobs
+         WHERE status = 'running' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?`,
+      ).all(now) as Array<{ taskKey: string; projectId: string; generationId: number; canonicalUri: string; attempts: number }>;
+      let recovered = 0;
+      let failed = 0;
+      for (const job of expired) {
+        if (job.attempts >= maxAttempts) {
+          const result = this.db.prepare(
+            `UPDATE inventory_generation_jobs
+             SET status = 'failed', error_code = 'TIMEOUT', error = 'lease expired',
+                 attempt_id = NULL, lease_token = NULL, lease_owner = NULL,
+                 lease_expires_at = NULL, updated_at = ?, completed_at = ?
+             WHERE task_key = ? AND status = 'running' AND lease_expires_at <= ?`,
+          ).run(now, now, job.taskKey, now);
+          if (result.changes > 0) {
+            this.markEntryGenerationState(job.generationId, job.projectId, job.canonicalUri, "failed");
+            this.recordGenerationLatency(job.taskKey);
+            failed++;
+          }
+          continue;
+        }
+        const result = this.db.prepare(
+          `UPDATE inventory_generation_jobs
+           SET status = 'pending', available_at = ?, error_code = 'TIMEOUT', error = 'lease expired',
+               attempt_id = NULL, lease_token = NULL, lease_owner = NULL,
+               lease_expires_at = NULL, updated_at = ?
+           WHERE task_key = ? AND status = 'running' AND lease_expires_at <= ?`,
+        ).run(now, now, job.taskKey, now);
+        if (result.changes > 0) {
+          this.recordGenerationLatency(job.taskKey);
+          recovered++;
+        }
+      }
+      return { recovered, failed };
+    });
+    return recover();
+  }
+
+  claimGenerationJobs(
+    limit = 8,
+    options: { owner?: string; leaseMs?: number; now?: number } = {},
+  ): InventoryGenerationJob[] {
     const safeLimit = Math.max(1, Math.min(limit, 32));
+    const now = options.now ?? Date.now();
+    const owner = options.owner ?? `knowledge-worker:${process.pid}`;
+    const leaseMs = Math.max(1_000, options.leaseMs ?? INVENTORY_GENERATION_LEASE_MS);
     const claim = this.db.transaction(() => {
       const rows = this.db.prepare(
-        `SELECT task_key AS taskKey, project_id AS projectId, canonical_uri AS canonicalUri,
+        `SELECT task_key AS taskKey, project_id AS projectId, workspace_id AS workspaceId,
+            generation_id AS generationId, canonical_uri AS canonicalUri,
             source_fingerprint AS sourceFingerprint, generator_version AS generatorVersion,
-            evidence_json AS evidenceJson, status, attempts, error
+            evidence_json AS evidenceJson, status, attempts, available_at AS availableAt,
+            attempt_id AS attemptId, lease_token AS leaseToken, lease_owner AS leaseOwner,
+            lease_expires_at AS leaseExpiresAt, error_code AS errorCode, error
          FROM inventory_generation_jobs
-         WHERE project_id = ? AND status = 'pending'
-         ORDER BY created_at, task_key LIMIT ?`,
-      ).all(projectId, safeLimit) as InventoryJobRow[];
+         WHERE status = 'pending' AND available_at <= ?
+         ORDER BY available_at, created_at, task_key LIMIT ?`,
+      ).all(now, safeLimit) as InventoryJobRow[];
       const update = this.db.prepare(
-        "UPDATE inventory_generation_jobs SET status = 'running', attempts = attempts + 1, updated_at = ? WHERE task_key = ? AND status = 'pending'",
+        `UPDATE inventory_generation_jobs
+         SET status = 'running', attempts = attempts + 1, attempt_id = ?,
+             lease_token = ?, lease_owner = ?, lease_expires_at = ?, updated_at = ?
+         WHERE task_key = ? AND status = 'pending' AND available_at <= ?`,
       );
-      return rows.filter((row) => update.run(Date.now(), row.taskKey).changes > 0).map((row) => {
+      return rows.flatMap((row) => {
+        const attemptId = crypto.randomUUID();
+        const leaseToken = crypto.randomUUID();
+        const leaseExpiresAt = now + leaseMs;
+        if (update.run(attemptId, leaseToken, owner, leaseExpiresAt, now, row.taskKey, now).changes === 0) return [];
         this.generationStarts.set(row.taskKey, Date.now());
-        return toGenerationJob(row);
+        return [toGenerationJob({
+          ...row,
+          status: "running",
+          attempts: row.attempts + 1,
+          attemptId,
+          leaseToken,
+          leaseOwner: owner,
+          leaseExpiresAt,
+        })];
       });
     });
     return claim();
   }
 
-  applyAnnotation(input: InventoryAnnotationInput): boolean {
+  completeGenerationJob(input: {
+    job: Pick<InventoryGenerationJob, "taskKey" | "generationId" | "attemptId" | "leaseToken" | "sourceFingerprint" | "projectId" | "canonicalUri">;
+    generated: InventoryGeneratedSemantic;
+    now?: number;
+  }): InventoryGenerationCommitResult {
     const write = this.db.transaction(() => {
+      const now = input.now ?? Date.now();
+      const current = this.db.prepare(
+        `SELECT status, generation_id AS generationId, source_fingerprint AS sourceFingerprint,
+            attempt_id AS attemptId, lease_token AS leaseToken
+         FROM inventory_generation_jobs WHERE task_key = ?`,
+      ).get(input.job.taskKey) as {
+        status: InventoryGenerationJobStatus;
+        generationId: number;
+        sourceFingerprint: string;
+        attemptId: string | null;
+        leaseToken: string | null;
+      } | undefined;
+      if (!current) return "stale" as const;
+      if (current.status === "ready") return "duplicate" as const;
+      if (current.status !== "running"
+        || current.generationId !== input.job.generationId
+        || current.sourceFingerprint !== input.job.sourceFingerprint
+        || current.attemptId !== input.job.attemptId
+        || current.leaseToken !== input.job.leaseToken) return "stale" as const;
       const generation = this.db.prepare(
         "SELECT generation_id AS generationId FROM inventory_generations WHERE project_id = ? AND status = 'active'",
-      ).get(input.projectId) as { generationId: number } | undefined;
-      if (!generation) return false;
+      ).get(input.job.projectId) as { generationId: number } | undefined;
+      if (!generation || generation.generationId !== input.job.generationId) {
+        this.supersedeRunningJob(input.job.taskKey, now);
+        return "stale" as const;
+      }
       const row = this.db.prepare(
         "SELECT entry_json AS entryJson FROM inventory_entries WHERE generation_id = ? AND canonical_uri = ?",
-      ).get(generation.generationId, input.canonicalUri) as { entryJson: string } | undefined;
-      if (!row) return false;
+      ).get(generation.generationId, input.job.canonicalUri) as { entryJson: string } | undefined;
+      if (!row) {
+        this.supersedeRunningJob(input.job.taskKey, now);
+        return "stale" as const;
+      }
       const entry = JSON.parse(row.entryJson) as InventoryEntry;
-      const currentJob = this.db.prepare(
-        `SELECT task_key AS taskKey FROM inventory_generation_jobs
-         WHERE project_id = ? AND canonical_uri = ? AND source_fingerprint = ?
-           AND status IN ('pending', 'running') LIMIT 1`,
-      ).get(input.projectId, input.canonicalUri, input.sourceFingerprint) as { taskKey?: string } | undefined;
-      if (entry.generated?.sourceFingerprint
-        && entry.generated.sourceFingerprint !== input.sourceFingerprint
-        && !currentJob) return false;
       entry.generated = input.generated;
       entry.generationState = "ready";
       entry.reviewState = entry.human.confirmedGeneratedHash
         ? entry.human.confirmedGeneratedHash === input.generated.contentHash ? "confirmed" : "review_recommended"
         : entry.reviewState === "not_required" ? "not_required" : "unreviewed";
-      this.updateEntry(generation.generationId, input.projectId, entry);
+      this.updateEntry(generation.generationId, input.job.projectId, entry);
       this.db.prepare(
         `INSERT OR REPLACE INTO inventory_annotations
           (project_id, canonical_uri, source_fingerprint, content_hash, annotation_json, created_at)
          VALUES (?, ?, ?, ?, ?, ?)`,
-      ).run(input.projectId, input.canonicalUri, input.sourceFingerprint, input.generated.contentHash, JSON.stringify(input.generated), Date.now());
+      ).run(input.job.projectId, input.job.canonicalUri, input.job.sourceFingerprint, input.generated.contentHash, JSON.stringify(input.generated), now);
       this.db.prepare(
-        `UPDATE inventory_generation_jobs SET status = 'ready', updated_at = ?
-         WHERE project_id = ? AND canonical_uri = ? AND source_fingerprint = ? AND status IN ('pending', 'running')`,
-      ).run(Date.now(), input.projectId, input.canonicalUri, input.sourceFingerprint);
-      if (currentJob?.taskKey) this.recordGenerationLatency(currentJob.taskKey);
-      return true;
+        `UPDATE inventory_generation_jobs SET status = 'ready', error_code = NULL, error = NULL,
+            attempt_id = NULL, lease_token = NULL, lease_owner = NULL, lease_expires_at = NULL,
+            updated_at = ?, completed_at = ? WHERE task_key = ? AND status = 'running'`,
+      ).run(now, now, input.job.taskKey);
+      this.recordGenerationLatency(input.job.taskKey);
+      return "applied" as const;
     });
-    return Boolean(write());
+    return write();
   }
 
-  markGenerationFailed(input: { projectId: string; canonicalUri: string; sourceFingerprint: string; error: string }): boolean {
+  failGenerationJob(input: {
+    job: Pick<InventoryGenerationJob, "taskKey" | "generationId" | "attemptId" | "leaseToken" | "sourceFingerprint" | "projectId" | "canonicalUri">;
+    errorCode: InventoryGenerationErrorCode;
+    error: string;
+    retryable: boolean;
+    now?: number;
+    maxAttempts?: number;
+    availableAt?: number;
+  }): InventoryGenerationFailureResult {
     const write = this.db.transaction(() => {
-      const task = this.db.prepare(
-        `SELECT task_key AS taskKey FROM inventory_generation_jobs
-         WHERE project_id = ? AND canonical_uri = ? AND source_fingerprint = ?
-           AND status IN ('pending', 'running') LIMIT 1`,
-      ).get(input.projectId, input.canonicalUri, input.sourceFingerprint) as { taskKey?: string } | undefined;
-      const result = this.db.prepare(
-        `UPDATE inventory_generation_jobs SET status = 'failed', error = ?, attempts = attempts + 1, updated_at = ?
-         WHERE project_id = ? AND canonical_uri = ? AND source_fingerprint = ? AND status IN ('pending', 'running')`,
-      ).run(input.error.slice(0, 200), Date.now(), input.projectId, input.canonicalUri, input.sourceFingerprint);
-      if (result.changes > 0 && task?.taskKey) this.recordGenerationLatency(task.taskKey);
-      const generation = this.db.prepare(
-        "SELECT generation_id AS generationId FROM inventory_generations WHERE project_id = ? AND status = 'active'",
-      ).get(input.projectId) as { generationId: number } | undefined;
-      if (generation) {
-        const row = this.db.prepare(
-          "SELECT entry_json AS entryJson FROM inventory_entries WHERE generation_id = ? AND canonical_uri = ?",
-        ).get(generation.generationId, input.canonicalUri) as { entryJson: string } | undefined;
-        if (row) {
-          const entry = JSON.parse(row.entryJson) as InventoryEntry;
-          if (result.changes > 0) {
-            entry.generationState = "failed";
-            this.updateEntry(generation.generationId, input.projectId, entry);
-          }
-        }
+      const now = input.now ?? Date.now();
+      const maxAttempts = input.maxAttempts ?? INVENTORY_GENERATION_MAX_ATTEMPTS;
+      const current = this.db.prepare(
+        `SELECT status, generation_id AS generationId, source_fingerprint AS sourceFingerprint,
+            attempt_id AS attemptId, lease_token AS leaseToken, attempts
+         FROM inventory_generation_jobs WHERE task_key = ?`,
+      ).get(input.job.taskKey) as {
+        status: InventoryGenerationJobStatus;
+        generationId: number;
+        sourceFingerprint: string;
+        attemptId: string | null;
+        leaseToken: string | null;
+        attempts: number;
+      } | undefined;
+      if (!current) return "stale" as const;
+      if (current.status === "failed" || current.status === "ready" || current.status === "superseded") return "duplicate" as const;
+      if (current.status !== "running" || current.generationId !== input.job.generationId
+        || current.sourceFingerprint !== input.job.sourceFingerprint || current.attemptId !== input.job.attemptId
+        || current.leaseToken !== input.job.leaseToken) return "stale" as const;
+      if (input.retryable && current.attempts < maxAttempts) {
+        this.db.prepare(
+          `UPDATE inventory_generation_jobs SET status = 'pending', available_at = ?,
+              error_code = ?, error = ?, attempt_id = NULL, lease_token = NULL,
+              lease_owner = NULL, lease_expires_at = NULL, updated_at = ? WHERE task_key = ?`,
+        ).run(input.availableAt ?? now, input.errorCode, input.error.slice(0, 200), now, input.job.taskKey);
+        this.recordGenerationLatency(input.job.taskKey);
+        return "retry_scheduled" as const;
       }
-      return result.changes > 0;
+      this.db.prepare(
+        `UPDATE inventory_generation_jobs SET status = 'failed', error_code = ?, error = ?,
+            attempt_id = NULL, lease_token = NULL, lease_owner = NULL, lease_expires_at = NULL,
+            updated_at = ?, completed_at = ? WHERE task_key = ?`,
+      ).run(input.errorCode, input.error.slice(0, 200), now, now, input.job.taskKey);
+      this.markEntryGenerationState(input.job.generationId, input.job.projectId, input.job.canonicalUri, "failed");
+      this.recordGenerationLatency(input.job.taskKey);
+      return "failed" as const;
     });
-    return Boolean(write());
+    return write();
   }
 
-  markGenerationSuperseded(taskKey: string): boolean {
+  markGenerationSuperseded(taskKey: string, now = Date.now()): boolean {
     const result = this.db.prepare(
-      "UPDATE inventory_generation_jobs SET status = 'superseded', updated_at = ? WHERE task_key = ? AND status = 'running'",
-    ).run(Date.now(), taskKey);
+      `UPDATE inventory_generation_jobs SET status = 'superseded', attempt_id = NULL,
+          lease_token = NULL, lease_owner = NULL, lease_expires_at = NULL, updated_at = ?
+       WHERE task_key = ? AND status IN ('pending', 'running')`,
+    ).run(now, taskKey);
     if (result.changes > 0) this.recordGenerationLatency(taskKey);
     return result.changes > 0;
   }
@@ -465,8 +623,9 @@ export class SqliteInventoryCatalog {
   }
 
   integrityCheck(): boolean {
-    const row = this.db.prepare("PRAGMA quick_check").get() as { quick_check: string };
-    return row.quick_check === "ok";
+    const quick = this.db.prepare("PRAGMA quick_check").get() as { quick_check: string };
+    const full = this.db.prepare("PRAGMA integrity_check").get() as { integrity_check: string };
+    return quick.quick_check === "ok" && full.integrity_check === "ok";
   }
 
   private updateEntry(generationId: number, projectId: string, entry: InventoryEntry): void {
@@ -496,6 +655,30 @@ export class SqliteInventoryCatalog {
         (generation_id, project_id, canonical_uri, name, aliases, summary, search_text)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ).run(generationId, projectId, entry.canonicalUri, resolved.name, resolved.aliases.join(" "), resolved.summary, inventorySearchText(entry));
+  }
+
+  private markEntryGenerationState(
+    generationId: number,
+    projectId: string,
+    canonicalUri: string,
+    state: "ready" | "failed" | "pending",
+  ): void {
+    const row = this.db.prepare(
+      "SELECT entry_json AS entryJson FROM inventory_entries WHERE generation_id = ? AND project_id = ? AND canonical_uri = ?",
+    ).get(generationId, projectId, canonicalUri) as { entryJson: string } | undefined;
+    if (!row) return;
+    const entry = JSON.parse(row.entryJson) as InventoryEntry;
+    entry.generationState = state;
+    this.updateEntry(generationId, projectId, entry);
+  }
+
+  private supersedeRunningJob(taskKey: string, now: number): void {
+    const result = this.db.prepare(
+      `UPDATE inventory_generation_jobs SET status = 'superseded', attempt_id = NULL,
+          lease_token = NULL, lease_owner = NULL, lease_expires_at = NULL, updated_at = ?
+       WHERE task_key = ? AND status = 'running'`,
+    ).run(now, taskKey);
+    if (result.changes > 0) this.recordGenerationLatency(taskKey);
   }
 
   private recordQueryLatency(durationMs: number): void {
@@ -536,6 +719,18 @@ export class SqliteInventoryCatalog {
         `INSERT INTO inventory_schema_meta (id, schema_version) VALUES (1, ?)
          ON CONFLICT(id) DO UPDATE SET schema_version = excluded.schema_version`,
       ).run(PROJECT_INVENTORY_SCHEMA_VERSION);
+    }
+    const existingJobColumns = this.db.prepare("PRAGMA table_info(inventory_generation_jobs)").all() as Array<{ name: string }>;
+    const requiredJobColumns = new Set([
+      "task_key", "project_id", "workspace_id", "generation_id", "canonical_uri",
+      "source_fingerprint", "generator_version", "evidence_json", "status", "attempts",
+      "available_at", "attempt_id", "lease_token", "lease_owner", "lease_expires_at",
+      "error_code", "error", "created_at", "updated_at", "completed_at",
+    ]);
+    if (existingJobColumns.length > 0 && [...requiredJobColumns].some((column) => !existingJobColumns.some((item) => item.name === column))) {
+      // Jobs are derived and have no compatibility promise. Reconcile will
+      // recreate them from the active inventory snapshot.
+      this.db.exec("DROP TABLE IF EXISTS inventory_generation_jobs");
     }
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS inventory_generations (
@@ -594,23 +789,30 @@ export class SqliteInventoryCatalog {
       CREATE TABLE IF NOT EXISTS inventory_generation_jobs (
         task_key TEXT PRIMARY KEY,
         project_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        generation_id INTEGER NOT NULL REFERENCES inventory_generations(generation_id) ON DELETE CASCADE,
         canonical_uri TEXT NOT NULL,
         source_fingerprint TEXT NOT NULL,
         generator_version TEXT NOT NULL,
         evidence_json TEXT NOT NULL DEFAULT '[]',
         status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'ready', 'failed', 'superseded')),
         attempts INTEGER NOT NULL DEFAULT 0,
+        available_at INTEGER NOT NULL,
+        attempt_id TEXT,
+        lease_token TEXT,
+        lease_owner TEXT,
+        lease_expires_at INTEGER,
+        error_code TEXT,
         error TEXT,
         created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
+        updated_at INTEGER NOT NULL,
+        completed_at INTEGER
       );
       CREATE INDEX IF NOT EXISTS idx_inventory_jobs_project
-        ON inventory_generation_jobs(project_id, status, updated_at DESC);
+        ON inventory_generation_jobs(project_id, status, available_at, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_inventory_jobs_available
+        ON inventory_generation_jobs(status, available_at, created_at);
     `);
-    const columns = this.db.prepare("PRAGMA table_info(inventory_generation_jobs)").all() as Array<{ name: string }>;
-    if (!columns.some((column) => column.name === "evidence_json")) {
-      this.db.exec("ALTER TABLE inventory_generation_jobs ADD COLUMN evidence_json TEXT NOT NULL DEFAULT '[]'");
-    }
   }
 }
 
@@ -630,12 +832,20 @@ interface InventoryGenerationRow {
 interface InventoryJobRow {
   taskKey: string;
   projectId: string;
+  workspaceId: string;
+  generationId: number;
   canonicalUri: string;
   sourceFingerprint: string;
   generatorVersion: string;
   evidenceJson: string;
   status: InventoryGenerationJob["status"];
   attempts: number;
+  availableAt: number;
+  attemptId: string | null;
+  leaseToken: string | null;
+  leaseOwner: string | null;
+  leaseExpiresAt: number | null;
+  errorCode: InventoryGenerationErrorCode | null;
   error: string | null;
 }
 
@@ -643,12 +853,20 @@ function toGenerationJob(row: InventoryJobRow): InventoryGenerationJob {
   return {
     taskKey: row.taskKey,
     projectId: row.projectId,
+    workspaceId: row.workspaceId,
+    generationId: row.generationId,
     canonicalUri: row.canonicalUri,
     sourceFingerprint: row.sourceFingerprint,
     generatorVersion: row.generatorVersion,
     evidenceRefs: JSON.parse(row.evidenceJson) as InventoryEvidenceRef[],
     status: row.status,
     attempts: row.attempts,
+    availableAt: row.availableAt,
+    ...(row.attemptId ? { attemptId: row.attemptId } : {}),
+    ...(row.leaseToken ? { leaseToken: row.leaseToken } : {}),
+    ...(row.leaseOwner ? { leaseOwner: row.leaseOwner } : {}),
+    ...(row.leaseExpiresAt ? { leaseExpiresAt: row.leaseExpiresAt } : {}),
+    ...(row.errorCode ? { errorCode: row.errorCode } : {}),
     ...(row.error ? { error: row.error } : {}),
   };
 }

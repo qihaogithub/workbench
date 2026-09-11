@@ -21,6 +21,8 @@ function mockBackendProvidersModules(options: {
   pushResults?: Array<{ ok: boolean; message: string }>;
   agentConfig?: BackendProvidersConfig;
   healthReachable?: boolean;
+  activeSessions?: Array<{ userId: string; sessionId: string }>;
+  userConfigs?: Record<string, BackendProvidersConfig>;
 }) {
   const readDbConfigWithMeta = jest.fn(() => {
     if (options.dbConfig === null) return null;
@@ -34,6 +36,9 @@ function mockBackendProvidersModules(options: {
   for (const result of options.pushResults || [{ ok: true, message: "ok" }]) {
     pushBackendProvidersToAgent.mockResolvedValueOnce(result);
   }
+  const pushSessionModelConfigToAgent = jest
+    .fn()
+    .mockResolvedValue({ ok: true, message: "session ok" });
   const fetchBackendProvidersFromAgent = jest.fn().mockResolvedValue({
     ok: true,
     config: options.agentConfig ?? savedConfig,
@@ -44,7 +49,17 @@ function mockBackendProvidersModules(options: {
   }));
   jest.doMock("@/lib/agent-providers", () => ({
     pushBackendProvidersToAgent,
+    pushSessionModelConfigToAgent,
     fetchBackendProvidersFromAgent,
+  }));
+  jest.doMock("@/lib/session-manager", () => ({
+    listActiveSessions: jest.fn(() => options.activeSessions ?? []),
+  }));
+  jest.doMock("@/lib/user-model-config", () => ({
+    readUserBackendProvidersConfig: jest.fn(
+      (userId: string, fallback: BackendProvidersConfig) =>
+        options.userConfigs?.[userId] ?? fallback,
+    ),
   }));
   jest.doMock("@/lib/runtime-config", () => ({
     getServerAgentServiceUrl: () => "http://localhost:3201",
@@ -79,6 +94,7 @@ function mockBackendProvidersModules(options: {
   return {
     readDbConfigWithMeta,
     pushBackendProvidersToAgent,
+    pushSessionModelConfigToAgent,
     fetchBackendProvidersFromAgent,
     mockFetch,
     setHealthReachable: (v: boolean) => {
@@ -123,6 +139,44 @@ describe("backend providers sync", () => {
     });
     expect(getBackendProvidersSyncStateSnapshot().lastSuccessAt).toEqual(
       expect.any(Number),
+    );
+  });
+
+  it("refreshes active sessions with effective user configurations after global sync", async () => {
+    const userConfig: BackendProvidersConfig = {
+      providers: [
+        {
+          id: "custom",
+          name: "User Custom",
+          baseURL: "https://user.example.com/v1",
+          apiKey: "sk-user",
+          models: ["user-model"],
+          enabled: true,
+        },
+      ],
+      activeProviderId: "custom",
+    };
+    const { pushSessionModelConfigToAgent } = mockBackendProvidersModules({
+      activeSessions: [
+        { userId: "user-a", sessionId: "session-a" },
+        { userId: "user-b", sessionId: "session-b" },
+      ],
+      userConfigs: { "user-a": userConfig },
+    });
+    const { syncStoredBackendProvidersToAgent } =
+      await import("@/lib/backend-providers-sync");
+
+    const result = await syncStoredBackendProvidersToAgent("save");
+
+    expect(result.ok).toBe(true);
+    expect(pushSessionModelConfigToAgent).toHaveBeenCalledTimes(2);
+    expect(pushSessionModelConfigToAgent).toHaveBeenCalledWith(
+      "session-a",
+      userConfig,
+    );
+    expect(pushSessionModelConfigToAgent).toHaveBeenCalledWith(
+      "session-b",
+      savedConfig,
     );
   });
 

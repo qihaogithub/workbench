@@ -19,7 +19,7 @@ describe("ConversationLedgerClient", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("sends bounded context summary metadata with terminal commit", async () => {
+  it("sends bounded context summary and structured trace with terminal commit", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
       success: true,
       data: { conversationId: "c", runId: "r", status: "completed" },
@@ -34,6 +34,13 @@ describe("ConversationLedgerClient", () => {
       ownerUserId: "u",
       projectId: "p",
       status: "completed",
+      traceEvents: [{
+        occurredAt: 1,
+        source: "system",
+        eventType: "run_completed",
+        title: "Agent 运行完成",
+        status: "completed",
+      }],
       contextSummary: {
         schemaVersion: 1,
         reason: "preflight",
@@ -51,6 +58,7 @@ describe("ConversationLedgerClient", () => {
         sourceRevision: 3,
         coveredThroughSequence: 8,
       },
+      traceEvents: [expect.objectContaining({ eventType: "run_completed" })],
     });
   });
 });

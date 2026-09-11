@@ -3,7 +3,10 @@ import os from "node:os";
 import path from "node:path";
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { guardVisibilityCompletionClaim, ToolHookManager } from "../../src/backends/managers/tool-hook-manager";
+import {
+  guardVisibilityCompletionClaim,
+  ToolHookManager,
+} from "../../src/backends/managers/tool-hook-manager";
 import type { AgentConfig, AgentEvent, FileChange } from "../../src/core/types";
 
 describe("ToolHookManager", () => {
@@ -33,11 +36,13 @@ describe("ToolHookManager", () => {
       false,
     );
     expect(guarded).toContain("跨页面联动尚未完成");
-    expect(guardVisibilityCompletionClaim(
-      "跨页面可见性联动已完成。",
-      [{ path: "demos/member/index.tsx", action: "modified" }],
-      true,
-    )).toBe("跨页面可见性联动已完成。");
+    expect(
+      guardVisibilityCompletionClaim(
+        "跨页面可见性联动已完成。",
+        [{ path: "demos/member/index.tsx", action: "modified" }],
+        true,
+      ),
+    ).toBe("跨页面可见性联动已完成。");
   });
 
   describe("getFileChangesForTool", () => {
@@ -263,6 +268,89 @@ describe("ToolHookManager", () => {
       expect(manager.getMutationReceipts()).toHaveLength(1);
       manager.resetForNewMessage();
       expect(manager.getMutationReceipts()).toEqual([]);
+    });
+
+    it("应清空页面转移运行级门禁", () => {
+      expect(
+        manager.validatePageTransferCall("transferPages", {
+          mode: "reference",
+          idempotencyKey: "transfer-key",
+        }),
+      ).toBeUndefined();
+      manager.handleToolResult(
+        "transferPages",
+        { mode: "reference", idempotencyKey: "transfer-key" },
+        true,
+        { details: { error: "WORKSPACE_STALE" } },
+        "session-1",
+      );
+      expect(manager.validatePageTransferCall("createPage", {})).toMatchObject({
+        block: true,
+      });
+
+      manager.resetForNewMessage();
+      expect(
+        manager.validatePageTransferCall("createPage", {}),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("page transfer run guard", () => {
+    it("转移失败后阻止手工重建工具", () => {
+      expect(
+        manager.validatePageTransferCall("transferPages", {
+          mode: "reference",
+          idempotencyKey: "stable-key",
+        }),
+      ).toBeUndefined();
+      manager.handleToolResult(
+        "transferPages",
+        { mode: "reference", idempotencyKey: "stable-key" },
+        true,
+        { details: { error: "WORKSPACE_STALE" } },
+        "session-1",
+      );
+
+      for (const toolName of [
+        "readProjectReference",
+        "saveImage",
+        "createPage",
+        "writeFile",
+        "editFile",
+        "delegateTask",
+      ]) {
+        expect(manager.validatePageTransferCall(toolName, {})).toEqual({
+          block: true,
+          reason: expect.stringContaining("WORKSPACE_STALE"),
+        });
+      }
+    });
+
+    it("重试必须复用首次模式和幂等键", () => {
+      expect(
+        manager.validatePageTransferCall("transferPages", {
+          mode: "reference",
+          idempotencyKey: "stable-key",
+        }),
+      ).toBeUndefined();
+      expect(
+        manager.validatePageTransferCall("transferPages", {
+          mode: "reference",
+          idempotencyKey: "stable-key",
+        }),
+      ).toBeUndefined();
+      expect(
+        manager.validatePageTransferCall("transferPages", {
+          mode: "copy",
+          idempotencyKey: "stable-key",
+        }),
+      ).toMatchObject({ block: true });
+      expect(
+        manager.validatePageTransferCall("transferPages", {
+          mode: "reference",
+          idempotencyKey: "changed-key",
+        }),
+      ).toMatchObject({ block: true });
     });
   });
 

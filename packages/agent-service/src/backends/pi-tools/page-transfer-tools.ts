@@ -11,7 +11,12 @@ type ListSourcePagesParams = Static<typeof ListSourcePagesParams>;
 const TransferPagesParams = Type.Object({
   sourceProjectId: Type.String({ description: "Authorized source project ID" }),
   sourcePageIds: Type.Array(Type.String(), { description: "Source page IDs" }),
-  mode: Type.Union([Type.Literal("reference"), Type.Literal("copy")]),
+  mode: Type.Optional(
+    Type.Union([Type.Literal("reference"), Type.Literal("copy")], {
+      description:
+        "Transfer mode. Omit for the default reference mode; use copy only when the user explicitly requests an independent editable copy.",
+    }),
+  ),
   targetFolderId: Type.Optional(Type.String()),
   placement: Type.Optional(Type.Unknown()),
   idempotencyKey: Type.String({ description: "Stable retry key" }),
@@ -51,12 +56,40 @@ type TransferToolResult = {
   isError?: boolean;
 };
 
-function failure(error: string, message = error): TransferToolResult {
+function failure(
+  error: string,
+  message = error,
+  errorDetails?: unknown,
+): TransferToolResult {
   return {
     content: [{ type: "text", text: `Error: ${message}` }],
-    details: { error },
+    details: {
+      error,
+      message,
+      ...(errorDetails === undefined ? {} : { errorDetails }),
+    },
     isError: true,
   };
+}
+
+class PageTransferRequestError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly details?: unknown,
+  ) {
+    super(message);
+    this.name = "PageTransferRequestError";
+  }
+}
+
+function requestFailure(error: unknown): TransferToolResult {
+  if (error instanceof PageTransferRequestError) {
+    return failure(error.code, error.message, error.details);
+  }
+  const message =
+    error instanceof Error ? error.message : "PAGE_TRANSFER_FAILED";
+  return failure(message);
 }
 
 function authorization(
@@ -125,9 +158,14 @@ async function readResponse(
 ): Promise<{ data: any; raw: any }> {
   const raw = await response.json().catch(() => ({}));
   if (!response.ok || raw?.success === false) {
-    const error =
-      raw?.error?.code || raw?.error || `PAGE_TRANSFER_HTTP_${response.status}`;
-    throw new Error(typeof error === "string" ? error : "PAGE_TRANSFER_FAILED");
+    const rawError = raw?.error;
+    const code =
+      (typeof rawError?.code === "string" && rawError.code) ||
+      (typeof rawError === "string" && rawError) ||
+      `PAGE_TRANSFER_HTTP_${response.status}`;
+    const message =
+      (typeof rawError?.message === "string" && rawError.message) || code;
+    throw new PageTransferRequestError(code, message, rawError?.details);
   }
   return { data: raw?.data ?? raw, raw };
 }
@@ -186,9 +224,7 @@ export function createListTransferSourcePagesTool(
           details: { pages: visible },
         };
       } catch (error) {
-        return failure(
-          error instanceof Error ? error.message : "PAGE_TRANSFER_FAILED",
-        );
+        return requestFailure(error);
       }
     },
   };
@@ -201,9 +237,10 @@ export function createTransferPagesTool(
     name: "transferPages",
     label: "Transfer Pages",
     description:
-      "Prepare and, when conflict-free, execute an authorized page transfer.",
+      "Prepare and, when conflict-free, execute an authorized page transfer. Defaults to reference. Use copy only for an explicit request for a copy/independent editable duplicate; ask before calling when wording mixes copy and reference. Never recreate transferred pages with readProjectReference, saveImage, or createPage after an error.",
     parameters: TransferPagesParams,
     execute: async (_id, args) => {
+      const mode = args.mode ?? "reference";
       try {
         if (!authorization(config))
           return failure("PAGE_TRANSFER_UNAUTHORIZED");
@@ -218,7 +255,7 @@ export function createTransferPagesTool(
           {
             sourceProjectId: args.sourceProjectId,
             sourcePageIds: args.sourcePageIds,
-            mode: args.mode,
+            mode,
             ...(args.targetFolderId === undefined
               ? {}
               : { targetFolderId: args.targetFolderId }),
@@ -271,9 +308,23 @@ export function createTransferPagesTool(
           },
         };
       } catch (error) {
-        return failure(
-          error instanceof Error ? error.message : "PAGE_TRANSFER_FAILED",
-        );
+        const code =
+          error instanceof PageTransferRequestError
+            ? error.code
+            : error instanceof Error
+              ? error.message
+              : "PAGE_TRANSFER_FAILED";
+        if (mode === "reference" && code === "FORBIDDEN") {
+          const result = requestFailure(error);
+          result.content = [
+            {
+              type: "text",
+              text: "Error: FORBIDDEN：引用需要源项目编辑或管理权限。请询问用户是否明确改用复制；不得自动切换为复制或手工重建页面。",
+            },
+          ];
+          return result;
+        }
+        return requestFailure(error);
       }
     },
   };
@@ -303,9 +354,7 @@ export function createGetPageTransferStatusTool(
           details: withReceipts(data),
         };
       } catch (error) {
-        return failure(
-          error instanceof Error ? error.message : "PAGE_TRANSFER_FAILED",
-        );
+        return requestFailure(error);
       }
     },
   };
@@ -342,9 +391,7 @@ export function createResolvePageTransferConflictsTool(
           details: withReceipts(data),
         };
       } catch (error) {
-        return failure(
-          error instanceof Error ? error.message : "PAGE_TRANSFER_FAILED",
-        );
+        return requestFailure(error);
       }
     },
   };
@@ -380,9 +427,7 @@ export function createRevokePageReferenceTool(
           details: withReceipts(data),
         };
       } catch (error) {
-        return failure(
-          error instanceof Error ? error.message : "PAGE_TRANSFER_FAILED",
-        );
+        return requestFailure(error);
       }
     },
   };

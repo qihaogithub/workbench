@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createDocumentApplicationService, documentErrorResponse, resolveDocumentActor, resolveDocumentContext, assertProject } from "@/lib/document-application-service";
+import { createDocumentApplicationService, documentErrorResponse, resolveDocumentActor, resolveDocumentContext, assertProject, refreshProjectInventoryAfterDocumentMutation } from "@/lib/document-application-service";
 
 type RouteParams = { projectId: string; documentId: string };
 
@@ -33,6 +33,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body.content !== undefined && typeof body.content !== "string") return NextResponse.json({ success: false, error: { code: "DOCUMENT_INVALID", message: "content 必须是字符串" } }, { status: 400 });
     const context = await resolveDocumentContext(request, projectId, actor, body);
     const result = await createDocumentApplicationService().update({ locator: { projectId, documentId }, title: typeof body.title === "string" ? body.title : undefined, description: typeof body.description === "string" ? body.description : undefined, content: typeof body.content === "string" ? body.content : undefined, actor, ...context });
+    refreshProjectInventoryAfterDocumentMutation({ request, projectId, actorId: actor.id, context });
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
     const response = documentErrorResponse(error);
@@ -48,6 +49,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     assertProject(projectId);
     const context = await resolveDocumentContext(request, projectId, actor);
     const result = await createDocumentApplicationService().remove({ locator: { projectId, documentId }, actor, ...context });
+    refreshProjectInventoryAfterDocumentMutation({ request, projectId, actorId: actor.id, context });
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
     const response = documentErrorResponse(error);

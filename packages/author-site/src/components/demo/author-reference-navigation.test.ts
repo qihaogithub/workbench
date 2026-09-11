@@ -40,12 +40,19 @@ describe("Author 项目引用导航", () => {
       { target: { ...target, pageId: "page-b" }, displayPath: "同名字段" },
     ])).toThrow();
   });
-  it("打开隔离的新浏览器标签且不使用原生 wb 协议", () => {
-    const open = jest.spyOn(window, "open").mockImplementation(() => null);
-    openAuthorReference(projectId, destinations[0]);
-    expect(open).toHaveBeenCalledWith(buildAuthorReferenceUrl(projectId, destinations[0]), "_blank", "noopener,noreferrer");
-    open.mockRestore();
-  });
+  it.each([destinations[0], destinations[1]])(
+    "打开隔离的新浏览器标签且不使用原生 wb 协议 %#",
+    (target) => {
+      const open = jest.spyOn(window, "open").mockImplementation(() => null);
+      openAuthorReference(projectId, target);
+      expect(open).toHaveBeenCalledWith(
+        buildAuthorReferenceUrl(projectId, target),
+        "_blank",
+        "noopener,noreferrer",
+      );
+      open.mockRestore();
+    },
+  );
   it("跨项目 provider 只向源项目转发 session，并可列出授权项目", async () => {
     const fetchMock = jest.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: { candidates: [] } }) })

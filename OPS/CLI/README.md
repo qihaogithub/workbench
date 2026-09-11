@@ -9,6 +9,8 @@ cd OPS/CLI
 pnpm install
 ```
 
+运行要求 Node `>=24.0.0 <25`（仓库根目录的 `.nvmrc` 为 `24`）。CLI 通过 `node --import tsx` 启动 TypeScript，避免 `tsx` CLI 包装器创建沙箱不允许的本机 IPC 管道。
+
 ## 快速开始
 
 ### 1. 确保 Agent Service 已启动
@@ -320,7 +322,7 @@ autosave/collab/preview 三类专项查询均包含 `autosave`、`collab`、`pre
 corepack pnpm workspace-authority:status -- "project-1" "live-1" --session "session-1" --json
 
 # 或直接调用 OPS CLI
-corepack pnpm --filter @workbench/cli-tools exec tsx src/index.ts \
+corepack pnpm --filter @workbench/cli-tools exec node --import tsx src/index.ts \
   workspace-authority-status "project-1" "live-1" \
   --session "session-1" \
   --json

@@ -1,6 +1,9 @@
 import type {
   DocumentErrorCode,
+  DocumentDeleteResult,
   DocumentListItem,
+  DocumentListIssue,
+  DocumentListResult,
   DocumentLocator,
   DocumentRevisionDetail,
   DocumentRevisionSummary,
@@ -12,7 +15,10 @@ import type { ProjectAdminActor } from "../types.js";
 
 export type {
   DocumentErrorCode,
+  DocumentDeleteResult,
   DocumentListItem,
+  DocumentListIssue,
+  DocumentListResult,
   DocumentLocator,
   DocumentRevisionDetail,
   DocumentRevisionSummary,
@@ -64,12 +70,37 @@ export interface DocumentRecord extends DocumentSnapshot {
   authorityRootHash?: string;
 }
 
+export interface DocumentListRecord extends DocumentListItem {
+  storageFileName: string;
+  storageWorkspacePath: string;
+}
+
+export interface DocumentListIssueRecord extends DocumentListIssue {
+  storageFileName: string;
+  storageWorkspacePath: string;
+  source: "user";
+  readonly?: boolean;
+}
+
+export interface DocumentRepositoryListResult {
+  items: DocumentListRecord[];
+  issues: DocumentListIssueRecord[];
+}
+
+export interface DocumentRepositoryDeleteResult {
+  deleted: DocumentListRecord | DocumentListIssueRecord;
+  record?: DocumentRecord;
+  authorityRevision?: WorkspaceRevision;
+  authorityRootHash?: string;
+}
+
 export interface DocumentRepositoryPort {
-  list(projectId: string, context?: DocumentWriteContext): Promise<readonly DocumentRecord[]> | readonly DocumentRecord[];
+  list(projectId: string, context?: DocumentWriteContext): Promise<DocumentRepositoryListResult> | DocumentRepositoryListResult;
+  getMetadata(locator: DocumentLocator, context?: DocumentWriteContext): Promise<DocumentListRecord | DocumentListIssueRecord | null> | DocumentListRecord | DocumentListIssueRecord | null;
   get(locator: DocumentLocator, context?: DocumentWriteContext): Promise<DocumentRecord | null> | DocumentRecord | null;
   create(input: DocumentCreateInput): Promise<DocumentRecord> | DocumentRecord;
   update(input: DocumentUpdateInput): Promise<DocumentRecord> | DocumentRecord;
-  remove(input: DocumentDeleteInput): Promise<DocumentRecord> | DocumentRecord;
+  remove(input: DocumentDeleteInput): Promise<DocumentRepositoryDeleteResult> | DocumentRepositoryDeleteResult;
   restore(input: DocumentRestoreInput, revision: DocumentRevisionDetail): Promise<DocumentRecord> | DocumentRecord;
 }
 
@@ -103,5 +134,5 @@ export interface DocumentRevisionPort {
 export interface DocumentPolicyPort {
   canRead(actor: ProjectAdminActor, projectId: string): boolean;
   canWrite(actor: ProjectAdminActor, projectId: string): boolean;
-  canMutateDocument(actor: ProjectAdminActor, record: DocumentRecord): boolean;
+  canMutateDocument(actor: ProjectAdminActor, record: Pick<DocumentRecord, "projectId" | "source" | "readonly">): boolean;
 }

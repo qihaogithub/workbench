@@ -51,6 +51,17 @@ function authorized(
   return !(value instanceof NextResponse);
 }
 
+function requestSessionId(
+  request: NextRequest,
+  value: Record<string, unknown>,
+  internal: boolean,
+): string | undefined {
+  if (internal) {
+    return request.headers.get("x-agent-session-id") ?? undefined;
+  }
+  return typeof value.sessionId === "string" ? value.sessionId : undefined;
+}
+
 async function authorize(
   request: NextRequest,
   targetProjectId: string,
@@ -85,11 +96,15 @@ export async function prepareRoute(
     );
   }
   try {
+    const body = {
+      ...value,
+      sessionId: requestSessionId(request, value, internal),
+    } as unknown as PageTransferPrepareInput;
     return ok(
       await preparePageTransfer({
         targetProjectId,
         actor: auth.actor,
-        body: value as unknown as PageTransferPrepareInput,
+        body,
       }),
       201,
     );
@@ -122,10 +137,7 @@ export async function executeRoute(
         transferId: jobId,
         targetProjectId,
         actor: auth.actor,
-        sessionId:
-          typeof value.sessionId === "string"
-            ? value.sessionId
-            : (request.headers.get("x-agent-session-id") ?? undefined),
+        sessionId: requestSessionId(request, value, internal),
         resolutions: Array.isArray(value.resolutions)
           ? (value.resolutions as PageTransferResolution[])
           : [],

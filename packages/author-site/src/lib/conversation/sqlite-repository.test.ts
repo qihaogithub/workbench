@@ -51,7 +51,7 @@ describe("SqliteConversationRepository", () => {
     repository = new SqliteConversationRepository(path.join(directory, "replacement.db"));
   });
 
-  it("migrates a version 2 ledger to the run artifact schema", () => {
+  it("migrates a version 2 ledger through the v4 trace schema", () => {
     const databasePath = path.join(directory, "conversation.db");
     repository.close();
     const legacy = new Database(databasePath);
@@ -63,13 +63,32 @@ describe("SqliteConversationRepository", () => {
 
     repository = new SqliteConversationRepository(databasePath);
     const migrated = new Database(databasePath, { readonly: true });
-    expect(migrated.pragma("user_version", { simple: true })).toBe(3);
+    expect(migrated.pragma("user_version", { simple: true })).toBe(4);
     expect(
       migrated.prepare(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='run_artifacts'",
       ).get(),
     ).toEqual({ name: "run_artifacts" });
+    expect(
+      migrated.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='run_trace_events'",
+      ).get(),
+    ).toEqual({ name: "run_trace_events" });
     migrated.close();
+  });
+
+  it("extends active v3 data to the 30-day policy during migration", () => {
+    ensure(10_000);
+    const databasePath = path.join(directory, "conversation.db");
+    repository.close();
+    const legacy = new Database(databasePath);
+    legacy.exec(`DROP TABLE run_trace_events; PRAGMA user_version = 3;`);
+    legacy.prepare("UPDATE conversations SET expires_at=? WHERE id=?").run(20_000, "conversation-1");
+    legacy.close();
+
+    repository = new SqliteConversationRepository(databasePath);
+    expect(repository.getProjection("user-1", "conversation-1").conversation.expiresAt)
+      .toBe(10_000 + CONVERSATION_RETENTION_MS);
   });
 
   it("returns the same ACK for the same clientMessageId and never duplicates a message", () => {
@@ -665,6 +684,106 @@ describe("SqliteConversationRepository", () => {
     expect(() => repository.getProjection("user-1", "conversation-1")).toThrow(
       ConversationDomainError,
     );
+  });
+
+  it("persists only normalized trace metadata and keeps terminal replay idempotent", () => {
+    ensure();
+    const accepted = repository.appendUserMessage({
+      conversationId: "conversation-1",
+      ownerUserId: "user-1",
+      clientMessageId: "client-trace",
+      content: "inspect",
+      now: 2_000,
+    });
+    const terminal = {
+      conversationId: "conversation-1",
+      runId: accepted.runId,
+      messageId: accepted.messageId,
+      assistantMessageId: accepted.assistantMessageId,
+      ownerUserId: "user-1",
+      projectId: "project-1",
+      status: "completed" as const,
+      content: "done",
+      traceEvents: [{
+        occurredAt: 2_500,
+        source: "tool" as const,
+        eventType: "tool_finished",
+        title: "Read workspace",
+        status: "completed",
+        parameters: { token: "secret" },
+        result: "private file body",
+        metrics: { toolKind: "read", prompt: "private prompt", token: "secret" },
+        files: [
+          { path: "demos/home/page.tsx", action: "modified" as const, content: "secret" },
+          { path: "/tmp/private", action: "created" as const },
+        ],
+      }],
+      now: 3_000,
+    };
+    const first = repository.commitRunTerminal(terminal);
+    expect(repository.commitRunTerminal(terminal)).toEqual(first);
+
+    const projection = repository.getAdminProjection("conversation-1");
+    expect(projection.traceEvents).toEqual([
+      expect.objectContaining({
+        eventType: "tool_finished",
+        metrics: { toolKind: "read" },
+        files: [{ path: "demos/home/page.tsx", action: "modified" }],
+      }),
+    ]);
+    expect(JSON.stringify(projection.traceEvents)).not.toMatch(/secret|private prompt|file body/);
+  });
+
+  it("filters admin conversations with stable keyset pagination", () => {
+    ensure(1_000);
+    repository.ensureConversation({ id: "conversation-2", ownerUserId: "user-2", projectId: "project-1", now: 2_000 });
+    repository.ensureConversation({ id: "conversation-3", ownerUserId: "user-1", projectId: "project-2", now: 3_000 });
+
+    const first = repository.listAdminConversations({ from: 1_500, to: 4_000, limit: 1 });
+    expect(first.items.map((item) => item.conversation.id)).toEqual(["conversation-3"]);
+    expect(first.nextCursor).not.toBeNull();
+    const second = repository.listAdminConversations({ from: 1_500, to: 4_000, limit: 1, cursor: first.nextCursor! });
+    expect(second.items.map((item) => item.conversation.id)).toEqual(["conversation-2"]);
+    expect(repository.listAdminConversations({ projectId: "project-1", userId: "user-2" }).items)
+      .toHaveLength(1);
+  });
+
+  it("bounds oversized traces and records the dropped event count", () => {
+    ensure();
+    const accepted = repository.appendUserMessage({
+      conversationId: "conversation-1",
+      ownerUserId: "user-1",
+      clientMessageId: "client-large-trace",
+      content: "long run",
+      now: 2_000,
+    });
+    repository.commitRunTerminal({
+      conversationId: "conversation-1",
+      runId: accepted.runId,
+      messageId: accepted.messageId,
+      assistantMessageId: accepted.assistantMessageId,
+      ownerUserId: "user-1",
+      projectId: "project-1",
+      status: "completed",
+      content: "done",
+      traceEvents: Array.from({ length: 700 }, (_, index) => ({
+        occurredAt: 2_100 + index,
+        source: "model" as const,
+        eventType: "status_changed",
+        title: `status ${index}`,
+        status: "running",
+        summary: "x".repeat(500),
+      })),
+      now: 3_000,
+    });
+
+    const trace = repository.getAdminProjection("conversation-1").traceEvents;
+    expect(trace.length).toBeLessThanOrEqual(500);
+    expect(trace).toContainEqual(expect.objectContaining({
+      eventType: "trace_truncated",
+      metrics: expect.objectContaining({ droppedEvents: expect.any(Number) }),
+    }));
+    expect(Buffer.byteLength(JSON.stringify(trace), "utf8")).toBeLessThan(300 * 1024);
   });
 
   it("hard-deletes content while retaining only a durable deletion tombstone", () => {

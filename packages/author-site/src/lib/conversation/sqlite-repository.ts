@@ -15,6 +15,10 @@ import {
   isTerminalRunStatus,
   sanitizeDisplayParts,
   sanitizeDisplayPartsPayload,
+  normalizeConversationTraceEvents,
+  type AdminConversationFilter,
+  type AdminConversationListResult,
+  type AdminConversationProjection,
   type AppendUserMessageCommand,
   type CancelRunAck,
   type CommitRunTerminalCommand,
@@ -28,6 +32,7 @@ import {
   type ConversationRecord,
   type ConversationRunRecord,
   type ConversationRunArtifactRecord,
+  type ConversationTraceEventRecord,
   type MessageAcceptedAck,
   type RunStartAck,
   type RunTerminalAck,
@@ -116,6 +121,25 @@ interface RunArtifactRow {
   expires_at: number;
 }
 
+interface RunTraceEventRow {
+  id: string;
+  conversation_id: string;
+  run_id: string;
+  sequence: number;
+  occurred_at: number;
+  source: ConversationTraceEventRecord["source"];
+  event_type: string;
+  title: string;
+  status: string | null;
+  tool_name: string | null;
+  tool_call_id: string | null;
+  duration_ms: number | null;
+  error_code: string | null;
+  summary: string | null;
+  metrics_json: string;
+  files_json: string;
+}
+
 function parseObject(value: string): Record<string, unknown> {
   try {
     const parsed = JSON.parse(value) as unknown;
@@ -185,6 +209,31 @@ function mapRun(row: RunRow): ConversationRunRecord {
     usage: parseObject(row.usage_json),
     summary: parseObject(row.summary_json),
     traceId: row.trace_id,
+  };
+}
+
+function mapRunTraceEvent(row: RunTraceEventRow): ConversationTraceEventRecord {
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    runId: row.run_id,
+    sequence: row.sequence,
+    occurredAt: row.occurred_at,
+    source: row.source,
+    eventType: row.event_type,
+    title: row.title,
+    ...(row.status ? { status: row.status } : {}),
+    ...(row.tool_name ? { toolName: row.tool_name } : {}),
+    ...(row.tool_call_id ? { toolCallId: row.tool_call_id } : {}),
+    ...(row.duration_ms !== null ? { durationMs: row.duration_ms } : {}),
+    ...(row.error_code ? { errorCode: row.error_code } : {}),
+    ...(row.summary ? { summary: row.summary } : {}),
+    ...(Object.keys(parseObject(row.metrics_json)).length > 0
+      ? { metrics: parseObject(row.metrics_json) }
+      : {}),
+    ...(parseArray(row.files_json).length > 0
+      ? { files: parseArray(row.files_json) as ConversationTraceEventRecord["files"] }
+      : {}),
   };
 }
 
@@ -258,7 +307,7 @@ export class SqliteConversationRepository implements ConversationRepository {
 
   private migrate(): void {
     const version = this.db.pragma("user_version", { simple: true }) as number;
-    if (version > 3) {
+    if (version > 4) {
       throw new Error(`Unsupported conversation schema version: ${version}`);
     }
     if (version === 0) {
@@ -281,6 +330,12 @@ export class SqliteConversationRepository implements ConversationRepository {
         CREATE INDEX idx_conversations_owner_project_updated
           ON conversations(user_id, project_id, updated_at DESC);
         CREATE INDEX idx_conversations_expiry ON conversations(expires_at);
+        CREATE INDEX idx_conversations_admin_updated
+          ON conversations(updated_at DESC, id DESC);
+        CREATE INDEX idx_conversations_project_updated
+          ON conversations(project_id, updated_at DESC, id DESC);
+        CREATE INDEX idx_conversations_user_updated
+          ON conversations(user_id, updated_at DESC, id DESC);
 
         CREATE TABLE messages (
           id TEXT PRIMARY KEY,
@@ -379,7 +434,30 @@ export class SqliteConversationRepository implements ConversationRepository {
         );
         CREATE INDEX idx_run_artifacts_owner_conversation
           ON run_artifacts(owner_user_id, conversation_id, expires_at);
-        PRAGMA user_version = 3;
+        CREATE TABLE run_trace_events (
+          id TEXT PRIMARY KEY,
+          conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+          run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+          sequence INTEGER NOT NULL CHECK(sequence > 0),
+          occurred_at INTEGER NOT NULL,
+          source TEXT NOT NULL CHECK(source IN ('model','tool','subagent','system')),
+          event_type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          status TEXT,
+          tool_name TEXT,
+          tool_call_id TEXT,
+          duration_ms INTEGER,
+          error_code TEXT,
+          summary TEXT,
+          metrics_json TEXT NOT NULL DEFAULT '{}',
+          files_json TEXT NOT NULL DEFAULT '[]',
+          UNIQUE(run_id, sequence)
+        );
+        CREATE INDEX idx_run_trace_events_conversation_time
+          ON run_trace_events(conversation_id, occurred_at, sequence);
+        CREATE INDEX idx_run_trace_events_run_sequence
+          ON run_trace_events(run_id, sequence);
+        PRAGMA user_version = 4;
         COMMIT;
       `);
     }
@@ -420,6 +498,48 @@ export class SqliteConversationRepository implements ConversationRepository {
         CREATE INDEX idx_run_artifacts_owner_conversation
           ON run_artifacts(owner_user_id, conversation_id, expires_at);
         PRAGMA user_version = 3;
+        COMMIT;
+      `);
+    }
+    if (version >= 1 && version <= 3) {
+      const retentionMs = CONVERSATION_RETENTION_MS;
+      this.db.exec(`
+        BEGIN IMMEDIATE;
+        CREATE INDEX IF NOT EXISTS idx_conversations_admin_updated
+          ON conversations(updated_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS idx_conversations_project_updated
+          ON conversations(project_id, updated_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS idx_conversations_user_updated
+          ON conversations(user_id, updated_at DESC, id DESC);
+        CREATE TABLE run_trace_events (
+          id TEXT PRIMARY KEY,
+          conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+          run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+          sequence INTEGER NOT NULL CHECK(sequence > 0),
+          occurred_at INTEGER NOT NULL,
+          source TEXT NOT NULL CHECK(source IN ('model','tool','subagent','system')),
+          event_type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          status TEXT,
+          tool_name TEXT,
+          tool_call_id TEXT,
+          duration_ms INTEGER,
+          error_code TEXT,
+          summary TEXT,
+          metrics_json TEXT NOT NULL DEFAULT '{}',
+          files_json TEXT NOT NULL DEFAULT '[]',
+          UNIQUE(run_id, sequence)
+        );
+        CREATE INDEX idx_run_trace_events_conversation_time
+          ON run_trace_events(conversation_id, occurred_at, sequence);
+        CREATE INDEX idx_run_trace_events_run_sequence
+          ON run_trace_events(run_id, sequence);
+        UPDATE conversations
+          SET expires_at = MAX(expires_at, updated_at + ${retentionMs})
+          WHERE deleted_at IS NULL;
+        UPDATE run_artifacts
+          SET expires_at = MAX(expires_at, created_at + ${retentionMs});
+        PRAGMA user_version = 4;
         COMMIT;
       `);
     }
@@ -620,6 +740,87 @@ export class SqliteConversationRepository implements ConversationRepository {
       SELECT * FROM runs WHERE conversation_id = ? ORDER BY rowid ASC
     `).all(conversationId) as RunRow[]).map(mapRun);
     return { conversation, messages, runs };
+  }
+
+  listAdminConversations(filter: AdminConversationFilter): AdminConversationListResult {
+    const limit = Math.max(1, Math.min(100, Math.floor(filter.limit ?? 50)));
+    const conditions = ["c.deleted_at IS NULL"];
+    const parameters: Array<string | number> = [];
+    if (filter.projectId) {
+      conditions.push("c.project_id = ?");
+      parameters.push(filter.projectId);
+    }
+    if (filter.userId) {
+      conditions.push("c.user_id = ?");
+      parameters.push(filter.userId);
+    }
+    if (filter.from !== undefined) {
+      conditions.push("c.updated_at >= ?");
+      parameters.push(filter.from);
+    }
+    if (filter.to !== undefined) {
+      conditions.push("c.updated_at < ?");
+      parameters.push(filter.to);
+    }
+    if (filter.cursor) {
+      conditions.push("(c.updated_at < ? OR (c.updated_at = ? AND c.id < ?))");
+      parameters.push(filter.cursor.updatedAt, filter.cursor.updatedAt, filter.cursor.id);
+    }
+    const rows = this.db.prepare(`
+      SELECT c.*,
+        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.status<>'superseded') AS message_count,
+        (SELECT COUNT(*) FROM runs r WHERE r.conversation_id=c.id) AS run_count,
+        (SELECT r.status FROM runs r WHERE r.conversation_id=c.id ORDER BY rowid DESC LIMIT 1) AS last_run_status,
+        (SELECT r.model_id FROM runs r WHERE r.conversation_id=c.id ORDER BY rowid DESC LIMIT 1) AS last_model_id
+      FROM conversations c
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY c.updated_at DESC, c.id DESC
+      LIMIT ?
+    `).all(...parameters, limit + 1) as Array<ConversationRow & {
+      message_count: number;
+      run_count: number;
+      last_run_status: ConversationRunRecord["status"] | null;
+      last_model_id: string | null;
+    }>;
+    const hasMore = rows.length > limit;
+    const page = rows.slice(0, limit);
+    const last = page.at(-1);
+    return {
+      items: page.map((row) => ({
+        conversation: mapConversation(row),
+        messageCount: row.message_count,
+        runCount: row.run_count,
+        lastRunStatus: row.last_run_status,
+        lastModelId: row.last_model_id,
+      })),
+      nextCursor: hasMore && last ? { updatedAt: last.updated_at, id: last.id } : null,
+    };
+  }
+
+  getAdminProjection(conversationId: string): AdminConversationProjection {
+    const row = this.db.prepare(
+      "SELECT * FROM conversations WHERE id=? AND deleted_at IS NULL",
+    ).get(assertStableId(conversationId, "conversationId")) as ConversationRow | undefined;
+    if (!row) {
+      throw new ConversationDomainError("CONVERSATION_NOT_FOUND", "对话不存在");
+    }
+    const messages = (this.db.prepare(`
+      SELECT * FROM messages WHERE conversation_id=? AND status<>'superseded' ORDER BY sequence ASC
+    `).all(conversationId) as MessageRow[]).map(mapMessage);
+    const runs = (this.db.prepare(`
+      SELECT * FROM runs WHERE conversation_id=? ORDER BY rowid ASC
+    `).all(conversationId) as RunRow[]).map(mapRun);
+    const traceEvents = (this.db.prepare(`
+      SELECT * FROM run_trace_events WHERE conversation_id=? ORDER BY occurred_at ASC, sequence ASC
+    `).all(conversationId) as RunTraceEventRow[]).map(mapRunTraceEvent);
+    return { conversation: mapConversation(row), messages, runs, traceEvents };
+  }
+
+  listAdminProjectIds(): string[] {
+    return (this.db.prepare(`
+      SELECT DISTINCT project_id FROM conversations
+      WHERE deleted_at IS NULL ORDER BY project_id ASC
+    `).all() as Array<{ project_id: string }>).map((row) => row.project_id);
   }
 
   getRunArtifact(
@@ -948,6 +1149,7 @@ export class SqliteConversationRepository implements ConversationRepository {
         : artifactSizeBytes > MAX_RUN_ARTIFACT_BYTES
           ? [{ type: "artifact", status: "omitted", reason: "run_artifact_too_large" }]
           : sanitizeDisplayParts(command.displayParts);
+      const traceEvents = normalizeConversationTraceEvents(command.traceEvents);
       const terminalHash = stableHash({
         status: command.status,
         content: command.content ?? "",
@@ -956,6 +1158,7 @@ export class SqliteConversationRepository implements ConversationRepository {
         usage: command.usage ?? {},
         summary: command.summary ?? {},
         contextSummary: command.contextSummary ?? null,
+        ...(traceEvents.length > 0 ? { traceEvents } : {}),
       });
       if (isTerminalRunStatus(run.status)) {
         if (run.status !== command.status || run.terminal_hash !== terminalHash) {
@@ -1033,6 +1236,31 @@ export class SqliteConversationRepository implements ConversationRepository {
         revision,
         run.id,
       );
+      const insertTraceEvent = this.db.prepare(`
+        INSERT INTO run_trace_events
+          (id,conversation_id,run_id,sequence,occurred_at,source,event_type,title,status,tool_name,tool_call_id,duration_ms,error_code,summary,metrics_json,files_json)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      `);
+      traceEvents.forEach((event, index) => {
+        insertTraceEvent.run(
+          `${run.id}:trace:${index + 1}`,
+          command.conversationId,
+          run.id,
+          index + 1,
+          event.occurredAt,
+          event.source,
+          event.eventType,
+          event.title,
+          event.status ?? null,
+          event.toolName ?? null,
+          event.toolCallId ?? null,
+          event.durationMs ?? null,
+          event.errorCode ?? null,
+          event.summary ?? null,
+          JSON.stringify(event.metrics ?? {}),
+          JSON.stringify(event.files ?? []),
+        );
+      });
       this.db.prepare(`
         UPDATE conversations SET revision=?, last_sequence=?, updated_at=?, expires_at=?
         WHERE id=? AND user_id=?

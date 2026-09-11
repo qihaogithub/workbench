@@ -327,6 +327,39 @@ export function listActiveSessionsForUser(userId: string): string[] {
   return sessionIds;
 }
 
+export interface ActiveSessionRef {
+  userId: string;
+  sessionId: string;
+}
+
+/**
+ * 列出所有用户当前仍在编辑租约内的 Session。
+ *
+ * 配置变更需要刷新已有 Session，但不能只按当前管理员用户查找，
+ * 否则其他用户已打开的编辑页仍会继续使用旧的会话级配置。
+ */
+export function listActiveSessions(): ActiveSessionRef[] {
+  const sessionsDir = getSessionsDir();
+  if (!fs.existsSync(sessionsDir)) return [];
+
+  const sessions: ActiveSessionRef[] = [];
+  let userDirs: fs.Dirent[];
+  try {
+    userDirs = fs.readdirSync(sessionsDir, { withFileTypes: true });
+  } catch {
+    return sessions;
+  }
+
+  for (const userDir of userDirs) {
+    if (!userDir.isDirectory()) continue;
+    for (const sessionId of listActiveSessionsForUser(userDir.name)) {
+      sessions.push({ userId: userDir.name, sessionId });
+    }
+  }
+
+  return sessions;
+}
+
 export function rebindProjectEditingSessionsToWorkspace(
   projectId: string,
   workspaceId: string,

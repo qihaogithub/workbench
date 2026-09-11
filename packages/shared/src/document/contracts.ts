@@ -23,11 +23,35 @@ export interface DocumentSnapshot extends DocumentLocator {
   workspaceRootHash?: string;
 }
 
-/** Lightweight list response; content is omitted to keep list calls cheap. */
-export type DocumentListItem = Omit<DocumentSnapshot, "content">;
+/** Lightweight list response; content and its hash are omitted so list calls
+ * never need to read every document body. */
+export type DocumentListItem = Omit<DocumentSnapshot, "content" | "contentHash"> & {
+  sourceState: "active";
+};
+
+export interface DocumentListIssue extends DocumentLocator {
+  code: "source_missing";
+  title: string;
+  sourceState: "missing";
+  repairable: true;
+}
+
+export interface DocumentListResult {
+  items: DocumentListItem[];
+  issues: DocumentListIssue[];
+}
 
 export interface DocumentWriteResult {
   snapshot: DocumentSnapshot;
+  authority?: {
+    revision: WorkspaceRevision;
+    rootHash: string;
+  };
+  resourceVersionId?: string;
+}
+
+export interface DocumentDeleteResult {
+  deleted: DocumentListItem | DocumentListIssue;
   authority?: {
     revision: WorkspaceRevision;
     rootHash: string;

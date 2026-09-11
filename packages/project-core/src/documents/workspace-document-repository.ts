@@ -8,7 +8,11 @@ import type {
   DocumentAuthorityPort,
   DocumentCreateInput,
   DocumentDeleteInput,
+  DocumentListIssueRecord,
+  DocumentListRecord,
   DocumentRecord,
+  DocumentRepositoryDeleteResult,
+  DocumentRepositoryListResult,
   DocumentRepositoryPort,
   DocumentRestoreInput,
   DocumentRevisionDetail,
@@ -104,6 +108,39 @@ function itemToRecord(projectId: string, workspacePath: string, item: WorkspaceM
   };
 }
 
+function itemToListRecord(projectId: string, workspacePath: string, item: WorkspaceManifestItem): DocumentListRecord | DocumentListIssueRecord {
+  const storageFileName = ensureInsideKnowledge(item.fileName);
+  const filePath = path.join(workspacePath, "knowledge", storageFileName);
+  const updatedAt = item.updatedAt ?? item.addedAt ?? new Date(0).toISOString();
+  const addedAt = item.addedAt ?? updatedAt;
+  const common = {
+    projectId,
+    documentId: item.id,
+    title: item.title,
+    source: "user" as const,
+    ...(item.readonly ? { readonly: true } : {}),
+    storageFileName,
+    storageWorkspacePath: workspacePath,
+  };
+  if (!fs.existsSync(filePath)) {
+    return {
+      ...common,
+      code: "source_missing",
+      sourceState: "missing",
+      repairable: true,
+    };
+  }
+  const sizeBytes = fs.statSync(filePath).size;
+  return {
+    ...common,
+    description: item.description ?? item.title,
+    addedAt,
+    updatedAt,
+    sizeBytes,
+    sourceState: "active",
+  };
+}
+
 function projectWorkspacePath(dataDir: string, projectId: string): string {
   return path.join(dataDir, "projects", projectId, "workspace");
 }
@@ -126,12 +163,24 @@ export class WorkspaceDocumentRepository implements DocumentRepositoryPort {
     return context?.workspacePath ?? projectWorkspacePath(this.dataDir, projectId);
   }
 
-  list(projectId: string, context?: { workspacePath?: string }): readonly DocumentRecord[] {
+  list(projectId: string, context?: { workspacePath?: string }): DocumentRepositoryListResult {
     const workspacePath = this.workspacePath(projectId, context);
     const { manifest } = readManifest(workspacePath);
-    return manifest.items
+    const entries = manifest.items
       .filter((item) => item.source !== "system")
-      .map((item) => itemToRecord(projectId, workspacePath, item));
+      .map((item) => itemToListRecord(projectId, workspacePath, item));
+    return {
+      items: entries.filter((item): item is DocumentListRecord => item.sourceState === "active"),
+      issues: entries.filter((item): item is DocumentListIssueRecord => item.sourceState === "missing"),
+    };
+  }
+
+  getMetadata(locator: { projectId: string; documentId: string }, context?: { workspacePath?: string }): DocumentListRecord | DocumentListIssueRecord | null {
+    const workspacePath = this.workspacePath(locator.projectId, context);
+    const { manifest } = readManifest(workspacePath);
+    const item = manifest.items.find((entry) => entry.id === locator.documentId);
+    if (!item || item.source === "system") return null;
+    return itemToListRecord(locator.projectId, workspacePath, item);
   }
 
   get(locator: { projectId: string; documentId: string }, context?: { workspacePath?: string }): DocumentRecord | null {
@@ -184,19 +233,25 @@ export class WorkspaceDocumentRepository implements DocumentRepositoryPort {
     return { ...itemToRecord(input.locator.projectId, workspacePath, updated, content), ...(authority ? { authorityRevision: authority.revision, authorityRootHash: authority.rootHash } : {}) };
   }
 
-  async remove(input: DocumentDeleteInput): Promise<DocumentRecord> {
+  async remove(input: DocumentDeleteInput): Promise<DocumentRepositoryDeleteResult> {
     const workspacePath = this.workspacePath(input.locator.projectId, input);
     const { manifest, raw } = readManifest(workspacePath);
     const index = manifest.items.findIndex((item) => item.id === input.locator.documentId);
     if (index < 0) throw new DocumentApplicationError({ code: "DOCUMENT_NOT_FOUND", message: "文档不存在" });
     const item = manifest.items[index];
     if (item.source === "system" || item.readonly) throw new DocumentApplicationError({ code: "DOCUMENT_READONLY", message: "系统只读文档不能删除" });
-    const record = itemToRecord(input.locator.projectId, workspacePath, item);
+    const deleted = itemToListRecord(input.locator.projectId, workspacePath, item);
+    const record = deleted.sourceState === "active"
+      ? itemToRecord(input.locator.projectId, workspacePath, item)
+      : undefined;
     const next = cloneManifest(manifest);
     next.items.splice(index, 1);
-    const authority = await this.persist(input, workspacePath, ensureInsideKnowledge(item.fileName), null, raw, next, "delete_document", false);
-    if (authority) return { ...record, authorityRevision: authority.revision, authorityRootHash: authority.rootHash };
-    return record;
+    const authority = await this.persist(input, workspacePath, ensureInsideKnowledge(item.fileName), null, raw, next, "delete_document", false, deleted.sourceState === "active");
+    return {
+      deleted,
+      ...(record ? { record } : {}),
+      ...(authority ? { authorityRevision: authority.revision, authorityRootHash: authority.rootHash } : {}),
+    };
   }
 
   async restore(input: DocumentRestoreInput, revision: DocumentRevisionDetail): Promise<DocumentRecord> {
@@ -228,7 +283,7 @@ export class WorkspaceDocumentRepository implements DocumentRepositoryPort {
     return { ...itemToRecord(input.locator.projectId, workspacePath, item, revision.content), ...(authority ? { authorityRevision: authority.revision, authorityRootHash: authority.rootHash } : {}) };
   }
 
-  private async persist(input: DocumentCreateInput | DocumentUpdateInput | DocumentDeleteInput | DocumentRestoreInput, workspacePath: string, fileName: string, content: string | null, previousManifest: string | null, nextManifest: WorkspaceManifest, reason: string, expectedAbsent: boolean): Promise<{ revision: number; rootHash: string } | undefined> {
+  private async persist(input: DocumentCreateInput | DocumentUpdateInput | DocumentDeleteInput | DocumentRestoreInput, workspacePath: string, fileName: string, content: string | null, previousManifest: string | null, nextManifest: WorkspaceManifest, reason: string, expectedAbsent: boolean, sourceExists = true): Promise<{ revision: number; rootHash: string } | undefined> {
     const nextRaw = JSON.stringify(nextManifest, null, 2);
     const isLive = (() => {
       try { return JSON.parse(fs.readFileSync(path.join(workspacePath, ".workspace.json"), "utf8"))?.scope === "live"; } catch { return false; }
@@ -236,8 +291,9 @@ export class WorkspaceDocumentRepository implements DocumentRepositoryPort {
     if (isLive) {
       if (!this.authority || !input.workspaceId || !input.sessionId) throw new DocumentApplicationError({ code: "DOCUMENT_AUTHORITY_NOT_READY", message: "live Workspace 文档写入需要 Authority session" });
       const operations: WorkspaceMutationOperation[] = [];
-      if (content === null) operations.push({ type: "delete_path", path: `knowledge/${fileName}`, expectedHash: hashText(fs.readFileSync(path.join(workspacePath, "knowledge", fileName), "utf8")) });
-      else {
+      if (content === null) {
+        if (sourceExists) operations.push({ type: "delete_path", path: `knowledge/${fileName}`, expectedHash: hashText(fs.readFileSync(path.join(workspacePath, "knowledge", fileName), "utf8")) });
+      } else {
         const contentPath = path.join(workspacePath, "knowledge", fileName);
         const previousContent = !expectedAbsent && fs.existsSync(contentPath) ? fs.readFileSync(contentPath, "utf8") : undefined;
         operations.push({ type: "put_text", path: `knowledge/${fileName}`, content, ...(expectedAbsent ? { expectedAbsent: true } : previousContent === undefined ? {} : { expectedHash: hashText(previousContent) }) });
@@ -268,8 +324,11 @@ export class WorkspaceDocumentRepository implements DocumentRepositoryPort {
     }
     fs.mkdirSync(path.join(workspacePath, "knowledge"), { recursive: true });
     const target = path.join(workspacePath, "knowledge", fileName);
-    if (content === null) fs.rmSync(target, { force: true });
-    else fs.writeFileSync(target, content, "utf8");
+    if (content === null) {
+      if (sourceExists) fs.rmSync(target, { force: true });
+    } else {
+      fs.writeFileSync(target, content, "utf8");
+    }
     fs.writeFileSync(path.join(workspacePath, "knowledge", "manifest.json"), nextRaw, "utf8");
     return undefined;
   }

@@ -19,11 +19,26 @@ export interface LedgerRunTerminalAck {
   conversationId: string; runId: string; messageId: string; assistantMessageId: string;
   status: string; conversationRevision: number; assistantMessage: unknown | null;
 }
+export interface LedgerTraceEventInput {
+  occurredAt: number;
+  source: "model" | "tool" | "subagent" | "system";
+  eventType: string;
+  title: string;
+  status?: string;
+  toolName?: string;
+  toolCallId?: string;
+  durationMs?: number;
+  errorCode?: string;
+  summary?: string;
+  metrics?: Record<string, unknown>;
+  files?: Array<{ path: string; action: "created" | "modified" | "deleted" }>;
+}
 export interface LedgerTerminalInput {
   conversationId: string; runId: string; messageId: string; assistantMessageId: string;
   ownerUserId: string; projectId: string; status: "completed" | "failed" | "cancelled" | "interrupted";
   content?: string; displayParts?: unknown[]; errorCode?: string;
   usage?: Record<string, unknown>; summary?: Record<string, unknown>; traceId?: string;
+  traceEvents?: LedgerTraceEventInput[];
   contextSummary?: {
     schemaVersion: 1;
     reason: "preflight" | "overflow_recovery";

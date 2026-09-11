@@ -1336,7 +1336,7 @@ function PreviewPanelInternal({
           sendVisualEditState();
           break;
 
-        case "LOADED":
+        case "LOADED": {
           if (!isCurrentPreviewRequest || !isCurrentPreviewIdentity) return;
           reportTiming("iframe_loaded", {
             updateToLoadedMs:
@@ -1414,6 +1414,7 @@ function PreviewPanelInternal({
           // 列表对应当前 React 页面。
           sendCollectVisualNodeTree();
           break;
+        }
 
         case "COMPONENT_READY":
           if (!isCurrentPreviewRequest || !isCurrentPreviewIdentity) return;

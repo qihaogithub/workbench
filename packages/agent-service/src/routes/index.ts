@@ -11,6 +11,7 @@ import { registerAttachmentRoutes } from "./attachments";
 import { registerCommentsWsRoutes } from "./comments-ws";
 import { registerCommentAiTaskRoutes } from "./comment-ai-task";
 import { registerInternalImageGenRoutes } from "./internal-image-gen";
+import { registerInternalInventoryGenerationRoutes } from "./internal-inventory-generation";
 
 export async function registerRoutes(fastify: FastifyInstance) {
   await registerAgentRoutes(fastify);
@@ -25,4 +26,5 @@ export async function registerRoutes(fastify: FastifyInstance) {
   await registerCommentsWsRoutes(fastify);
   await registerCommentAiTaskRoutes(fastify);
   await registerInternalImageGenRoutes(fastify);
+  await registerInternalInventoryGenerationRoutes(fastify);
 }

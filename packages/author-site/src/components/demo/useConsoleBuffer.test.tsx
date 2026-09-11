@@ -30,6 +30,9 @@ describe("useConsoleBuffer", () => {
           readyState: WebSocket.OPEN,
           send,
         },
+        forwardConsoleEntries: (entries: ConsoleLogPayload[]) => {
+          send(JSON.stringify({ type: "console_data", entries }));
+        },
       } as unknown as StreamService,
     };
   }

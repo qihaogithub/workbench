@@ -38,14 +38,16 @@ Author API 只负责认证、参数校验、Session/Workspace 上下文解析、
 - `DocumentLocator`：只包含 `projectId` 和 `documentId`。
 - `DocumentSnapshot`：包含标题、描述、Markdown 正文、创建/更新时间、内容哈希、来源和 Workspace Authority 证明字段；不包含 `workingDir`、`fileName`、Token 或 Session 内部字段。
 - `DocumentListItem`：列表用的轻量快照，不带正文。
+- `DocumentListResult`：包含 `items` 与 `issues`；`items` 只含正文存在的文档，`issues` 用稳定 `source_missing` 语义报告 manifest 孤儿及可修复的文档 ID、标题。
 - `DocumentWriteResult`：返回最新快照，可附带 Authority revision/rootHash 和 ResourceVersion ID。
+- `DocumentDeleteResult`：返回被删除的正常元数据或一致性问题，并附带 Authority receipt；正文缺失的孤儿不会伪造 ResourceVersion。
 - `DocumentRevisionSummary` / `DocumentRevisionDetail`：ResourceVersion 的文档领域视图。
 
 错误码被收敛为文档不存在、禁止、只读、冲突、Authority 未就绪和版本不存在等稳定语义。底层 Workspace 错误在应用层转换后再返回，调用方不需要理解文件系统或 HTTP 状态的差异。
 
 ## 三、读写流程
 
-读取时，应用层先检查 actor 是否能访问项目，再由 repository 从 manifest 找到条目并读取 Markdown。列表只返回元数据；单文档读取才返回正文和内容哈希。
+读取时，应用层先检查 actor 是否能访问项目。列表只读取 manifest 与逐条文件 stat，不加载所有 Markdown 正文；单个正文缺失只进入 `issues`，不会使整份列表失败。单文档读取才返回正文和内容哈希，正文缺失仍返回文档不存在。
 
 创建、更新、删除和恢复都经过同一个门面：
 
@@ -55,7 +57,7 @@ Author API 只负责认证、参数校验、Session/Workspace 上下文解析、
 4. branch/offline Workspace 由 repository 写入受管目录。
 5. 成功后通过 `ResourceVersionDocumentAdapter` 记录或读取现有资源版本；版本记录失败不会改变正文已经成功的事实。
 
-删除仍保留正文快照并创建 tombstone，恢复从既有版本读取正文和元数据后重新物化。评论、`wb://` 引用、画布布局、发布快照和知识索引继续由各自领域持有。
+正常删除仍保留正文快照并创建 tombstone，恢复从既有版本读取正文和元数据后重新物化。对于只剩 manifest 的孤儿，删除只通过 Authority 原子移除 manifest 条目并返回 receipt，不因无法读取旧正文而阻塞修复。评论、`wb://` 引用、画布布局、发布快照和知识索引继续由各自领域持有。
 
 ## 四、项目子资源 API
 
@@ -63,11 +65,11 @@ Author API 只负责认证、参数校验、Session/Workspace 上下文解析、
 
 | 方法 | 路径 | 作用 |
 | --- | --- | --- |
-| GET | `/api/projects/:projectId/documents` | 列出用户文档元数据 |
+| GET | `/api/projects/:projectId/documents` | 返回 `{ items, issues }`，分离有效元数据与一致性异常 |
 | POST | `/api/projects/:projectId/documents` | 创建文档 |
 | GET | `/api/projects/:projectId/documents/:documentId` | 读取正文与元数据 |
 | PATCH | `/api/projects/:projectId/documents/:documentId` | 更新标题、描述或正文 |
-| DELETE | `/api/projects/:projectId/documents/:documentId` | 删除并写入 tombstone |
+| DELETE | `/api/projects/:projectId/documents/:documentId` | 删除正常文档或 manifest 孤儿；正常文档写入 tombstone |
 | GET | `/api/projects/:projectId/documents/:documentId/revisions` | 列出 ResourceVersion 视图 |
 | GET | `/api/projects/:projectId/documents/:documentId/revisions/:revisionId` | 读取指定版本 |
 | POST | `/api/projects/:projectId/documents/:documentId/restore` | 恢复指定版本 |

@@ -27,6 +27,9 @@ export interface ProjectInventoryContext {
   snapshot: InventorySnapshot;
   generationRequests: InventoryBuildResult["generationRequests"];
   source: "derived" | "workspace";
+  projectionState: "ready" | "stale" | "unavailable";
+  generationActivity: "active" | "idle" | "failed" | "unavailable";
+  reconcileRequired: boolean;
 }
 
 export function buildWorkspaceInventory(
@@ -128,23 +131,43 @@ export async function getProjectInventory(
   context: MarkdownReferenceWorkspaceContext,
 ): Promise<ProjectInventoryContext> {
   try {
-    const snapshot = await knowledgeService.getInventorySnapshot(context.projectId);
-    if (snapshot && snapshot.freshness !== "unavailable") {
-      return { snapshot, generationRequests: [], source: "derived" };
+    const state = await knowledgeService.getInventorySnapshotState(context.projectId);
+    const snapshot = state.snapshot;
+    const matchesAuthority = snapshot
+      && context.observedRevision !== undefined
+      && context.observedRootHash !== undefined
+      && snapshot.workspaceRevision === context.observedRevision
+      && snapshot.workspaceRootHash === context.observedRootHash;
+    if (snapshot && snapshot.freshness !== "unavailable" && matchesAuthority) {
+      return {
+        snapshot,
+        generationRequests: [],
+        source: "derived",
+        projectionState: "ready",
+        generationActivity: state.generationActivity,
+        reconcileRequired: false,
+      };
     }
+    const built = buildWorkspaceInventory(context);
+    return {
+      snapshot: built.snapshot,
+      generationRequests: built.generationRequests,
+      source: "workspace",
+      projectionState: "stale",
+      generationActivity: "idle",
+      reconcileRequired: true,
+    };
   } catch {
-    // Fall through to the query endpoint and finally the local directory.
+    const built = buildWorkspaceInventory(context);
+    return {
+      snapshot: built.snapshot,
+      generationRequests: built.generationRequests,
+      source: "workspace",
+      projectionState: "unavailable",
+      generationActivity: "unavailable",
+      reconcileRequired: true,
+    };
   }
-  try {
-    const current = await knowledgeService.getInventory(context.projectId, 100);
-    if (current.freshness !== "unavailable") {
-      return { snapshot: queryResultToSnapshot(context, current), generationRequests: [], source: "derived" };
-    }
-  } catch {
-    // Fall through to a bounded deterministic workspace directory.
-  }
-  const built = buildWorkspaceInventory(context);
-  return { snapshot: built.snapshot, generationRequests: built.generationRequests, source: "workspace" };
 }
 
 export async function reconcileProjectInventory(
@@ -168,27 +191,14 @@ export async function reconcileProjectInventory(
     throw new Error("INVENTORY_STALE");
   }
   const { generationId } = await knowledgeService.publishInventory(built.snapshot);
-  const queued = await knowledgeService.createInventoryJobs(context.projectId, built.generationRequests, built.snapshot.generatorVersion);
-  return { snapshot: built.snapshot, generationId, queued };
-}
-
-function queryResultToSnapshot(
-  context: MarkdownReferenceWorkspaceContext,
-  result: Awaited<ReturnType<KnowledgeServiceClient["getInventory"]>>,
-): InventorySnapshot {
-  return {
-    schemaVersion: PROJECT_INVENTORY_SCHEMA_VERSION,
+  const queued = await knowledgeService.createInventoryJobs({
     projectId: context.projectId,
-    workspaceRevision: context.observedRevision ?? null,
-    workspaceRootHash: context.observedRootHash ?? null,
-    catalogFingerprint: "derived",
-    overlayHash: "derived",
-    projectionFingerprint: "derived",
-    generatorVersion: PROJECT_INVENTORY_GENERATOR_VERSION,
-    builtAt: new Date().toISOString(),
-    freshness: result.freshness,
-    entries: result.entries.map(({ resolved: _resolved, matchedBy: _matchedBy, targetAvailability: _targetAvailability, ...entry }) => entry),
-  };
+    workspaceId: context.workspaceId,
+    generationId,
+    requests: built.generationRequests,
+    generatorVersion: built.snapshot.generatorVersion,
+  });
+  return { snapshot: built.snapshot, generationId, queued };
 }
 
 function readOverrides(workspacePath: string): InventoryOverridesFile | null {

@@ -3,7 +3,9 @@ import type {
   KnowledgeSource,
 } from "./sqlite-catalog.js";
 import { getLocalhostUrl } from "@workbench/runtime-config/topology";
-import { PROJECT_INVENTORY_GENERATOR_VERSION, type InventoryQuery, type InventoryQueryResult, type InventorySnapshot } from "@workbench/shared";
+import type { InventoryQuery, InventoryQueryResult, InventorySnapshot } from "@workbench/shared";
+import { PROJECT_INVENTORY_GENERATOR_VERSION } from "./shared-runtime.js";
+import type { InventoryGenerationActivity } from "./inventory-catalog.js";
 
 export type { KnowledgeSearchHit, KnowledgeSource } from "./sqlite-catalog.js";
 
@@ -85,10 +87,27 @@ export class KnowledgeServiceClient {
   }
 
   async getInventorySnapshot(projectId: string): Promise<InventorySnapshot | null> {
+    return (await this.getInventorySnapshotState(projectId)).snapshot;
+  }
+
+  async getInventorySnapshotState(projectId: string): Promise<{
+    snapshot: InventorySnapshot | null;
+    generationActivity: InventoryGenerationActivity;
+  }> {
     const response = await this.request(`/api/inventory/snapshot?projectId=${encodeURIComponent(projectId)}`, { method: "GET" });
-    if (response.status === 404) return null;
-    const payload = await response.json() as { success?: boolean; data?: InventorySnapshot };
-    return payload.success && payload.data ? payload.data : null;
+    if (response.status === 404) return { snapshot: null, generationActivity: "idle" };
+    const payload = await response.json() as {
+      success?: boolean;
+      data?: { snapshot?: InventorySnapshot; generationActivity?: InventoryGenerationActivity } | InventorySnapshot;
+    };
+    if (!payload.success || !payload.data) return { snapshot: null, generationActivity: "idle" };
+    if ("snapshot" in payload.data) {
+      return {
+        snapshot: payload.data.snapshot ?? null,
+        generationActivity: payload.data.generationActivity ?? "idle",
+      };
+    }
+    return { snapshot: payload.data as InventorySnapshot, generationActivity: "idle" };
   }
 
   async publishInventory(snapshot: InventorySnapshot): Promise<{ generationId: number }> {
@@ -103,10 +122,18 @@ export class KnowledgeServiceClient {
     return { generationId: payload.data.generationId };
   }
 
-  async createInventoryJobs(projectId: string, requests: unknown[], generatorVersion: string = PROJECT_INVENTORY_GENERATOR_VERSION): Promise<number> {
+  async createInventoryJobs(
+    input: {
+      projectId: string;
+      workspaceId: string;
+      generationId: number;
+      requests: unknown[];
+      generatorVersion?: string;
+    },
+  ): Promise<number> {
     const response = await this.request("/api/inventory/jobs", {
       method: "POST",
-      body: JSON.stringify({ projectId, requests, generatorVersion }),
+      body: JSON.stringify({ ...input, generatorVersion: input.generatorVersion ?? PROJECT_INVENTORY_GENERATOR_VERSION }),
     });
     const payload = (await response.json()) as { success?: boolean; data?: { inserted?: number } };
     return payload.success && typeof payload.data?.inserted === "number" ? payload.data.inserted : 0;

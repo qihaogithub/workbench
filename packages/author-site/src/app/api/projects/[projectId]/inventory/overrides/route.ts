@@ -28,12 +28,12 @@ function error(code: string, message: string, status: number): NextResponse {
   return json(createApiError(code as never, message), status);
 }
 
-async function contextFor(request: NextRequest, projectId: string) {
+async function contextFor(request: NextRequest, projectId: string, mode: "read" | "write" = "read") {
   const user = await getCurrentUserFromRequest(request);
   if (!user) return { response: error("UNAUTHORIZED", "未登录", 401) } as const;
   const actor = toProjectAdminActor(user);
   if (!getProjectAdminService().getProject(projectId, actor).ok) return { response: error("FORBIDDEN", "无权访问项目清单", 403) } as const;
-  if (user.role !== "admin" && user.role !== "editor") return { response: error("FORBIDDEN", "无权编辑项目清单", 403) } as const;
+  if (mode === "write" && user.role !== "admin" && user.role !== "editor") return { response: error("FORBIDDEN", "无权编辑项目清单", 403) } as const;
   const context = resolveMarkdownReferenceWorkspace(request, projectId, user.id);
   if (!context) return { response: error("FILE_READ_ERROR", "项目工作空间不可用", 404) } as const;
   const workspaceId = context.workspaceId;
@@ -74,12 +74,17 @@ export async function GET(
   { params }: { params: Promise<{ projectId: string }> },
 ) {
   const { projectId } = await params;
-  const resolved = await contextFor(request, projectId);
+  const resolved = await contextFor(request, projectId, "read");
   if ("response" in resolved) return resolved.response;
   try {
     const resource = await currentResource({ projectId, workspaceId: resolved.workspaceId, sessionId: resolved.sessionId });
     const overrides = resource ? parseOverridesContent(resource.content) : emptyOverrides();
-    const inventory = await getProjectInventory(resolved.context);
+    const authorityState = await getWorkspaceAuthorityState({ projectId, workspaceId: resolved.workspaceId, sessionId: resolved.sessionId });
+    const inventory = await getProjectInventory({
+      ...resolved.context,
+      observedRevision: authorityState.revision,
+      observedRootHash: authorityState.rootHash,
+    });
     const service = getProjectAdminService();
     const entries = projectInventoryEntries(inventory.snapshot, true).map((entry) => {
       if (entry.scope === "local") return { ...entry, targetAvailability: "available" as const };
@@ -99,7 +104,22 @@ export async function GET(
       return target?.projectId === projectId;
     });
     const visibleOverrides: InventoryOverridesFile = { schemaVersion: PROJECT_INVENTORY_SCHEMA_VERSION, entries: visibleOverrideEntries };
-    return json(createApiSuccess({ overrides: visibleOverrides, entries, orphanEntries, freshness: inventory.snapshot.freshness, hash: resource?.hash ?? null, revision: resource?.revision ?? null }));
+    return json(createApiSuccess({
+      overrides: visibleOverrides,
+      entries,
+      orphanEntries,
+      freshness: inventory.snapshot.freshness,
+      projectionSource: inventory.source,
+      projectionState: inventory.projectionState,
+      generationActivity: inventory.generationActivity,
+      reconcileRequired: inventory.reconcileRequired,
+      currentRevision: authorityState.revision,
+      currentRootHash: authorityState.rootHash,
+      snapshotRevision: inventory.snapshot.workspaceRevision,
+      snapshotRootHash: inventory.snapshot.workspaceRootHash,
+      hash: resource?.hash ?? null,
+      revision: resource?.revision ?? null,
+    }));
   } catch (cause) {
     if (cause instanceof InventoryOverridesError) return error("VALIDATION_ERROR", "清单覆盖文件无效", 409);
     if (cause instanceof WorkspaceAuthorityClientError) return error(cause.code, cause.message, cause.status);
@@ -112,7 +132,7 @@ export async function PUT(
   { params }: { params: Promise<{ projectId: string }> },
 ) {
   const { projectId } = await params;
-  const resolved = await contextFor(request, projectId);
+  const resolved = await contextFor(request, projectId, "write");
   if ("response" in resolved) return resolved.response;
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (declaredLength > 256 * 1024) return error("INVALID_REQUEST", "请求体过大", 400);

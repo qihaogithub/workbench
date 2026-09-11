@@ -28,13 +28,70 @@ describe("DocumentApplicationService", () => {
       expect(created.snapshot).not.toHaveProperty("storageFileName");
       expect(created.snapshot).not.toHaveProperty("fileName");
       const listed = await app.list("p1", actor);
-      expect(listed).toHaveLength(1);
-      expect(listed[0]).not.toHaveProperty("content");
+      expect(listed.items).toHaveLength(1);
+      expect(listed.items[0]).not.toHaveProperty("content");
+      expect(listed.issues).toEqual([]);
       const updated = await app.update({ locator: { projectId: "p1", documentId: created.snapshot.documentId }, content: "# Updated", actor });
       expect(updated.snapshot.content).toBe("# Updated");
       expect(fs.readFileSync(path.join(workspace, "knowledge", "Rules.md"), "utf8")).toBe("# Updated");
       await app.remove({ locator: { projectId: "p1", documentId: created.snapshot.documentId }, actor });
       await expect(app.get({ projectId: "p1", documentId: created.snapshot.documentId }, actor)).rejects.toMatchObject({ code: "DOCUMENT_NOT_FOUND" });
+    } finally {
+      fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it("lists healthy documents when another manifest entry has no source file", async () => {
+    const { dataDir, workspace } = makeWorkspace();
+    try {
+      fs.writeFileSync(path.join(workspace, "knowledge", "healthy.md"), "# Healthy");
+      fs.writeFileSync(path.join(workspace, "knowledge", "manifest.json"), JSON.stringify({
+        version: 1,
+        items: [
+          { id: "missing", title: "Missing", source: "user", fileName: "missing.md" },
+          { id: "healthy", title: "Healthy", source: "user", fileName: "healthy.md" },
+        ],
+      }));
+      const app = new DocumentApplicationService(new WorkspaceDocumentRepository({ dataDir }));
+
+      const listed = await app.list("p1", actor);
+
+      expect(listed.items).toEqual([expect.objectContaining({ documentId: "healthy", title: "Healthy" })]);
+      expect(listed.issues).toEqual([expect.objectContaining({ code: "source_missing", documentId: "missing", title: "Missing", repairable: true })]);
+      await expect(app.get({ projectId: "p1", documentId: "missing" }, actor)).rejects.toMatchObject({ code: "DOCUMENT_NOT_FOUND" });
+    } finally {
+      fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it("removes a manifest-only orphan through the Authority without inventing source content", async () => {
+    const { dataDir, workspace } = makeWorkspace("live");
+    const commits: Array<{ operations: Array<{ type: string; path: string }> }> = [];
+    try {
+      fs.writeFileSync(path.join(workspace, "knowledge", "manifest.json"), JSON.stringify({
+        version: 1,
+        items: [{ id: "missing", title: "Missing", source: "user", fileName: "missing.md" }],
+      }));
+      const app = new DocumentApplicationService(new WorkspaceDocumentRepository({
+        dataDir,
+        authority: {
+          async commit(input) {
+            commits.push(input as typeof commits[number]);
+            return { revision: 2, rootHash: "root-2" };
+          },
+        },
+      }));
+
+      const deleted = await app.remove({
+        locator: { projectId: "p1", documentId: "missing" },
+        actor,
+        workspaceId: "w1",
+        sessionId: "s1",
+      });
+
+      expect(deleted.deleted).toMatchObject({ documentId: "missing", title: "Missing", sourceState: "missing" });
+      expect(deleted.authority).toEqual({ revision: 2, rootHash: "root-2" });
+      expect(commits[0]?.operations).toEqual([expect.objectContaining({ type: "put_text", path: "knowledge/manifest.json" })]);
     } finally {
       fs.rmSync(dataDir, { recursive: true, force: true });
     }

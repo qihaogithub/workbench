@@ -5,19 +5,13 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
-const valuesPaths = [
-  path.join(
-    testDirectory,
-    "../../../data/workspaces/projects/proj_1785135808250_r4cb4a/live-1785205322879-latagwnoh/demos/闯关活动页-进行中_ec853d/config.values.json",
-  ),
-  path.join(
-    testDirectory,
-    "../../../data/projects/proj_1785135808250_r4cb4a/workspace/demos/闯关活动页-进行中_ec853d/config.values.json",
-  ),
-];
+const valuesPath = path.join(
+  testDirectory,
+  "../test-fixtures/level-config-values.json",
+);
 
 describe("闯关活动页关卡图配置值", () => {
-  it.each(valuesPaths)("%s 使用 position 保存关卡坐标，不再写入顶层 x/y", (valuesPath) => {
+  it("使用 position 保存关卡坐标，不再写入顶层 x/y", () => {
     const values = JSON.parse(fs.readFileSync(valuesPath, "utf8")) as {
       modules?: Array<{ type?: string; levels?: Array<Record<string, unknown>> }>;
     };

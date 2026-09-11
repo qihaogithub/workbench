@@ -803,6 +803,7 @@ export async function registerWebSocketRoutes(
                       summary: result.success
                         ? undefined
                         : { message: result.error?.message },
+                      traceEvents: eventRouter.getLedgerTraceEvents(),
                       contextSummary: terminalContextSummary,
                     })
                   : null;

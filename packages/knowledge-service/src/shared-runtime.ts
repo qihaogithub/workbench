@@ -27,6 +27,8 @@ export const {
   isInventorySnapshot,
   normalizeInventoryHuman,
   resolveInventorySemantic,
+  INVENTORY_GENERATION_LEASE_MS,
+  INVENTORY_GENERATION_MAX_ATTEMPTS,
   PROJECT_INVENTORY_GENERATOR_VERSION,
   PROJECT_INVENTORY_SCHEMA_VERSION,
 } = shared;

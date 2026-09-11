@@ -3,6 +3,9 @@ import type {
   CancelRunAck,
   CommitRunTerminalCommand,
   ConversationDeletionScope,
+  AdminConversationFilter,
+  AdminConversationListResult,
+  AdminConversationProjection,
   ConversationProjection,
   ConversationReliabilitySnapshot,
   ConversationRecord,
@@ -36,6 +39,9 @@ export interface ConversationRepository {
   ensureConversation(input: EnsureConversationInput): ConversationRecord;
   listConversations(ownerUserId: string, projectId: string): ConversationRecord[];
   getProjection(ownerUserId: string, conversationId: string): ConversationProjection;
+  listAdminConversations(filter: AdminConversationFilter): AdminConversationListResult;
+  getAdminProjection(conversationId: string): AdminConversationProjection;
+  listAdminProjectIds(): string[];
   getRunArtifact(
     ownerUserId: string,
     conversationId: string,
