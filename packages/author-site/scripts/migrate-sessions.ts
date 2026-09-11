@@ -12,20 +12,10 @@
 
 import fs from 'fs';
 import path from 'path';
-
-function findProjectRoot(cwd: string): string {
-  let current = path.resolve(cwd);
-  while (current !== path.dirname(current)) {
-    if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
-      return current;
-    }
-    current = path.dirname(current);
-  }
-  return cwd;
-}
+import { resolveDataDir } from '@workbench/runtime-config/paths';
 
 const SESSIONS_DIR = process.env.SESSIONS_DIR || path.join(
-  process.env.DATA_DIR || path.join(findProjectRoot(process.cwd()), 'data'),
+  resolveDataDir(),
   'sessions'
 );
 

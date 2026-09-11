@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getImageInfo } from '@/lib/image-store';
+import { getDataDir } from '@/lib/paths';
 import type { ImageReference } from './types';
 
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -34,21 +35,6 @@ function isApiImagePath(p: string): boolean {
 
 function isSessionAssetPath(p: string): boolean {
   return SESSION_ASSET_RE.test(p) && IMAGE_EXTENSIONS.test(stripUrlSuffix(p));
-}
-
-function getDataDir(): string {
-  return process.env.DATA_DIR
-    ? path.resolve(process.env.DATA_DIR)
-    : (() => {
-        let current = path.resolve(process.cwd());
-        while (current !== path.dirname(current)) {
-          if (fs.existsSync(path.join(current, 'pnpm-workspace.yaml'))) {
-            return path.join(current, 'data');
-          }
-          current = path.dirname(current);
-        }
-        return path.join(process.cwd(), 'data');
-      })();
 }
 
 function resolvePath(relativePath: string, sourceFile: string): string {

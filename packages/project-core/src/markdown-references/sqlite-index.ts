@@ -4,6 +4,7 @@ import Database from "better-sqlite3";
 
 import { encodeMarkdownReferenceUri, MARKDOWN_REFERENCE_INDEX_VERSION } from "@workbench/shared/markdown-reference";
 
+import { getProjectAdminDataDir } from "../config.js";
 import { InMemoryMarkdownReferenceIndex, type MarkdownReferenceIndexScope, type RebuildMarkdownReferenceIndexInput } from "./link-index.js";
 import type {
   MarkdownIndexStatus,
@@ -291,7 +292,7 @@ CREATE INDEX IF NOT EXISTS markdown_index_records_target ON markdown_index_recor
 `;
 
 function defaultDataDir(): string {
-  return process.env.DATA_DIR ?? path.join(process.cwd(), "data");
+  return getProjectAdminDataDir();
 }
 
 function buildMemorySnapshot(input: RebuildMarkdownReferenceIndexInput): MarkdownLinkIndexSnapshot {
