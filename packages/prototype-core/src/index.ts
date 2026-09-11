@@ -1,5 +1,8 @@
 import { parseFragment } from "parse5";
 
+export const MAX_PROTOTYPE_HTML_LENGTH = 2_000_000;
+export const MAX_PROTOTYPE_CSS_LENGTH = 120_000;
+
 interface Location {
   startOffset: number;
   endOffset: number;

@@ -1,5 +1,7 @@
 import { defineConfig } from "vitest/config";
+import { workbenchVitestNode } from "../../vitest.node";
 
 export default defineConfig({
-  test: { include: ["tests/**/*.test.ts"] },
+  ...workbenchVitestNode,
+  test: { ...workbenchVitestNode.test, include: ["tests/**/*.test.ts"] },
 });

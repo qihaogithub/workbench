@@ -2,7 +2,6 @@ import { createHash } from 'crypto';
 import { compilePreviewPageSource } from '@workbench/preview-contract/compiler';
 import {
   extractImports as extractPreviewImports,
-  isNpmPackage,
   rewriteImportsWithResolver,
 } from '@workbench/preview-contract/runtime';
 import {
@@ -11,7 +10,6 @@ import {
   getWorkspaceDemoPageFiles,
 } from './fs-utils';
 import {
-  PREVIEW_DEPENDENCY_POLICY,
   PREVIEW_DEPENDENCY_POLICY_VERSION,
   getPreviewDependencyUrl,
 } from './preview-dependency-policy';
@@ -43,13 +41,6 @@ function getCodeHash(code: string): string {
  */
 export function extractImports(code: string): string[] {
   return extractPreviewImports(code);
-}
-
-/**
- * 判断一个 import 是否是 CSS 导入
- */
-function isCssImport(moduleName: string): boolean {
-  return moduleName.endsWith('.css') || moduleName.endsWith('.scss') || moduleName.endsWith('.less');
 }
 
 /**
@@ -113,45 +104,8 @@ export function compileCode(
 }
 
 /**
- * 异步解析 npm 包在 esm.sh 上的实际版本 URL
- * 通过 HEAD 请求获取重定向后的 URL
- */
-export async function resolveDependencyVersion(
-  packageName: string,
-): Promise<string | null> {
-  if (!isNpmPackage(packageName) || isCssImport(packageName)) {
-    return null;
-  }
-
-  // 预览依赖策略已有固定版本，不需要通过 CDN 重定向解析。
-  if (PREVIEW_DEPENDENCY_POLICY[packageName]) {
-    return null;
-  }
-
-  return null;
-}
-
-/**
- * 批量解析依赖版本并返回锁定映射
- */
-export async function resolveDependencyVersions(
-  dependencies: string[],
-): Promise<Record<string, string>> {
-  const locks: Record<string, string> = {};
-
-  for (const dep of dependencies) {
-    const resolved = await resolveDependencyVersion(dep);
-    if (resolved) {
-      locks[dep] = resolved;
-    }
-  }
-
-  return locks;
-}
-
-/**
  * 从 Session/Workspace 读取代码并编译
- * 自动读取关联项目的依赖版本锁定
+ * 依赖统一由 Preview Dependency Policy 解析。
  * @param sessionId Session ID
  * @param demoId 多页面模式下必填，指定要编译的页面
  */

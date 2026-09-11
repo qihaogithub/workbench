@@ -172,9 +172,11 @@ export interface WhiteboardBinding {
 }
 
 export const WHITEBOARD_DOCUMENT_MAX_BYTES = 2 * 1024 * 1024;
-export const WHITEBOARD_DOCUMENT_VERSION = 3 as const;
-export const WHITEBOARD_DOCUMENT_V2_VERSION = 2 as const;
-export const WHITEBOARD_DOCUMENT_V3_VERSION = 3 as const;
+export {
+  WHITEBOARD_DOCUMENT_VERSION,
+  WHITEBOARD_DOCUMENT_V2_VERSION,
+  WHITEBOARD_DOCUMENT_V3_VERSION,
+} from "@workbench/whiteboard-core";
 export const WHITEBOARD_SCENE_FORMAT = "sketch-scene-v1" as const;
 export const WHITEBOARD_BRIDGE_NODE_TYPES = ["group", "rect", "ellipse", "image", "text", "button"] as const;
 

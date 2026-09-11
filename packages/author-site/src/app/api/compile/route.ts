@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
-import { createApiSuccess, createApiError, readProjectMeta, writeProjectMeta, getSessionMeta } from '@/lib/fs-utils';
-import { compileCode, compileSession, resolveDependencyVersions } from '@/lib/compiler';
+import { createApiSuccess, createApiError, getSessionMeta } from '@/lib/fs-utils';
+import { compileCode, compileSession } from '@/lib/compiler';
 import { PreviewRuntimeContractError } from '@/lib/preview-dependency-policy';
 import { registerPreviewModule } from '@/lib/preview-module-store';
 import { shouldUsePreviewRuntimeCdn } from '@/lib/preview-runtime-manifest';
@@ -33,22 +33,17 @@ export async function POST(request: NextRequest) {
     if (code && typeof code === 'string') {
       requestKind = 'inline-code';
       codeLength = code.length;
-      let lockedDependencies: Record<string, string> | undefined;
       if (sessionId && typeof sessionId === 'string') {
         try {
           const sessionMeta = getSessionMeta(sessionId);
           if (sessionMeta?.demoId) {
             projectId = sessionMeta.demoId;
-            const project = readProjectMeta(projectId);
-            if (project?.lockedDependencies) {
-              lockedDependencies = project.lockedDependencies;
-            }
           }
         } catch {
           // 忽略元数据读取错误
         }
       }
-      result = compileCode(code, lockedDependencies, runtimeOptions);
+      result = compileCode(code, undefined, runtimeOptions);
     } else if (sessionId) {
       requestKind = 'session';
       if (typeof sessionId !== 'string') {
@@ -108,32 +103,6 @@ export async function POST(request: NextRequest) {
       ...result,
       moduleUrl: `/api/preview-modules/${result.moduleHash}.js`,
     };
-
-    // 异步解析并锁定依赖版本（不阻塞响应）
-    if (projectId && result.dependencies.length > 0) {
-      const project = readProjectMeta(projectId);
-      if (project) {
-        // 筛选出尚未锁定的 npm 依赖
-        const existingLocks = project.lockedDependencies || {};
-        const unresolvedDeps = result.dependencies.filter((dep) => {
-          if (dep.startsWith('.') || dep.startsWith('/')) return false;
-          if (dep.endsWith('.css') || dep.endsWith('.scss') || dep.endsWith('.less')) return false;
-          return !existingLocks[dep];
-        });
-
-        if (unresolvedDeps.length > 0) {
-          // 后台解析版本并保存（不 await，不阻塞响应）
-          resolveDependencyVersions(unresolvedDeps).then((newLocks) => {
-            if (Object.keys(newLocks).length > 0) {
-              project.lockedDependencies = { ...existingLocks, ...newLocks };
-              writeProjectMeta(projectId, project);
-            }
-          }).catch((err) => {
-            console.error('[compile] 依赖版本锁定失败:', err);
-          });
-        }
-      }
-    }
 
     console.info('[PreviewRuntime][compile-api]', {
       requestKind,
